@@ -1,0 +1,130 @@
+# Culinary Logic Puzzle Game - Updates Log
+
+This document tracks the changes and improvements made to the Culinary Logic Puzzle game.
+
+## Update History
+
+### Project Structure Cleanup (March 2025)
+**Request:** Organize the project structure and remove unnecessary files.
+**Solution:** 
+- Removed unnecessary files (complex index.html, old.js)
+- Created proper directory structure (js/, css/, assets/)
+- Added documentation (README.md)
+- Improved organization by moving files to appropriate directories
+
+### Supabase Integration (March 2025)
+**Request:** Replace the hardcoded Chicken Parm puzzle with data from Supabase.
+**Solution:**
+- Created supabase.js for database connectivity
+- Implemented functions to fetch recipe data based on current date
+- Added error handling for data loading
+- Created a test-api.html file for debugging database connections
+
+### Data Processing Fixes (March 2025)
+**Request:** Fix issues with the game not loading recipe data correctly.
+**Solution:**
+- Updated the fetchTodayRecipe function to work with older Supabase client versions
+- Enhanced the processRecipeData function to better handle data formatting
+- Added detailed logging for troubleshooting
+- Fixed compatibility issues with the Supabase client
+
+### Vessel Completion Logic Fix (March 5, 2025 - 11:30 AM)
+**Request:** Fix issue where vessels weren't turning green when they should.
+**Solution:**
+- Fixed the logic in combineVessels function to correctly determine when a vessel is complete
+- Updated how the game checks if all required ingredients for a combination are present
+- Fixed a boolean logic error in the hint condition
+- Added detailed logging to help diagnose issues
+
+### Hint Functionality Fix (March 5, 2025 - 12:15 PM)
+**Request:** Fix issue where ingredients that belong to a hint couldn't be combined in the main area.
+**Solution:**
+- Restructured the combineVessels function to handle hint-related combinations first
+- Ensured that when players combine ingredients that are part of an active hint, they're properly added to the hint vessel
+- Enhanced the checkForMatchingVessels function with better logging
+
+### Partial Combinations Fix (March 5, 2025 - 12:45 PM)
+**Request:** Fix issue where partial combinations (yellow vessels) weren't being created.
+**Solution:**
+- Updated the combineVessels function to allow creating yellow vessels for any combination of ingredients
+- Changed how the game looks for recipe matches to allow partial matches
+- Ensured that any ingredients can be combined, even if they don't match any recipe
+
+### Visual Design Proposal (March 5, 2025 - 1:30 PM)
+**Request:** Propose visual design changes to make the game more appealing with a 70s-inspired, cookbook aesthetic.
+**Solution:**
+- Presented a comprehensive design proposal with color palette, typography, and vessel redesign ideas
+- Outlined a phased implementation plan for the visual refresh
+- Suggested enhancements for animations, sound design, and UI elements
+
+### Visual Refresh Phase 1 (March 5, 2025 - 2:00 PM)
+**Request:** Implement Phase 1 of the visual refresh (colors and typography) and create vessel design concepts.
+**Solution:**
+- Updated CSS with a new 70s-inspired color palette (avocado green, burnt orange, mustard yellow)
+- Added Google Fonts integration for Cooper Black, Poppins, and Quicksand
+- Updated sketch.js to use the new colors and fonts
+- Created a "Redesign Vessels.md" file with 20 different vessel design concepts
+- Organized vessel designs by function (base ingredients, partial combinations, complete combinations, hints)
+
+### Loading Screen Error Fix (March 5, 2025 - 2:30 PM)
+**Request:** Fix error where the game gets stuck on the loading screen with errors related to undefined buttons and font loading.
+**Solution:**
+- Updated the mouseMoved function to check if buttons exist before trying to use them
+- Added error handling for font loading with fallbacks to web-safe fonts
+- Wrapped font loading in try-catch blocks to prevent crashes
+- Ensured the game can still run even if Google Fonts fail to load
+- Created a proper favicon.ico file to prevent 404 errors
+- Removed Google Fonts import from CSS to use web-safe fonts instead
+
+### Vessel Design Mockups (March 5, 2025 - 3:00 PM)
+**Request:** Create visual representations of vessel designs using p5.js, showing them in profile view rather than from above.
+**Solution:**
+- Created a "vessel-designs.html" file with a clean, organized layout
+- Developed a "vessel-designs.js" file with 20 different vessel designs drawn using p5.js
+- Implemented each vessel as a separate p5.js instance with its own canvas
+- Organized designs by category: mixing bowls, sauté pans, casserole dishes, chef's pots
+- Included detailed descriptions for each vessel design
+- Drew vessels in profile view to show their distinctive shapes and features
+
+### Font Loading Fix (March 5, 2025 - 3:30 PM)
+**Request:** Fix persistent font loading errors ("Unsupported OpenType signature").
+**Solution:**
+- Reverted to using web-safe fonts directly in the preload function
+- Removed all attempts to load Google Fonts via loadFont()
+- Simplified the font handling to avoid any font loading errors
+- Used Georgia, Arial, and Verdana as direct replacements for the custom fonts
+
+### Textured Mixing Bowl Variants (March 5, 2025 - 3:30 PM)
+**Request:** Create 10 variants of the textured mixing bowl with different patterns, using white bases and avocado green patterns.
+**Solution:**
+- Created a new "textured-bowls.html" file to showcase the variants
+- Developed a "textured-bowls.js" file with 10 different pattern implementations
+- Updated the bowl shape to have a 90-degree angle between the sides and top
+- Implemented various patterns: stripes, dots, zigzag, checkered, floral, wavy lines, crosshatch, herringbone, spiral, and geometric
+- Used white for the bowl base and avocado green for all patterns
+- Added a link from the main vessel designs page to the textured bowl variants 
+
+### Gameplay Fixes (March 5, 2025 - 4:00 PM)
+**Request:** Fix issues with the hint button placement and vessel combination logic.
+**Solution:**
+- Fixed the hint vessel positioning to appear above the hint button instead of in the center of the screen
+- Updated the vessel combination logic to only allow combinations that match or partially match a recipe
+- Improved the recipe matching algorithm to ensure all ingredients in a combination must be part of a valid recipe
+- Added better logging for invalid combinations to help with debugging
+- Ensured the game is now properly challenging as players can no longer combine unrelated ingredients 
+
+### Hint Vessel Positioning Fix (March 5, 2025 - 4:15 PM)
+**Request:** Fix the hint vessel positioning to prevent overlap with ingredient vessels.
+**Solution:**
+- Adjusted the hint vessel's vertical position to be closer to the hint button
+- Reduced the offset from 100px to 80px to ensure the hint vessel appears directly above the hint button
+- Ensured the hint vessel is clearly visible and doesn't overlap with the lowest row of ingredients
+- Maintained the same horizontal alignment with the hint button for visual consistency 
+
+### Final Hint Vessel Positioning Fix (March 5, 2025 - 4:30 PM)
+**Request:** Position the hint vessel to appear exactly over the hint button, visually replacing it.
+**Solution:**
+- Updated the hint vessel's position to use the exact same coordinates as the hint button
+- Removed the vertical offset completely so the hint vessel appears directly on top of the hint button
+- Created a seamless visual transition from button to hint vessel when the hint is activated
+- Improved user experience by making the hint appear exactly where the user clicked 
