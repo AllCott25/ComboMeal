@@ -1,0 +1,78 @@
+/* Culinary Logic Puzzle - Main Styles */
+/* Removing Google Fonts import to prevent loading errors */
+/* @import url('https://fonts.googleapis.com/css2?family=Cooper+Black&family=Poppins:wght@400;500;600&family=Quicksand:wght@500;700&display=swap'); */
+
+:root {
+  /* 70s-inspired color palette */
+  --color-background: #F5F1E8;      /* Soft cream background */
+  --color-primary: #778F5D;         /* Avocado green */
+  --color-secondary: #D96941;       /* Burnt orange */
+  --color-tertiary: #E2B33C;        /* Mustard yellow */
+  --color-accent: #7A9BB5;          /* Dusty blue */
+  --color-text: #333333;            /* Dark gray for text */
+  
+  /* Vessel colors */
+  --color-vessel-base: #F9F5EB;     /* Cream white for base ingredients */
+  --color-vessel-yellow: #E2B33C;   /* Mustard yellow for partial combinations */
+  --color-vessel-green: #778F5D;    /* Avocado green for complete combinations */
+  --color-vessel-hint: #D96941;     /* Burnt orange for hint vessels */
+  
+  /* Typography with web-safe fallbacks */
+  --font-title: 'Georgia', serif;
+  --font-body: 'Arial', sans-serif;
+  --font-button: 'Verdana', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--font-body);
+  background-color: var(--color-background);
+  color: var(--color-text);
+}
+
+canvas {
+  display: block;
+}
+
+/* Button styles */
+button {
+  font-family: var(--font-button);
+  font-weight: 700;
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  background-color: var(--color-secondary);
+  transform: scale(1.05);
+}
+
+/* Loading screen */
+.loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background-color: var(--color-background);
+}
+
+.loading-screen h1 {
+  font-family: var(--font-title);
+  color: var(--color-primary);
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.loading-screen p {
+  font-family: var(--font-body);
+  color: var(--color-text);
+  font-size: 1.2rem;
+} 
