@@ -44,27 +44,6 @@ let intermediate_combinations = [
     vesselHint: '#D96941'     // Burnt orange for hint vessels
   };
   
-  // Add these variables at the top with the other global variables
-  let demoIngredients = [
-    { name: "Bread", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Grapes", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Peanuts", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Sugar", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Salt", x: 0, y: 0, color: COLORS.vesselBase, combined: false }
-  ];
-  
-  let demoSteps = [
-    { ingredients: ["Peanuts", "Salt"], result: "Peanut Butter", color: 'yellow', completed: false, timer: 0 },
-    { ingredients: ["Grapes", "Sugar"], result: "Jelly", color: 'yellow', completed: false, timer: 0 },
-    { ingredients: ["Bread", "Jelly"], result: "Bread & Jelly", color: 'yellow', completed: false, timer: 0 },
-    { ingredients: ["Peanut Butter", "Bread & Jelly"], result: "PB&J", color: 'green', completed: false, timer: 0 }
-  ];
-  
-  let demoAnimations = [];
-  let currentDemoStep = 0;
-  let demoStepDelay = 90; // Faster animation between demo steps
-  let demoTimer = 0;
-  
   // Animation class for combining ingredients
   class CombineAnimation {
     constructor(x, y, color, targetX, targetY) {
@@ -486,12 +465,22 @@ let intermediate_combinations = [
   }
   
   function arrangeVessels() {
-    let basic_w = 100;
-    let advanced_w = 200; // Double width for advanced vessels
-    let basic_h = 80;
-    let advanced_h = 100; // Slightly taller for advanced vessels
-    let margin = 15; // Space between vessels
-    let vertical_margin = 8; // Vertical spacing between rows
+    // Increase vessel sizes for better mobile experience
+    let basic_w = 120; // Increased from 100
+    let advanced_w = 240; // Increased from 200
+    let basic_h = 100; // Increased from 80
+    let advanced_h = 120; // Increased from 100
+    let margin = 10; // Consistent 10px margin between vessels
+    let vertical_margin = 10; // Consistent 10px vertical margin
+
+    // Check if we're on a mobile device and adjust sizes accordingly
+    if (windowWidth < 768) {
+      // Further adjustments for very small screens
+      if (windowWidth < 400) {
+        basic_w = 100;
+        advanced_w = 200;
+      }
+    }
 
     // First, separate vessels into advanced and basic
     let advancedVessels = vessels.filter(v => v.isAdvanced);
@@ -500,12 +489,25 @@ let intermediate_combinations = [
     // Calculate total slots needed
     let totalSlots = advancedVessels.length * 2 + basicVessels.length;
     let slotsPerRow = 3; // Maximum slots per row
+    
+    // Adjust slots per row based on screen width
+    if (windowWidth < 500) {
+      slotsPerRow = 2; // Fewer slots for very small screens
+    }
+    
     let rows = Math.ceil(totalSlots / slotsPerRow);
 
     // Calculate maximum height needed for vessels
     let totalHeight = rows * advanced_h + (rows - 1) * vertical_margin;
-    // Ensure we leave space at the bottom for the hint button
-    let startY = Math.min(180, 180 + (400 - totalHeight) / 2);
+    
+    // Ensure we leave enough space at the top for the title and byline
+    // Increased space between title/byline and vessels
+    let startY = 180; // Increased from 150px to 180px for more space
+    
+    // On smaller screens, adjust the starting position
+    if (windowWidth < 500) {
+      startY = 210; // Increased from 180px to 210px for more space on small screens
+    }
 
     // Create an array to hold our row arrangements
     let rowArrangements = [];
@@ -584,7 +586,7 @@ let intermediate_combinations = [
 
             // Set vessel position
             v.x = currentX + v.w / 2;
-            v.y = startY + rowIndex * (advanced_h + vertical_margin);
+            v.y = startY + rowIndex * (basic_h + vertical_margin);
             v.originalX = v.x;
             v.originalY = v.y;
 
@@ -592,6 +594,15 @@ let intermediate_combinations = [
             currentX += v.w + margin;
         });
     });
+    
+    // Calculate the lowest vessel position
+    let lowestY = 0;
+    vessels.forEach(v => {
+        lowestY = Math.max(lowestY, v.y + v.h/2);
+    });
+    
+    // Set fixed hint button position 20 pixels below the lowest vessel
+    hintButtonY = lowestY + 20;
   }
   
   function draw() {
@@ -639,7 +650,6 @@ let intermediate_combinations = [
     if (!gameStarted) {
       // Draw start screen with animated demo
       drawStartScreen();
-      updateDemo();
     } else if (gameWon) {
       // Draw win screen
       drawWinScreen();
@@ -678,11 +688,11 @@ let intermediate_combinations = [
         }
       }
       
-      // Draw turn counter
+      // Draw turn counter (removed "Turns:" text)
       textAlign(LEFT, BOTTOM);
       textSize(16);
       fill('#333');
-      text("Turns: " + turnCounter, 20, height - 20);
+      text(turnCounter, 20, height - 20);
       
       // Draw move history
       drawMoveHistory();
@@ -698,259 +708,172 @@ let intermediate_combinations = [
     textSize(48);
     textAlign(CENTER, CENTER);
     fill(COLORS.primary);
+    noStroke(); // Ensure no stroke is applied to the text
     text("Combo Meal", width / 2, 60);
     
     textFont(bodyFont);
     textSize(16);
     fill(COLORS.text);
-    text("Combine ingredients to make " + final_combination.name, width / 2, 100);
+    noStroke(); // Ensure no stroke is applied to the text
+    text("Reveal a new recipe every day!", width / 2, 100);
     pop();
   }
   
   function drawStartScreen() {
-    // Draw demo ingredients and combinations
-    drawDemoIngredients();
-    
-    // Draw demo animations
-    for (let i = demoAnimations.length - 1; i >= 0; i--) {
-      demoAnimations[i].draw();
-      if (demoAnimations[i].update()) {
-        demoAnimations.splice(i, 1);
-      }
-    }
-    
-    // Draw instructions
+    // Draw "How to play:" header
     textAlign(CENTER);
-    textSize(18);
+    textSize(28);
     fill('#333');
-    text("Combine ingredients into culinary combos to discover the dish", width/2, height * 0.55);
-    text("in the fewest turns. New recipe daily!", width/2, height * 0.55 + 30);
+    text("How to play:", width/2, height * 0.15);
     
-    // Draw start button
+    // Draw the three equations with more even spacing
+    drawTutorialEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
+                        "Combine ingredients to make new ones!", height * 0.28);
+    
+    drawTutorialEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
+                        "Partial combos turn yellow. Add more ingredients!", height * 0.43);
+    
+    drawTutorialEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
+                        "Solve the recipe in as few moves as you can!", height * 0.58, true);
+    
+    // Draw start button (moved up slightly)
     startButton.draw();
     startButton.checkHover(mouseX, mouseY);
   }
   
-  function arrangeDemoIngredients() {
-    // Position the demo ingredients in a more compact layout
-    const centerY = height * 0.35;
-    const topRowY = centerY - 50;
-    const bottomRowY = centerY;
+  // New function to draw tutorial equations
+  function drawTutorialEquation(equationNum, leftName, leftColor, rightName, rightColor, resultName, resultColor, description, yPosition, showStarburst = false) {
+    const margin = 20;
+    const vesselWidth = 80;
+    const vesselHeight = 50;
+    const operatorSize = 30;
     
-    // First row: 3 ingredients
-    demoIngredients[0].x = width * 0.25; // Bread
-    demoIngredients[0].y = topRowY;
+    // Calculate positions
+    const leftX = width * 0.2;
+    const operatorX1 = width * 0.35;
+    const rightX = width * 0.5;
+    const operatorX2 = width * 0.65;
+    const resultX = width * 0.8;
     
-    demoIngredients[1].x = width * 0.5; // Grapes
-    demoIngredients[1].y = topRowY;
+    // Draw left vessel
+    drawTutorialVessel(leftX, yPosition, leftName, leftColor);
     
-    demoIngredients[2].x = width * 0.75; // Peanuts
-    demoIngredients[2].y = topRowY;
+    // Draw plus sign
+    textAlign(CENTER, CENTER);
+    textSize(operatorSize);
+    fill('#333');
+    noStroke();
+    text("+", operatorX1, yPosition);
     
-    // Second row: 2 ingredients
-    demoIngredients[3].x = width * 0.35; // Sugar
-    demoIngredients[3].y = bottomRowY;
+    // Draw right vessel
+    drawTutorialVessel(rightX, yPosition, rightName, rightColor);
     
-    demoIngredients[4].x = width * 0.65; // Salt
-    demoIngredients[4].y = bottomRowY;
+    // Draw equals sign
+    textAlign(CENTER, CENTER);
+    textSize(operatorSize);
+    fill('#333');
+    noStroke();
+    text("=", operatorX2, yPosition);
     
-    // Position for intermediate results - keep everything more compact
-    demoSteps[0].x = width * 0.75; // Peanut Butter (stays on right)
-    demoSteps[0].y = centerY + 50;
+    // Draw result vessel with optional starburst
+    if (showStarburst) {
+      drawStarburst(resultX, yPosition);
+    }
+    drawTutorialVessel(resultX, yPosition, resultName, resultColor);
     
-    demoSteps[1].x = width * 0.4; // Jelly (stays on left)
-    demoSteps[1].y = centerY + 50;
-    
-    demoSteps[2].x = width * 0.4; // Bread & Jelly (replaces Jelly position)
-    demoSteps[2].y = centerY + 50;
-    
-    demoSteps[3].x = width * 0.5; // Final PB&J (centered)
-    demoSteps[3].y = centerY + 80;
+    // Draw description with improved spacing
+    textAlign(LEFT);
+    textSize(16);
+    fill('#333');
+    text(description, width * 0.2, yPosition + 45);
   }
   
-  function drawDemoIngredients() {
-    // Draw each demo ingredient
-    for (let ing of demoIngredients) {
-      if (!ing.combined) {
-        drawDemoVessel(ing.x, ing.y, ing.name, ing.color, false);
-      }
-    }
-    
-    // Draw completed combinations
-    for (let step of demoSteps) {
-      if (step.completed) {
-        drawDemoVessel(step.x, step.y, step.result, step.color, true);
-      }
-    }
-  }
-  
-  function drawDemoVessel(x, y, name, vesselColor, isAdvanced) {
+  // New function to draw tutorial vessels
+  function drawTutorialVessel(x, y, name, color) {
     push();
     translate(x, y);
     
-    if (!isAdvanced) {
-      // Basic ingredient vessel
-      fill(vesselColor);
-        stroke('black');
-      strokeWeight(3);
+    // Draw vessel
+    if (color === "white") {
+      // Basic ingredient vessel (white)
+      fill('white');
+      stroke('black');
+      strokeWeight(2);
       
       // Draw rounded rectangle
       rectMode(CENTER);
-      rect(0, -10, 80, 50, 5, 5, 30, 30);
+      rect(0, 0, 80, 50, 5, 5, 30, 30);
+    } else if (color === "yellow") {
+      // Draw handles behind the vessel
+      fill('#888888');
+      stroke('black');
+      strokeWeight(2);
+      circle(-50, -5, 15);
+      circle(50, -5, 15);
       
-      // Draw text
-        fill('black');
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(12);
-      text(name, 0, -10);
-    } else {
-      // Advanced vessel
-      if (vesselColor === 'green') {
-        // Green vessel (pan with long handle)
-        fill('#888888');
-        stroke('black');
-        strokeWeight(3);
-        rectMode(CENTER);
-        rect(80, 0, 80, 15, 5);
-        
-        // Draw vessel body - make it larger for the final result
-        fill(vesselColor);
-        stroke('black');
-        strokeWeight(3);
-        
-        // Draw rectangle with rounded corners ONLY at the bottom
-        rectMode(CENTER);
-        rect(0, 0, 140, 70, 0, 0, 10, 10);
-      } else {
-        // Yellow vessel (pot with two handles)
-        fill('#888888');
-        stroke('black');
-        strokeWeight(3);
-        circle(-60, -5, 20);
-        circle(60, -5, 20);
-        
-        // Draw vessel body
-        fill(vesselColor);
-        stroke('black');
-        strokeWeight(3);
-        
-        // Draw rectangle with rounded corners ONLY at the bottom
-        rectMode(CENTER);
-        rect(0, 0, 120, 60, 0, 0, 10, 10);
-      }
+      // Yellow vessel (partial combination)
+      fill(COLORS.tertiary); // Mustard yellow
+      stroke('black');
+      strokeWeight(2);
       
-      // Draw text
-      fill('black');
-      noStroke();
-      textAlign(CENTER, CENTER);
-      textSize(14);
-      text(name, 0, -10);
+      // Draw rectangle with rounded corners
+      rectMode(CENTER);
+      rect(0, 0, 100, 60, 0, 0, 10, 10);
+    } else if (color === "green") {
+      // Draw handle behind the vessel
+      fill('#888888');
+      stroke('black');
+      strokeWeight(2);
+      rectMode(CENTER);
+      rect(60, 0, 40, 10, 5);
+      
+      // Green vessel (complete combination)
+      fill(COLORS.primary); // Avocado green
+      stroke('black');
+      strokeWeight(2);
+      
+      // Draw rectangle with rounded corners
+      rectMode(CENTER);
+      rect(0, 0, 100, 60, 0, 0, 10, 10);
+    }
+    
+    // Draw text
+    fill('black');
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    
+    // Split text into lines if needed
+    let lines = splitTextIntoLines(name, 70);
+    for (let i = 0; i < lines.length; i++) {
+      let yOffset = (i - (lines.length - 1) / 2) * 15;
+      text(lines[i], 0, yOffset);
     }
     
     pop();
   }
   
-  function updateDemo() {
-    demoTimer++;
+  // New function to draw starburst behind final vessel
+  function drawStarburst(x, y) {
+    push();
+    translate(x, y);
     
-    // Process the current demo step
-    if (currentDemoStep < demoSteps.length) {
-      let step = demoSteps[currentDemoStep];
-      
-      if (!step.completed) {
-        step.timer++;
-        
-        // When it's time to perform this step
-        if (step.timer >= demoStepDelay) {
-          // Special handling for the Bread & Jelly step
-          if (step.result === "Bread & Jelly") {
-            // Find Bread and animate it moving to Jelly
-            let bread = demoIngredients.find(i => i.name === "Bread");
-            let jellyStep = demoSteps.find(s => s.result === "Jelly");
-            
-            if (bread && !bread.combined && jellyStep && jellyStep.completed) {
-              bread.combined = true;
-              
-              // Create animation from Bread to Jelly position
-              createDemoAnimation(bread.x, bread.y, bread.color, jellyStep.x, jellyStep.y);
-              
-              // Mark this step as completed
-              step.completed = true;
-              
-              // Move to the next step
-              currentDemoStep++;
-            }
-          }
-          // Special handling for the final PB&J step
-          else if (step.result === "PB&J") {
-            // Find Peanut Butter and animate it moving to Bread & Jelly
-            let pbStep = demoSteps.find(s => s.result === "Peanut Butter");
-            let bjStep = demoSteps.find(s => s.result === "Bread & Jelly");
-            
-            if (pbStep && pbStep.completed && bjStep && bjStep.completed) {
-              // Create animation from Peanut Butter to Bread & Jelly position
-              createDemoAnimation(pbStep.x, pbStep.y, pbStep.color, bjStep.x, bjStep.y);
-              
-              // Mark this step as completed
-              step.completed = true;
-              
-              // Move to the next step
-              currentDemoStep++;
-              
-              // If we've completed all steps, reset the demo after a delay
-              if (currentDemoStep >= demoSteps.length) {
-                setTimeout(resetDemo, 3000);
-              }
-            }
-          }
-          // Normal handling for other steps
-          else {
-            // Mark the ingredients as combined
-            for (let ingName of step.ingredients) {
-              // Check if it's a basic ingredient
-              let basicIng = demoIngredients.find(i => i.name === ingName && !i.combined);
-              if (basicIng) {
-                basicIng.combined = true;
-                
-                // Create animation from this ingredient to the result position
-                createDemoAnimation(basicIng.x, basicIng.y, basicIng.color, step.x, step.y);
-              }
-            }
-            
-            // Mark this step as completed
-            step.completed = true;
-            
-            // Move to the next step
-            currentDemoStep++;
-          }
-        }
-      }
-    }
-  }
-  
-  function createDemoAnimation(startX, startY, color, targetX, targetY) {
-    for (let i = 0; i < 5; i++) {
-      demoAnimations.push(new CombineAnimation(startX, startY, color, targetX, targetY));
-    }
-  }
-  
-  function resetDemo() {
-    // Reset all demo ingredients and steps
-    for (let ing of demoIngredients) {
-      ing.combined = false;
-    }
+    // Draw subtle yellow starburst
+    fill(COLORS.tertiary + '80'); // Mustard yellow with 50% opacity
+    noStroke();
     
-    for (let step of demoSteps) {
-      step.completed = false;
-      step.timer = 0;
+    // Draw an 8-point star
+    beginShape();
+    for (let i = 0; i < 16; i++) {
+      let radius = i % 2 === 0 ? 70 : 50;
+      let angle = TWO_PI * i / 16 - PI/16;
+      let px = cos(angle) * radius;
+      let py = sin(angle) * radius;
+      vertex(px, py);
     }
+    endShape(CLOSE);
     
-    currentDemoStep = 0;
-    demoTimer = 0;
-    
-    // Clear any remaining animations
-    demoAnimations = [];
+    pop();
   }
   
   function drawWinScreen() {
@@ -1000,10 +923,16 @@ let intermediate_combinations = [
   
   // Enhanced move history display for win screen
   function drawWinMoveHistory() {
+    textAlign(CENTER);
+    textSize(16);
+    fill('black');
+    text(`You solved it in ${moveHistory.length} moves!`, width/2, height/2 + 110);
+    
     const circleSize = 25;
     const margin = 8;
     const maxPerRow = 15;
-    const startX = width/2 - (Math.min(moveHistory.length, maxPerRow) * (circleSize + margin) - margin) / 2;
+    const rowWidth = Math.min(moveHistory.length, maxPerRow) * (circleSize + margin) - margin;
+    const startX = width/2 - rowWidth / 2;
     const startY = height/2 + 140;
     
     for (let i = 0; i < moveHistory.length; i++) {
@@ -1021,16 +950,26 @@ let intermediate_combinations = [
   
   // Keep the regular move history for during gameplay
   function drawMoveHistory() {
+    if (moveHistory.length === 0) return;
+    
+    // Remove the text counter, keeping only the visual circles
     const circleSize = 15;
-    const margin = 5;
-    const startX = 90;
-    const startY = height - 20;
+    const margin = 8;
+    const maxPerRow = 15;
+    const rowWidth = Math.min(moveHistory.length, maxPerRow) * (circleSize + margin) - margin;
+    const startX = width/2 - rowWidth / 2;
+    const startY = height/2 + 140;
     
     for (let i = 0; i < moveHistory.length; i++) {
+      const row = Math.floor(i / maxPerRow);
+      const col = i % maxPerRow;
+      const x = startX + col * (circleSize + margin);
+      const y = startY + row * (circleSize + margin);
+      
       fill(moveHistory[i]);
       stroke('black');
-      strokeWeight(1);
-      circle(startX + i * (circleSize + margin), startY - circleSize/2, circleSize);
+      strokeWeight(2);
+      circle(x, y, circleSize);
     }
   }
   
@@ -1512,26 +1451,70 @@ let intermediate_combinations = [
   }
   
   function triggerHapticFeedback(type) {
+    // Only trigger haptic feedback if the device supports it
     if (navigator.vibrate) {
-      switch(type) {
-        case 'success':
-          navigator.vibrate([50, 30, 50]); // Short double vibration
-          break;
-        case 'error':
-          navigator.vibrate(100); // Single short vibration
-          break;
-        case 'completion':
-          navigator.vibrate([100, 50, 100, 50, 200]); // Celebratory pattern
-          break;
+      if (type === 'success') {
+        navigator.vibrate(50);
+      } else if (type === 'error') {
+        navigator.vibrate([50, 30, 50]);
+      } else if (type === 'complete') {
+        navigator.vibrate([50, 30, 50, 30, 100]);
       }
     }
   }
   
+  // Add touch support for mobile devices
+  function touchStarted() {
+    // Prevent default touch behavior to avoid scrolling
+    if (touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Handle the same logic as mousePressed but with touch coordinates
+      if (!gameStarted) {
+        // Check if start button was touched
+        if (startButton.isInside(touchX, touchY)) {
+          startButton.handleClick();
+          return false;
+        }
+      } else if (gameWon) {
+        // Check if buttons were touched
+        if (shareButton.isInside(touchX, touchY)) {
+          shareButton.handleClick();
+          return false;
+        }
+        if (recipeButton.isInside(touchX, touchY)) {
+          recipeButton.handleClick();
+          return false;
+        }
+      } else {
+        // Check if hint button was touched
+        if (!showingHint && hintButton.isInside(touchX, touchY)) {
+          hintButton.handleClick();
+          return false;
+        }
+        
+        // Check if a vessel was touched
+        for (let v of vessels) {
+          if (v.isInside(touchX, touchY)) {
+            draggedVessel = v;
+            offsetX = touchX - v.x;
+            offsetY = touchY - v.y;
+            v.targetScale = 1.1; // Slight scale up when dragging
+            triggerHapticFeedback('success'); // Haptic feedback on successful drag
+            return false;
+          }
+        }
+      }
+    }
+    return false; // Prevent default
+  }
+  
   // New function to initialize the game after data is loaded
   function initializeGame() {
-    let original_w = 100;
-    let original_h = 80;
-    let margin = 10; // Reduced margin for compact UI
+    let original_w = 120; // Increased from 100
+    let original_h = 100; // Increased from 80
+    let margin = 10; // Consistent 10px margin
     
     // Create vessels for each ingredient
     ingredients.forEach((ing) => {
@@ -1545,14 +1528,7 @@ let intermediate_combinations = [
     // Initial arrangement of vessels
     arrangeVessels();
     
-    // Calculate the lowest vessel position
-    let lowestY = 0;
-    vessels.forEach(v => {
-        lowestY = Math.max(lowestY, v.y + v.h/2);
-    });
-    
-    // Set fixed hint button position 40 pixels below the lowest vessel
-    hintButtonY = lowestY + 40;
+    // Note: The hintButtonY is now set in arrangeVessels function
     
     // Create share and recipe buttons
     shareButton = new Button(width * 0.35, height * 0.65, 120, 40, "Share Score", shareScore);
@@ -1561,10 +1537,7 @@ let intermediate_combinations = [
     // Create hint button with white background and grey outline, using the fixed Y position
     hintButton = new Button(width * 0.5, hintButtonY, 120, 40, "Hint", showHint, 'white', '#FF5252');
     
-    // Create start button
-    startButton = new Button(width * 0.5, height * 0.7, 180, 60, "Start Cooking!", startGame, '#4CAF50', 'white');
-    
-    // Position demo ingredients
-    arrangeDemoIngredients();
+    // Create start button (positioned higher to match new spacing)
+    startButton = new Button(width * 0.5, height * 0.75, 180, 60, "Let's Get Cooking!", startGame, '#4CAF50', 'white');
   }
   

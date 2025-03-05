@@ -1,14 +1,14 @@
-// Define intermediate combinations (will be replaced with data from Supabase)
+// Define intermediate combinations
 let intermediate_combinations = [
     { name: "Fried Chicken Cutlet", required: ["Chicken Cutlet", "Flour", "Eggs", "Panko Bread Crumbs"] },
     { name: "Tomato Sauce", required: ["Garlic", "Red Chile Flakes", "Plum Tomatoes", "Basil"] },
     { name: "Mixed Cheeses", required: ["Parmesan", "Mozzarella"] }
   ];
   
-  // Define the final combination (will be replaced with data from Supabase)
+  // Define the final combination
   let final_combination = { name: "Chicken Parm", required: ["Fried Chicken Cutlet", "Tomato Sauce", "Mixed Cheeses"] };
   
-  // Extract all individual ingredients (will be replaced with data from Supabase)
+  // Extract all individual ingredients
   let ingredients = [...new Set(intermediate_combinations.flatMap(c => c.required))];
   
   // Global variables
@@ -19,38 +19,22 @@ let intermediate_combinations = [
   let turnCounter = 0;
   let moveHistory = []; // Array to store move history with colors
   let animations = []; // Array to store active animations
-  let titleFont, bodyFont, buttonFont;
-  let recipeUrl = "https://www.bonappetit.com/recipe/chicken-parm"; // Will be replaced with data from Supabase
+  let titleFont;
+  let recipeUrl = "https://www.bonappetit.com/recipe/chicken-parm";
   let hintButton;
   let hintVessel = null;
   let showingHint = false;
   let gameStarted = false; // New variable to track game state
   let startButton; // New button for start screen
   let hintButtonY;
-  let isLoadingRecipe = true; // Flag to track if we're still loading recipe data
-  let loadingError = false; // Flag to track if there was an error loading recipe data
-  
-  // Color palette
-  const COLORS = {
-    background: '#F5F1E8',    // Soft cream background
-    primary: '#778F5D',       // Avocado green
-    secondary: '#D96941',     // Burnt orange
-    tertiary: '#E2B33C',      // Mustard yellow
-    accent: '#7A9BB5',        // Dusty blue
-    text: '#333333',          // Dark gray for text
-    vesselBase: '#F9F5EB',    // Cream white for base ingredients
-    vesselYellow: '#E2B33C',  // Mustard yellow for partial combinations
-    vesselGreen: '#778F5D',   // Avocado green for complete combinations
-    vesselHint: '#D96941'     // Burnt orange for hint vessels
-  };
   
   // Add these variables at the top with the other global variables
   let demoIngredients = [
-    { name: "Bread", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Grapes", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Peanuts", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Sugar", x: 0, y: 0, color: COLORS.vesselBase, combined: false },
-    { name: "Salt", x: 0, y: 0, color: COLORS.vesselBase, combined: false }
+    { name: "Bread", x: 0, y: 0, color: 'white', combined: false },
+    { name: "Grapes", x: 0, y: 0, color: 'white', combined: false },
+    { name: "Peanuts", x: 0, y: 0, color: 'white', combined: false },
+    { name: "Sugar", x: 0, y: 0, color: 'white', combined: false },
+    { name: "Salt", x: 0, y: 0, color: 'white', combined: false }
   ];
   
   let demoSteps = [
@@ -131,7 +115,7 @@ let intermediate_combinations = [
   
   // Button class for UI elements
   class Button {
-    constructor(x, y, w, h, label, action, color = COLORS.primary, textColor = 'white') {
+    constructor(x, y, w, h, label, action, color = '#4285F4', textColor = 'white') {
       this.x = x;
       this.y = y;
       this.w = w;
@@ -159,7 +143,6 @@ let intermediate_combinations = [
       fill(this.textColor);
       noStroke();
       textAlign(CENTER, CENTER);
-      textFont(buttonFont);
       textSize(16);
       text(this.label, this.x, this.y);
     }
@@ -185,15 +168,15 @@ let intermediate_combinations = [
   // Hint Vessel class - extends Vessel with hint-specific functionality
   class HintVessel {
     constructor(combo) {
+      this.combo = combo;
       this.name = combo.name;
-      this.required = combo.required;
+      this.required = [...combo.required];
       this.collected = [];
-      // Position the hint vessel exactly over the hint button
-      this.x = width * 0.5; // Same x as hint button
-      this.y = hintButtonY; // Exactly at the hint button's position
-      this.w = 250;
-      this.h = 120;
-      this.color = COLORS.vesselHint;
+      this.x = width / 2;
+      this.y = hintButtonY; // Use the fixed Y position
+      this.w = 200;
+      this.h = 100;
+      this.color = '#FF5252'; // Red color
       this.scale = 1;
       this.targetScale = 1;
     }
@@ -266,7 +249,7 @@ let intermediate_combinations = [
     
     // Convert to a regular vessel when complete but keep it red
     toVessel() {
-      let v = new Vessel([], [], this.name, COLORS.vesselHint, this.x, this.y, 200, 100);
+      let v = new Vessel([], [], this.name, '#FF5252', this.x, this.y, 200, 100);
       v.isAdvanced = true; // Mark as advanced for proper rendering
       v.pulse();
       return v;
@@ -278,14 +261,7 @@ let intermediate_combinations = [
       this.ingredients = ingredients;
       this.complete_combinations = complete_combinations;
       this.name = name;
-      
-      // Map color names to our new color palette
-      if (color === 'white') this.color = COLORS.vesselBase;
-      else if (color === 'yellow') this.color = COLORS.vesselYellow;
-      else if (color === 'green') this.color = COLORS.vesselGreen;
-      else if (color === '#FF5252') this.color = COLORS.vesselHint; // Hint vessel color
-      else this.color = color; // Use provided color if it doesn't match any of our mappings
-      
+      this.color = color;
       this.x = x;
       this.y = y;
       this.w = w;
@@ -423,57 +399,52 @@ let intermediate_combinations = [
     return lines;
   }
   
-  // Preload function to load assets before setup
   function preload() {
-    console.log("Preloading assets...");
-    
-    // Use web-safe fonts directly instead of trying to load Google Fonts
-    titleFont = 'Georgia';
-    bodyFont = 'Arial';
-    buttonFont = 'Verdana';
-    
-    console.log("Using web-safe fonts instead of Google Fonts");
+    // Load fonts or other assets
+    titleFont = loadFont('https://cdnjs.cloudflare.com/ajax/libs/topcoat/0.8.0/font/SourceSansPro-Bold.otf');
   }
   
   function setup() {
     createCanvas(windowWidth, windowHeight); // Fullscreen canvas for mobile
-    textFont(bodyFont);
+    textFont('Arial');
     
-    // The actual game initialization will happen in initializeGame()
-    // after the recipe data is loaded
+    let original_w = 100;
+    let original_h = 80;
+    let margin = 10; // Reduced margin for compact UI
     
-    // Load recipe data from Supabase if not in playtest mode
-    if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
-      loadRecipeData();
-    } else {
-      console.log("Playtest mode: waiting for date selection");
-      isLoadingRecipe = false; // In playtest mode, we'll load the recipe after date selection
-    }
-  }
-  
-  // Function to load recipe data from Supabase
-  async function loadRecipeData() {
-    try {
-      console.log("Loading recipe data from Supabase...");
-      const recipeData = await fetchTodayRecipe();
-      
-      if (recipeData) {
-        // Update game variables with recipe data
-        intermediate_combinations = recipeData.intermediateCombinations;
-        final_combination = recipeData.finalCombination;
-        ingredients = recipeData.baseIngredients;
-        recipeUrl = recipeData.recipeUrl;
-        
-        console.log("Recipe data loaded successfully");
-        isLoadingRecipe = false;
-      } else {
-        throw new Error("Failed to process recipe data");
-      }
-    } catch (error) {
-      console.error("Error loading recipe data:", error);
-      loadingError = true;
-      isLoadingRecipe = false;
-    }
+    // Create vessels for each ingredient
+    ingredients.forEach((ing) => {
+      let v = new Vessel([ing], [], null, 'white', 0, 0, original_w, original_h);
+      vessels.push(v);
+    });
+    
+    // Randomize the order of vessels
+    shuffleArray(vessels);
+    
+    // Initial arrangement of vessels
+    arrangeVessels();
+    
+    // Calculate the lowest vessel position
+    let lowestY = 0;
+    vessels.forEach(v => {
+        lowestY = Math.max(lowestY, v.y + v.h/2);
+    });
+    
+    // Set fixed hint button position 40 pixels below the lowest vessel
+    hintButtonY = lowestY + 40;
+    
+    // Create share and recipe buttons
+    shareButton = new Button(width * 0.35, height * 0.65, 120, 40, "Share Score", shareScore);
+    recipeButton = new Button(width * 0.65, height * 0.65, 120, 40, "View Recipe", viewRecipe);
+    
+    // Create hint button with white background and grey outline, using the fixed Y position
+    hintButton = new Button(width * 0.5, hintButtonY, 120, 40, "Hint", showHint, 'white', '#FF5252');
+    
+    // Create start button
+    startButton = new Button(width * 0.5, height * 0.7, 180, 60, "Start Cooking!", startGame, '#4CAF50', 'white');
+    
+    // Position demo ingredients
+    arrangeDemoIngredients();
   }
   
   // Fisher-Yates shuffle algorithm to randomize vessel order
@@ -595,43 +566,7 @@ let intermediate_combinations = [
   }
   
   function draw() {
-    background(COLORS.background);
-    
-    // No need to set default fonts since we're using web-safe fonts directly
-    
-    // Check if we're still loading recipe data
-    if (isLoadingRecipe) {
-      // Display loading screen
-      textAlign(CENTER, CENTER);
-      textSize(24);
-      fill(0);
-      text("Loading today's recipe...", width/2, height/2);
-      return;
-    }
-    
-    // Check if there was an error loading recipe data
-    if (loadingError) {
-      textAlign(CENTER, CENTER);
-      textSize(24);
-      fill(255, 0, 0);
-      text("Error loading recipe. Using default recipe.", width/2, height/2 - 30);
-      textSize(16);
-      text("Please check your internet connection and refresh the page.", width/2, height/2 + 10);
-      
-      // After 3 seconds, continue with default recipe
-      if (frameCount % 180 === 0) {
-        loadingError = false;
-        // Initialize the game with default recipe data
-        initializeGame();
-      }
-      return;
-    }
-    
-    // Check if we need to initialize the game after loading data
-    if (vessels.length === 0) {
-      initializeGame();
-      return;
-    }
+    background(245, 242, 235); // Cream background
     
     // Draw title
     drawTitle();
@@ -693,18 +628,18 @@ let intermediate_combinations = [
   }
   
   function drawTitle() {
-    push();
-    textFont(titleFont);
-    textSize(48);
+    // Draw game title
     textAlign(CENTER, CENTER);
-    fill(COLORS.primary);
-    text("Combo Meal", width / 2, 60);
+    fill('#333');
+    textSize(40);
+    textFont(titleFont);
+    text("COMBO MEAL", width/2, 60);
     
-    textFont(bodyFont);
-    textSize(16);
-    fill(COLORS.text);
-    text("Combine ingredients to make " + final_combination.name, width / 2, 100);
-    pop();
+    // Draw byline
+    textSize(18);
+    textFont('Arial');
+    fill('#666');
+    text("Combine the ingredients to discover the dish!", width/2, 100);
   }
   
   function drawStartScreen() {
@@ -1263,61 +1198,40 @@ let intermediate_combinations = [
     
     if (v1.ingredients.length > 0 && v2.ingredients.length > 0 && v1.complete_combinations.length === 0 && v2.complete_combinations.length === 0) {
       let U = [...new Set([...v1.ingredients, ...v2.ingredients])];
+      let C_candidates = intermediate_combinations.filter(C => U.every(ing => C.required.includes(ing)));
       
-      // Special handling for hint: If all ingredients are part of the hint, create a yellow vessel
-      // This will be detected by checkForMatchingVessels and added to the hint vessel
-      if (hintActive) {
-        // Check if all ingredients are required for the hint
-        let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
-        
-        // Check if any of these ingredients are already collected in the hint
-        let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
-        
-        // If all ingredients are part of the hint and none are already collected,
-        // create a yellow vessel that will be detected by checkForMatchingVessels
-        if (allIngredientsInHint && !anyAlreadyCollected) {
-          console.log(`Creating yellow vessel for hint with ingredients: ${U.join(', ')}`);
-          let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
-          return new_v;
-        }
-      }
-      
-      // Check if this combination matches or partially matches any recipe
-      let C_candidates = intermediate_combinations.filter(C => {
-        // Check if there's any overlap between the required ingredients and our combined set
-        let overlap = C.required.filter(ing => U.includes(ing));
-        // Only consider it a match if ALL ingredients in U are part of the recipe
-        // AND there's at least one ingredient from the recipe in U
-        return overlap.length > 0 && U.every(ing => C.required.includes(ing));
-      });
-      
-      // Only create a new vessel if we have valid recipe candidates
       if (C_candidates.length > 0) {
-        // Create a new vessel (yellow or green)
-        let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
-        
         let C = C_candidates[0];
         
-        // Check if we have all required ingredients for this combination
-        // Only turn green if we have exactly the required ingredients (no extras)
-        if (U.length === C.required.length && C.required.every(ing => U.includes(ing))) {
-          // Only turn green if not part of an active hint
-          if (!hintActive || C.name !== hintVessel.name) {
-            new_v.name = C.name;
-            new_v.color = 'green';
-            new_v.ingredients = []; // Clear ingredients since this is now a complete combination
-            console.log(`Created green vessel for ${C.name} with ingredients: ${U.join(', ')}`);
+        // If hint is active, check if these ingredients are part of the hint
+        if (hintActive) {
+          // Check if all ingredients are required for the hint
+          let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
+          
+          // Check if any of these ingredients are already collected in the hint
+          let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
+          
+          // If all ingredients are part of the hint and none are already collected,
+          // we should add them to the hint vessel instead of creating a new vessel
+          if (allIngredientsInHint && !anyAlreadyCollected) {
+            // We'll handle this in mouseReleased by returning a yellow vessel
+            // that will be detected by checkForMatchingVessels
+            let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+            return new_v;
           }
-        } else {
-          console.log(`Created yellow vessel with ingredients: ${U.join(', ')}`);
-          console.log(`Missing ingredients for ${C.name}: ${C.required.filter(ing => !U.includes(ing)).join(', ')}`);
         }
         
+        // Create a new vessel (yellow or green)
+        let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+        if (U.length === C.required.length && C.required.every(ing => U.includes(ing))) {
+          // Only turn green if not part of an active hint
+          if (!hintActive || !C.name === hintVessel.name) {
+          new_v.name = C.name;
+          new_v.color = 'green';
+            new_v.ingredients = []; // Clear ingredients since this is now a complete combination
+          }
+        }
         return new_v;
-      } else {
-        // No matching recipe, don't create a vessel
-        console.log(`Cannot combine unrelated ingredients: ${U.join(', ')}`);
-        return null;
       }
     } else if ((v1.name || v1.complete_combinations.length > 0) && (v2.name || v2.complete_combinations.length > 0)) {
       // Handle combining completed combinations (green vessels)
@@ -1334,10 +1248,6 @@ let intermediate_combinations = [
           new_v.name = final_combination.name;
           new_v.color = 'green';
           new_v.complete_combinations = []; // Clear since this is the final combination
-          console.log(`Created green vessel for final combination ${final_combination.name}`);
-        } else {
-          console.log(`Created yellow vessel with combinations: ${U.join(', ')}`);
-          console.log(`Missing combinations for ${final_combination.name}: ${final_combination.required.filter(name => !U.includes(name)).join(', ')}`);
         }
         return new_v;
       }
@@ -1375,16 +1285,14 @@ let intermediate_combinations = [
   }
   
   function mouseMoved() {
-    // Check if buttons exist before trying to use them
-    if (!gameStarted && startButton) {
+    // Update button hover states
+    if (!gameStarted) {
       startButton.checkHover(mouseX, mouseY);
-    }
-    
-    if (gameStarted) {
-      // Only check these buttons if they exist and the game has started
-      if (shareButton) shareButton.checkHover(mouseX, mouseY);
-      if (recipeButton) recipeButton.checkHover(mouseX, mouseY);
-      if (hintButton) hintButton.checkHover(mouseX, mouseY);
+    } else if (gameWon) {
+      shareButton.checkHover(mouseX, mouseY);
+      recipeButton.checkHover(mouseX, mouseY);
+    } else if (!showingHint) {
+      hintButton.checkHover(mouseX, mouseY);
     }
   }
   
@@ -1463,7 +1371,6 @@ let intermediate_combinations = [
           
           if (canAddAll) {
             matchesHint = true;
-            console.log(`Adding ingredients to hint: ${v.ingredients.join(', ')}`);
             
             // Add all ingredients to the hint vessel
             for (let ing of v.ingredients) {
@@ -1504,6 +1411,12 @@ let intermediate_combinations = [
       // Reset hint
       hintVessel = null;
       showingHint = false;
+      
+      // Check win condition
+      if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+        gameWon = true;
+        triggerHapticFeedback('completion'); // Haptic feedback on game completion
+      }
     }
   }
   
@@ -1525,46 +1438,5 @@ let intermediate_combinations = [
           break;
       }
     }
-  }
-  
-  // New function to initialize the game after data is loaded
-  function initializeGame() {
-    let original_w = 100;
-    let original_h = 80;
-    let margin = 10; // Reduced margin for compact UI
-    
-    // Create vessels for each ingredient
-    ingredients.forEach((ing) => {
-      let v = new Vessel([ing], [], null, 'white', 0, 0, original_w, original_h);
-      vessels.push(v);
-    });
-    
-    // Randomize the order of vessels
-    shuffleArray(vessels);
-    
-    // Initial arrangement of vessels
-    arrangeVessels();
-    
-    // Calculate the lowest vessel position
-    let lowestY = 0;
-    vessels.forEach(v => {
-        lowestY = Math.max(lowestY, v.y + v.h/2);
-    });
-    
-    // Set fixed hint button position 40 pixels below the lowest vessel
-    hintButtonY = lowestY + 40;
-    
-    // Create share and recipe buttons
-    shareButton = new Button(width * 0.35, height * 0.65, 120, 40, "Share Score", shareScore);
-    recipeButton = new Button(width * 0.65, height * 0.65, 120, 40, "View Recipe", viewRecipe);
-    
-    // Create hint button with white background and grey outline, using the fixed Y position
-    hintButton = new Button(width * 0.5, hintButtonY, 120, 40, "Hint", showHint, 'white', '#FF5252');
-    
-    // Create start button
-    startButton = new Button(width * 0.5, height * 0.7, 180, 60, "Start Cooking!", startGame, '#4CAF50', 'white');
-    
-    // Position demo ingredients
-    arrangeDemoIngredients();
   }
   
