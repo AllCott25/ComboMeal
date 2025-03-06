@@ -1,14 +1,14 @@
-// Define intermediate combinations
+// Define intermediate combinations (will be replaced with data from Supabase)
 let intermediate_combinations = [
     { name: "Fried Chicken Cutlet", required: ["Chicken Cutlet", "Flour", "Eggs", "Panko Bread Crumbs"] },
     { name: "Tomato Sauce", required: ["Garlic", "Red Chile Flakes", "Plum Tomatoes", "Basil"] },
     { name: "Mixed Cheeses", required: ["Parmesan", "Mozzarella"] }
   ];
   
-  // Define the final combination
+  // Define the final combination (will be replaced with data from Supabase)
   let final_combination = { name: "Chicken Parm", required: ["Fried Chicken Cutlet", "Tomato Sauce", "Mixed Cheeses"] };
   
-  // Extract all individual ingredients
+  // Extract all individual ingredients (will be replaced with data from Supabase)
   let ingredients = [...new Set(intermediate_combinations.flatMap(c => c.required))];
   
   // Global variables
@@ -19,35 +19,35 @@ let intermediate_combinations = [
   let turnCounter = 0;
   let moveHistory = []; // Array to store move history with colors
   let animations = []; // Array to store active animations
-  let titleFont;
-  let recipeUrl = "https://www.bonappetit.com/recipe/chicken-parm";
+  let titleFont, bodyFont, buttonFont;
+  let recipeUrl = "https://www.bonappetit.com/recipe/chicken-parm"; // Will be replaced with data from Supabase
   let hintButton;
   let hintVessel = null;
   let showingHint = false;
   let gameStarted = false; // New variable to track game state
   let startButton; // New button for start screen
   let hintButtonY;
+  let isLoadingRecipe = true; // Flag to track if we're still loading recipe data
+  let loadingError = false; // Flag to track if there was an error loading recipe data
   
-  // Add these variables at the top with the other global variables
-  let demoIngredients = [
-    { name: "Bread", x: 0, y: 0, color: 'white', combined: false },
-    { name: "Grapes", x: 0, y: 0, color: 'white', combined: false },
-    { name: "Peanuts", x: 0, y: 0, color: 'white', combined: false },
-    { name: "Sugar", x: 0, y: 0, color: 'white', combined: false },
-    { name: "Salt", x: 0, y: 0, color: 'white', combined: false }
-  ];
+  // Play area constraints
+  let maxPlayWidth = 400; // Max width for the play area (phone-sized)
+  let playAreaPadding = 20; // Padding around the play area
+  let playAreaX, playAreaY, playAreaWidth, playAreaHeight; // Will be calculated in setup
   
-  let demoSteps = [
-    { ingredients: ["Peanuts", "Salt"], result: "Peanut Butter", color: 'yellow', completed: false, timer: 0 },
-    { ingredients: ["Grapes", "Sugar"], result: "Jelly", color: 'yellow', completed: false, timer: 0 },
-    { ingredients: ["Bread", "Jelly"], result: "Bread & Jelly", color: 'yellow', completed: false, timer: 0 },
-    { ingredients: ["Peanut Butter", "Bread & Jelly"], result: "PB&J", color: 'green', completed: false, timer: 0 }
-  ];
-  
-  let demoAnimations = [];
-  let currentDemoStep = 0;
-  let demoStepDelay = 90; // Faster animation between demo steps
-  let demoTimer = 0;
+  // Color palette
+  const COLORS = {
+    background: '#F5F1E8',    // Soft cream background
+    primary: '#778F5D',       // Avocado green
+    secondary: '#D96941',     // Burnt orange
+    tertiary: '#E2B33C',      // Mustard yellow
+    accent: '#7A9BB5',        // Dusty blue
+    text: '#333333',          // Dark gray for text
+    vesselBase: '#F9F5EB',    // Cream white for base ingredients
+    vesselYellow: '#E2B33C',  // Mustard yellow for partial combinations
+    vesselGreen: '#778F5D',   // Avocado green for complete combinations
+    vesselHint: '#D96941'     // Burnt orange for hint vessels
+  };
   
   // Animation class for combining ingredients
   class CombineAnimation {
@@ -115,7 +115,7 @@ let intermediate_combinations = [
   
   // Button class for UI elements
   class Button {
-    constructor(x, y, w, h, label, action, color = '#4285F4', textColor = 'white') {
+    constructor(x, y, w, h, label, action, color = COLORS.primary, textColor = 'white') {
       this.x = x;
       this.y = y;
       this.w = w;
@@ -143,6 +143,7 @@ let intermediate_combinations = [
       fill(this.textColor);
       noStroke();
       textAlign(CENTER, CENTER);
+      textFont(buttonFont);
       textSize(16);
       text(this.label, this.x, this.y);
     }
@@ -168,15 +169,15 @@ let intermediate_combinations = [
   // Hint Vessel class - extends Vessel with hint-specific functionality
   class HintVessel {
     constructor(combo) {
-      this.combo = combo;
       this.name = combo.name;
-      this.required = [...combo.required];
+      this.required = combo.required;
       this.collected = [];
-      this.x = width / 2;
-      this.y = hintButtonY; // Use the fixed Y position
-      this.w = 200;
-      this.h = 100;
-      this.color = '#FF5252'; // Red color
+      // Position the hint vessel exactly over the hint button
+      this.x = width * 0.5; // Same x as hint button
+      this.y = hintButtonY; // Exactly at the hint button's position
+      this.w = 250;
+      this.h = 120;
+      this.color = COLORS.vesselHint;
       this.scale = 1;
       this.targetScale = 1;
     }
@@ -249,7 +250,7 @@ let intermediate_combinations = [
     
     // Convert to a regular vessel when complete but keep it red
     toVessel() {
-      let v = new Vessel([], [], this.name, '#FF5252', this.x, this.y, 200, 100);
+      let v = new Vessel([], [], this.name, COLORS.vesselHint, this.x, this.y, 200, 100);
       v.isAdvanced = true; // Mark as advanced for proper rendering
       v.pulse();
       return v;
@@ -261,7 +262,14 @@ let intermediate_combinations = [
       this.ingredients = ingredients;
       this.complete_combinations = complete_combinations;
       this.name = name;
-      this.color = color;
+      
+      // Map color names to our new color palette
+      if (color === 'white') this.color = COLORS.vesselBase;
+      else if (color === 'yellow') this.color = COLORS.vesselYellow;
+      else if (color === 'green') this.color = COLORS.vesselGreen;
+      else if (color === '#FF5252') this.color = COLORS.vesselHint; // Hint vessel color
+      else this.color = color; // Use provided color if it doesn't match any of our mappings
+      
       this.x = x;
       this.y = y;
       this.w = w;
@@ -399,52 +407,66 @@ let intermediate_combinations = [
     return lines;
   }
   
+  // Preload function to load assets before setup
   function preload() {
-    // Load fonts or other assets
-    titleFont = loadFont('https://cdnjs.cloudflare.com/ajax/libs/topcoat/0.8.0/font/SourceSansPro-Bold.otf');
+    console.log("Preloading assets...");
+    
+    // Use web-safe fonts directly instead of trying to load Google Fonts
+    titleFont = 'Georgia';
+    bodyFont = 'Arial';
+    buttonFont = 'Verdana';
+    
+    console.log("Using web-safe fonts instead of Google Fonts");
   }
   
   function setup() {
     createCanvas(windowWidth, windowHeight); // Fullscreen canvas for mobile
-    textFont('Arial');
+    textFont(bodyFont);
     
-    let original_w = 100;
-    let original_h = 80;
-    let margin = 10; // Reduced margin for compact UI
+    // Calculate play area dimensions
+    playAreaWidth = min(maxPlayWidth, windowWidth - 2 * playAreaPadding);
+    // Set a fixed aspect ratio for the play area (mobile phone-like)
+    playAreaHeight = min(windowHeight - 2 * playAreaPadding, playAreaWidth * 1.8); // 16:9 aspect ratio
     
-    // Create vessels for each ingredient
-    ingredients.forEach((ing) => {
-      let v = new Vessel([ing], [], null, 'white', 0, 0, original_w, original_h);
-      vessels.push(v);
-    });
+    // Center the play area both horizontally and vertically
+    playAreaX = (windowWidth - playAreaWidth) / 2;
+    playAreaY = (windowHeight - playAreaHeight) / 2;
     
-    // Randomize the order of vessels
-    shuffleArray(vessels);
+    // The actual game initialization will happen in initializeGame()
+    // after the recipe data is loaded
     
-    // Initial arrangement of vessels
-    arrangeVessels();
-    
-    // Calculate the lowest vessel position
-    let lowestY = 0;
-    vessels.forEach(v => {
-        lowestY = Math.max(lowestY, v.y + v.h/2);
-    });
-    
-    // Set fixed hint button position 40 pixels below the lowest vessel
-    hintButtonY = lowestY + 40;
-    
-    // Create share and recipe buttons
-    shareButton = new Button(width * 0.35, height * 0.65, 120, 40, "Share Score", shareScore);
-    recipeButton = new Button(width * 0.65, height * 0.65, 120, 40, "View Recipe", viewRecipe);
-    
-    // Create hint button with white background and grey outline, using the fixed Y position
-    hintButton = new Button(width * 0.5, hintButtonY, 120, 40, "Hint", showHint, 'white', '#FF5252');
-    
-    // Create start button
-    startButton = new Button(width * 0.5, height * 0.7, 180, 60, "Start Cooking!", startGame, '#4CAF50', 'white');
-    
-    // Position demo ingredients
-    arrangeDemoIngredients();
+    // Load recipe data from Supabase if not in playtest mode
+    if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
+      loadRecipeData();
+    } else {
+      console.log("Playtest mode: waiting for date selection");
+      isLoadingRecipe = false; // In playtest mode, we'll load the recipe after date selection
+    }
+  }
+  
+  // Function to load recipe data from Supabase
+  async function loadRecipeData() {
+    try {
+      console.log("Loading recipe data from Supabase...");
+      const recipeData = await fetchTodayRecipe();
+      
+      if (recipeData) {
+        // Update game variables with recipe data
+        intermediate_combinations = recipeData.intermediateCombinations;
+        final_combination = recipeData.finalCombination;
+        ingredients = recipeData.baseIngredients;
+        recipeUrl = recipeData.recipeUrl;
+        
+        console.log("Recipe data loaded successfully");
+        isLoadingRecipe = false;
+      } else {
+        throw new Error("Failed to process recipe data");
+      }
+    } catch (error) {
+      console.error("Error loading recipe data:", error);
+      loadingError = true;
+      isLoadingRecipe = false;
+    }
   }
   
   // Fisher-Yates shuffle algorithm to randomize vessel order
@@ -457,116 +479,164 @@ let intermediate_combinations = [
   }
   
   function arrangeVessels() {
-    let basic_w = 100;
-    let advanced_w = 200; // Double width for advanced vessels
-    let basic_h = 80;
-    let advanced_h = 100; // Slightly taller for advanced vessels
-    let margin = 15; // Space between vessels
-    let vertical_margin = 8; // Vertical spacing between rows
+    // Calculate vessel sizes based on play area width to ensure 3 base vessels per row
+    // We need to fit 3 vessels plus margins in the play area width
+    let margin = 10;
+    let vertical_margin = 10;
+    
+    // Calculate basic vessel width to fit exactly 3 per row with margins
+    let basic_w = (playAreaWidth - (4 * margin)) / 3; // 3 vessels with margin on both sides
+    let basic_h = basic_w * 0.8; // Maintain aspect ratio
+    
+    // Advanced vessels are twice as wide
+    let advanced_w = basic_w * 2 + margin;
+    let advanced_h = basic_h * 1.2;
+    
+    // Adjust margins for very small screens
+    if (playAreaWidth < 300) {
+      margin = 5;
+      vertical_margin = 5;
+      // Recalculate with smaller margins
+      basic_w = (playAreaWidth - (4 * margin)) / 3;
+      basic_h = basic_w * 0.8;
+      advanced_w = basic_w * 2 + margin;
+      advanced_h = basic_h * 1.2;
+    }
 
     // First, separate vessels into advanced and basic
     let advancedVessels = vessels.filter(v => v.isAdvanced);
     let basicVessels = vessels.filter(v => !v.isAdvanced);
 
-    // Calculate total slots needed
-    let totalSlots = advancedVessels.length * 2 + basicVessels.length;
-    let slotsPerRow = 3; // Maximum slots per row
-    let rows = Math.ceil(totalSlots / slotsPerRow);
-
-    // Calculate maximum height needed for vessels
-    let totalHeight = rows * advanced_h + (rows - 1) * vertical_margin;
-    // Ensure we leave space at the bottom for the hint button
-    let startY = Math.min(180, 180 + (400 - totalHeight) / 2);
-
     // Create an array to hold our row arrangements
     let rowArrangements = [];
-    let currentRow = [];
-    let currentSlots = 0;
-
-    // First, try to pair advanced vessels with basic vessels when possible
+    
+    // Create rows with optimal arrangements
     while (advancedVessels.length > 0 || basicVessels.length > 0) {
-        // Reset/create new row if current row is full
-        if (currentSlots >= slotsPerRow) {
-            rowArrangements.push(currentRow);
-            currentRow = [];
-            currentSlots = 0;
-        }
-
-        // If we can fit an advanced vessel (2 slots) and have one available
-        if (currentSlots + 2 <= slotsPerRow && advancedVessels.length > 0) {
-            // Randomly decide whether to add the advanced vessel now or wait
-            if (Math.random() < 0.5 || basicVessels.length === 0) {
-                currentRow.push(advancedVessels.shift());
-                currentSlots += 2;
-                
-                // If we have exactly one slot left and a basic vessel, add it
-                if (currentSlots === 2 && basicVessels.length > 0) {
-                    currentRow.push(basicVessels.shift());
-                    currentSlots += 1;
-                }
-            } else {
-                // Add basic vessels first
-                while (currentSlots + 1 <= slotsPerRow && basicVessels.length > 0 && 
-                       (currentSlots + 3 <= slotsPerRow || advancedVessels.length === 0)) {
-                    currentRow.push(basicVessels.shift());
-                    currentSlots += 1;
-                }
-            }
-        }
-        // If we can't fit an advanced vessel but can fit a basic one
-        else if (currentSlots + 1 <= slotsPerRow && basicVessels.length > 0) {
-            currentRow.push(basicVessels.shift());
-            currentSlots += 1;
-        }
-        // If we can't fit either type but still have vessels, start a new row
-        else if (currentRow.length > 0) {
-            rowArrangements.push(currentRow);
-            currentRow = [];
-            currentSlots = 0;
-        }
-    }
-
-    // Add the last row if it has any vessels
-    if (currentRow.length > 0) {
+      let currentRow = [];
+      
+      // Try to create rows with 1 advanced vessel and 1 basic vessel when possible
+      if (advancedVessels.length > 0 && basicVessels.length > 0) {
+        currentRow.push(advancedVessels.shift()); // Add 1 advanced vessel (takes 2 slots)
+        currentRow.push(basicVessels.shift()); // Add 1 basic vessel (takes 1 slot)
         rowArrangements.push(currentRow);
+      }
+      // If we only have advanced vessels left, add 1 per row
+      else if (advancedVessels.length > 0) {
+        currentRow.push(advancedVessels.shift());
+        rowArrangements.push(currentRow);
+      }
+      // If we only have basic vessels left, add 3 per row (or fewer if that's all we have)
+      else if (basicVessels.length > 0) {
+        // Add up to 3 basic vessels
+        for (let i = 0; i < 3 && basicVessels.length > 0; i++) {
+          currentRow.push(basicVessels.shift());
+        }
+        rowArrangements.push(currentRow);
+      }
     }
+
+    // Calculate the starting Y position
+    let startY = playAreaY + playAreaHeight * 0.2; // Position relative to play area
 
     // Position all vessels based on row arrangements
     rowArrangements.forEach((row, rowIndex) => {
-        // Calculate total width of this row
-        let rowWidth = row.reduce((width, v) => {
-            return width + (v.isAdvanced ? advanced_w : basic_w);
-        }, 0) + (row.length - 1) * margin;
+      // Calculate total width of this row
+      let rowWidth = row.reduce((width, v) => {
+        return width + (v.isAdvanced ? advanced_w : basic_w);
+      }, 0) + (row.length - 1) * margin;
 
-        // Calculate starting x position to center the row
-        let startX = (width - rowWidth) / 2;
-        let currentX = startX;
+      // Calculate starting x position to center the row within the play area
+      let startX = playAreaX + (playAreaWidth - rowWidth) / 2;
+      let currentX = startX;
 
-        // Position each vessel in the row
-        row.forEach((v) => {
-            // Update vessel dimensions
-            if (v.isAdvanced) {
-                v.w = advanced_w;
-                v.h = advanced_h;
-            } else {
-                v.w = basic_w;
-                v.h = basic_h;
-            }
+      // Position each vessel in the row
+      row.forEach((v) => {
+        // Update vessel dimensions
+        if (v.isAdvanced) {
+          v.w = advanced_w;
+          v.h = advanced_h;
+        } else {
+          v.w = basic_w;
+          v.h = basic_h;
+        }
 
-            // Set vessel position
-            v.x = currentX + v.w / 2;
-            v.y = startY + rowIndex * (advanced_h + vertical_margin);
-            v.originalX = v.x;
-            v.originalY = v.y;
+        // Set vessel position
+        v.x = currentX + v.w / 2;
+        v.y = startY + rowIndex * (advanced_h + vertical_margin);
+        v.originalX = v.x;
+        v.originalY = v.y;
 
-            // Move x position for next vessel
-            currentX += v.w + margin;
-        });
+        // Move x position for next vessel
+        currentX += v.w + margin;
+      });
     });
+    
+    // Calculate the lowest vessel position for hint button placement
+    let lowestY = startY;
+    vessels.forEach(v => {
+      lowestY = Math.max(lowestY, v.y + v.h/2);
+    });
+    
+    // Set hint button position 20 pixels below the lowest vessel
+    hintButtonY = lowestY + 20;
+    
+    // Ensure the hint button stays within the play area
+    hintButtonY = Math.min(hintButtonY, playAreaY + playAreaHeight - 60);
   }
   
   function draw() {
-    background(245, 242, 235); // Cream background
+    background(COLORS.background);
+    
+    // Draw the floral pattern border
+    drawFloralBorder();
+    
+    // Ensure no stroke for all text elements
+    noStroke();
+    
+    // Check if we're still loading recipe data
+    if (isLoadingRecipe) {
+      // Display loading screen
+      textAlign(CENTER, CENTER);
+      textSize(24);
+      fill(0);
+      text("Loading today's recipe...", width/2, height/2);
+      
+      // Display current time in EST for debugging
+      textSize(14);
+      const estTime = getCurrentESTTime();
+      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
+      
+      return;
+    }
+    
+    // Check if there was an error loading recipe data
+    if (loadingError) {
+      textAlign(CENTER, CENTER);
+      textSize(24);
+      fill(255, 0, 0);
+      text("Error loading recipe. Using default recipe.", width/2, height/2 - 30);
+      textSize(16);
+      text("Please check your internet connection and refresh the page.", width/2, height/2 + 10);
+      
+      // Display current time in EST for debugging
+      textSize(14);
+      const estTime = getCurrentESTTime();
+      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
+      
+      // After 3 seconds, continue with default recipe
+      if (frameCount % 180 === 0) {
+        loadingError = false;
+        // Initialize the game with default recipe data
+        initializeGame();
+      }
+      return;
+    }
+    
+    // Check if we need to initialize the game after loading data
+    if (vessels.length === 0) {
+      initializeGame();
+      return;
+    }
     
     // Draw title
     drawTitle();
@@ -574,7 +644,6 @@ let intermediate_combinations = [
     if (!gameStarted) {
       // Draw start screen with animated demo
       drawStartScreen();
-      updateDemo();
     } else if (gameWon) {
       // Draw win screen
       drawWinScreen();
@@ -613,12 +682,6 @@ let intermediate_combinations = [
         }
       }
       
-      // Draw turn counter
-      textAlign(LEFT, BOTTOM);
-      textSize(16);
-      fill('#333');
-      text("Turns: " + turnCounter, 20, height - 20);
-      
       // Draw move history
       drawMoveHistory();
     }
@@ -628,301 +691,251 @@ let intermediate_combinations = [
   }
   
   function drawTitle() {
-    // Draw game title
-    textAlign(CENTER, CENTER);
-    fill('#333');
-    textSize(40);
+    push();
     textFont(titleFont);
-    text("COMBO MEAL", width/2, 60);
+    textSize(48);
+    textAlign(CENTER, CENTER);
+    fill(COLORS.primary);
+    noStroke(); // Ensure no stroke is applied to the text
+    text("Combo Meal", width / 2, 60);
     
-    // Draw byline
-    textSize(18);
-    textFont('Arial');
-    fill('#666');
-    text("Combine the ingredients to discover the dish!", width/2, 100);
+    textFont(bodyFont);
+    textSize(16);
+    fill(COLORS.text);
+    noStroke(); // Ensure no stroke is applied to the text
+    text("Reveal a new recipe every day!", width / 2, 100);
+    pop();
   }
   
   function drawStartScreen() {
-    // Draw demo ingredients and combinations
-    drawDemoIngredients();
+    // Adjust header size based on available space
+    let headerSize = 28;
+    let descriptionSize = 14;
     
-    // Draw demo animations
-    for (let i = demoAnimations.length - 1; i >= 0; i--) {
-      demoAnimations[i].draw();
-      if (demoAnimations[i].update()) {
-        demoAnimations.splice(i, 1);
-      }
+    // Scale down based on play area width
+    if (playAreaWidth < 380) {
+      headerSize = 24;
+      descriptionSize = 12;
+    }
+    if (playAreaWidth < 340) {
+      headerSize = 20;
+      descriptionSize = 10;
     }
     
-    // Draw instructions
+    // Draw "How to play:" header - position relative to play area
     textAlign(CENTER);
-    textSize(18);
+    textSize(headerSize);
     fill('#333');
-    text("Combine ingredients into culinary combos to discover the dish", width/2, height * 0.55);
-    text("in the fewest turns. New recipe daily!", width/2, height * 0.55 + 30);
+    text("How to play:", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.12);
     
-    // Draw start button
+    // Draw the three equations with more compact spacing
+    // Position relative to play area
+    drawTutorialEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
+                        "Combine ingredients to make new ones!", 
+                        playAreaY + playAreaHeight * 0.25, false, descriptionSize);
+    
+    drawTutorialEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
+                        "Partial combos turn yellow. Add more ingredients!", 
+                        playAreaY + playAreaHeight * 0.45, false, descriptionSize);
+    
+    drawTutorialEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
+                        "Solve the recipe in as few moves as you can!", 
+                        playAreaY + playAreaHeight * 0.65, true, descriptionSize);
+    
+    // Position start button relative to play area
+    startButton.x = playAreaX + playAreaWidth/2;
+    startButton.y = playAreaY + playAreaHeight * 0.85;
     startButton.draw();
     startButton.checkHover(mouseX, mouseY);
   }
   
-  function arrangeDemoIngredients() {
-    // Position the demo ingredients in a more compact layout
-    const centerY = height * 0.35;
-    const topRowY = centerY - 50;
-    const bottomRowY = centerY;
+  // Function to draw tutorial equations
+  function drawTutorialEquation(equationNum, leftName, leftColor, rightName, rightColor, resultName, resultColor, description, yPosition, showStarburst = false, descriptionSize = 16) {
+    // Adjust vessel sizes based on play area width
+    let vesselWidth = min(70, playAreaWidth * 0.15);
+    let vesselHeight = vesselWidth * 0.6;
+    let operatorSize = min(24, playAreaWidth * 0.06);
     
-    // First row: 3 ingredients
-    demoIngredients[0].x = width * 0.25; // Bread
-    demoIngredients[0].y = topRowY;
+    // Calculate positions relative to play area
+    const spacing = playAreaWidth * 0.2;
+    const leftX = playAreaX + playAreaWidth * 0.25;
+    const rightX = playAreaX + playAreaWidth * 0.5;
+    const resultX = playAreaX + playAreaWidth * 0.75;
     
-    demoIngredients[1].x = width * 0.5; // Grapes
-    demoIngredients[1].y = topRowY;
+    // Operator positions
+    const operatorX1 = (leftX + rightX) / 2;
+    const operatorX2 = (rightX + resultX) / 2;
     
-    demoIngredients[2].x = width * 0.75; // Peanuts
-    demoIngredients[2].y = topRowY;
+    // Draw left vessel
+    drawTutorialVessel(leftX, yPosition, leftName, leftColor, vesselWidth, vesselHeight);
     
-    // Second row: 2 ingredients
-    demoIngredients[3].x = width * 0.35; // Sugar
-    demoIngredients[3].y = bottomRowY;
+    // Draw plus sign
+    textAlign(CENTER, CENTER);
+    textSize(operatorSize);
+    fill('#333');
+    noStroke();
+    text("+", operatorX1, yPosition);
     
-    demoIngredients[4].x = width * 0.65; // Salt
-    demoIngredients[4].y = bottomRowY;
+    // Draw right vessel
+    drawTutorialVessel(rightX, yPosition, rightName, rightColor, vesselWidth, vesselHeight);
     
-    // Position for intermediate results - keep everything more compact
-    demoSteps[0].x = width * 0.75; // Peanut Butter (stays on right)
-    demoSteps[0].y = centerY + 50;
+    // Draw equals sign
+    textAlign(CENTER, CENTER);
+    textSize(operatorSize);
+    fill('#333');
+    noStroke();
+    text("=", operatorX2, yPosition);
     
-    demoSteps[1].x = width * 0.4; // Jelly (stays on left)
-    demoSteps[1].y = centerY + 50;
+    // Draw result vessel with optional starburst
+    if (showStarburst) {
+      drawStarburst(resultX, yPosition);
+    }
+    drawTutorialVessel(resultX, yPosition, resultName, resultColor, vesselWidth, vesselHeight);
     
-    demoSteps[2].x = width * 0.4; // Bread & Jelly (replaces Jelly position)
-    demoSteps[2].y = centerY + 50;
+    // Draw description with improved spacing
+    textAlign(CENTER); // Center align all descriptions for better fit
+    textSize(descriptionSize);
+    fill('#333');
     
-    demoSteps[3].x = width * 0.5; // Final PB&J (centered)
-    demoSteps[3].y = centerY + 80;
+    // Position description below the equation
+    text(description, playAreaX + playAreaWidth/2, yPosition + vesselHeight * 0.9);
   }
   
-  function drawDemoIngredients() {
-    // Draw each demo ingredient
-    for (let ing of demoIngredients) {
-      if (!ing.combined) {
-        drawDemoVessel(ing.x, ing.y, ing.name, ing.color, false);
-      }
-    }
-    
-    // Draw completed combinations
-    for (let step of demoSteps) {
-      if (step.completed) {
-        drawDemoVessel(step.x, step.y, step.result, step.color, true);
-      }
-    }
-  }
-  
-  function drawDemoVessel(x, y, name, vesselColor, isAdvanced) {
+  // New function to draw tutorial vessels
+  function drawTutorialVessel(x, y, name, color, vesselWidth, vesselHeight) {
     push();
     translate(x, y);
     
-    if (!isAdvanced) {
-      // Basic ingredient vessel
-      fill(vesselColor);
-        stroke('black');
-      strokeWeight(3);
+    // Draw vessel
+    if (color === "white") {
+      // Basic ingredient vessel (white)
+      fill('white');
+      stroke('black');
+      strokeWeight(2);
       
       // Draw rounded rectangle
       rectMode(CENTER);
-      rect(0, -10, 80, 50, 5, 5, 30, 30);
+      rect(0, 0, vesselWidth, vesselHeight, 5, 5, 30, 30);
+    } else if (color === "yellow") {
+      // Draw handles behind the vessel
+      fill('#888888');
+      stroke('black');
+      strokeWeight(2);
+      circle(-vesselWidth * 0.4, -5, 15);
+      circle(vesselWidth * 0.4, -5, 15);
       
-      // Draw text
-        fill('black');
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(12);
-      text(name, 0, -10);
-    } else {
-      // Advanced vessel
-      if (vesselColor === 'green') {
-        // Green vessel (pan with long handle)
-        fill('#888888');
-        stroke('black');
-        strokeWeight(3);
-        rectMode(CENTER);
-        rect(80, 0, 80, 15, 5);
-        
-        // Draw vessel body - make it larger for the final result
-        fill(vesselColor);
-        stroke('black');
-        strokeWeight(3);
-        
-        // Draw rectangle with rounded corners ONLY at the bottom
-        rectMode(CENTER);
-        rect(0, 0, 140, 70, 0, 0, 10, 10);
-      } else {
-        // Yellow vessel (pot with two handles)
-        fill('#888888');
-        stroke('black');
-        strokeWeight(3);
-        circle(-60, -5, 20);
-        circle(60, -5, 20);
-        
-        // Draw vessel body
-        fill(vesselColor);
-        stroke('black');
-        strokeWeight(3);
-        
-        // Draw rectangle with rounded corners ONLY at the bottom
-        rectMode(CENTER);
-        rect(0, 0, 120, 60, 0, 0, 10, 10);
-      }
+      // Yellow vessel (partial combination)
+      fill(COLORS.tertiary); // Mustard yellow
+      stroke('black');
+      strokeWeight(2);
       
-      // Draw text
-      fill('black');
-      noStroke();
-      textAlign(CENTER, CENTER);
-      textSize(14);
-      text(name, 0, -10);
+      // Draw rectangle with rounded corners
+      rectMode(CENTER);
+      rect(0, 0, vesselWidth, vesselHeight, 0, 0, 10, 10);
+    } else if (color === "green") {
+      // Draw handle behind the vessel
+      fill('#888888');
+      stroke('black');
+      strokeWeight(2);
+      rectMode(CENTER);
+      rect(vesselWidth * 0.6, 0, vesselWidth * 0.5, vesselHeight * 0.15, 5);
+      
+      // Green vessel (complete combination)
+      fill(COLORS.primary); // Avocado green
+      stroke('black');
+      strokeWeight(2);
+      
+      // Draw rectangle with rounded corners
+      rectMode(CENTER);
+      rect(0, 0, vesselWidth, vesselHeight, 0, 0, 10, 10);
+    }
+    
+    // Draw text
+    fill('black');
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    
+    // Split text into lines if needed
+    let lines = splitTextIntoLines(name, vesselWidth * 0.7);
+    for (let i = 0; i < lines.length; i++) {
+      let yOffset = (i - (lines.length - 1) / 2) * 15;
+      text(lines[i], 0, yOffset);
     }
     
     pop();
   }
   
-  function updateDemo() {
-    demoTimer++;
+  // New function to draw starburst behind final vessel
+  function drawStarburst(x, y) {
+    push();
+    translate(x, y);
     
-    // Process the current demo step
-    if (currentDemoStep < demoSteps.length) {
-      let step = demoSteps[currentDemoStep];
-      
-      if (!step.completed) {
-        step.timer++;
-        
-        // When it's time to perform this step
-        if (step.timer >= demoStepDelay) {
-          // Special handling for the Bread & Jelly step
-          if (step.result === "Bread & Jelly") {
-            // Find Bread and animate it moving to Jelly
-            let bread = demoIngredients.find(i => i.name === "Bread");
-            let jellyStep = demoSteps.find(s => s.result === "Jelly");
-            
-            if (bread && !bread.combined && jellyStep && jellyStep.completed) {
-              bread.combined = true;
-              
-              // Create animation from Bread to Jelly position
-              createDemoAnimation(bread.x, bread.y, bread.color, jellyStep.x, jellyStep.y);
-              
-              // Mark this step as completed
-              step.completed = true;
-              
-              // Move to the next step
-              currentDemoStep++;
-            }
-          }
-          // Special handling for the final PB&J step
-          else if (step.result === "PB&J") {
-            // Find Peanut Butter and animate it moving to Bread & Jelly
-            let pbStep = demoSteps.find(s => s.result === "Peanut Butter");
-            let bjStep = demoSteps.find(s => s.result === "Bread & Jelly");
-            
-            if (pbStep && pbStep.completed && bjStep && bjStep.completed) {
-              // Create animation from Peanut Butter to Bread & Jelly position
-              createDemoAnimation(pbStep.x, pbStep.y, pbStep.color, bjStep.x, bjStep.y);
-              
-              // Mark this step as completed
-              step.completed = true;
-              
-              // Move to the next step
-              currentDemoStep++;
-              
-              // If we've completed all steps, reset the demo after a delay
-              if (currentDemoStep >= demoSteps.length) {
-                setTimeout(resetDemo, 3000);
-              }
-            }
-          }
-          // Normal handling for other steps
-          else {
-            // Mark the ingredients as combined
-            for (let ingName of step.ingredients) {
-              // Check if it's a basic ingredient
-              let basicIng = demoIngredients.find(i => i.name === ingName && !i.combined);
-              if (basicIng) {
-                basicIng.combined = true;
-                
-                // Create animation from this ingredient to the result position
-                createDemoAnimation(basicIng.x, basicIng.y, basicIng.color, step.x, step.y);
-              }
-            }
-            
-            // Mark this step as completed
-            step.completed = true;
-            
-            // Move to the next step
-            currentDemoStep++;
-          }
-        }
-      }
-    }
-  }
-  
-  function createDemoAnimation(startX, startY, color, targetX, targetY) {
-    for (let i = 0; i < 5; i++) {
-      demoAnimations.push(new CombineAnimation(startX, startY, color, targetX, targetY));
-    }
-  }
-  
-  function resetDemo() {
-    // Reset all demo ingredients and steps
-    for (let ing of demoIngredients) {
-      ing.combined = false;
-    }
+    // Draw subtle yellow starburst
+    fill(COLORS.tertiary + '80'); // Mustard yellow with 50% opacity
+    noStroke();
     
-    for (let step of demoSteps) {
-      step.completed = false;
-      step.timer = 0;
+    // Draw an 8-point star
+    beginShape();
+    for (let i = 0; i < 16; i++) {
+      let radius = i % 2 === 0 ? 70 : 50;
+      let angle = TWO_PI * i / 16 - PI/16;
+      let px = cos(angle) * radius;
+      let py = sin(angle) * radius;
+      vertex(px, py);
     }
+    endShape(CLOSE);
     
-    currentDemoStep = 0;
-    demoTimer = 0;
-    
-    // Clear any remaining animations
-    demoAnimations = [];
+    pop();
   }
   
   function drawWinScreen() {
-    // Draw win message
+    // Draw title
+    drawTitle();
+    
+    // Center all content within the play area
     textAlign(CENTER, CENTER);
-    textSize(40);
-    textFont(titleFont);
+    
+    // Draw "YOU MADE IT!" text
+    textSize(36);
     fill('#333');
-    text("YOU MADE IT!", width/2, height/2 - 120);
+    text("YOU MADE IT!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.15);
     
     // Draw recipe name
     textSize(32);
-    fill('#4CAF50');
-    text(final_combination.name, width/2, height/2 - 60);
+    fill(COLORS.secondary);
+    text(final_combination.name, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.25);
     
     // Draw turn count with larger, more prominent display
-    textSize(28);
+    textSize(24);
     fill('#666');
-    text("Completed in", width/2, height/2);
+    text("Completed in", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.35);
     
     // Draw turn counter in a circle
-    let turnCircleSize = 80;
-    fill('#4285F4');
-    stroke('#333');
-    strokeWeight(3);
-    circle(width/2, height/2 + 60, turnCircleSize);
+    let turnCircleSize = 70;
+    fill(COLORS.primary);
+    noStroke();
+    circle(playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.45, turnCircleSize);
     
     // Draw turn number
     fill('white');
-    noStroke();
-    textSize(36);
-    text(turnCounter, width/2, height/2 + 60);
-    textSize(18);
-    text("turns", width/2, height/2 + 90);
+    textSize(32);
+    text(turnCounter, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.45);
+    textSize(16);
+    text("turns", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.45 + 25);
     
     // Draw move history with larger circles
     drawWinMoveHistory();
+    
+    // Position buttons at the bottom of the play area with proper spacing
+    const buttonSpacing = 20;
+    const buttonY = playAreaY + playAreaHeight * 0.9;
+    
+    // Update button positions
+    shareButton.x = playAreaX + playAreaWidth/2 - shareButton.w - buttonSpacing/2;
+    shareButton.y = buttonY;
+    recipeButton.x = playAreaX + playAreaWidth/2 + buttonSpacing/2;
+    recipeButton.y = buttonY;
     
     // Draw buttons
     shareButton.draw();
@@ -935,37 +948,93 @@ let intermediate_combinations = [
   
   // Enhanced move history display for win screen
   function drawWinMoveHistory() {
-    const circleSize = 25;
-    const margin = 8;
-    const maxPerRow = 15;
-    const startX = width/2 - (Math.min(moveHistory.length, maxPerRow) * (circleSize + margin) - margin) / 2;
-    const startY = height/2 + 140;
+    textAlign(CENTER);
+    textSize(16);
+    fill('black');
+    text(`You solved it in ${moveHistory.length} moves!`, 
+         playAreaX + playAreaWidth/2, 
+         playAreaY + playAreaHeight * 0.55);
     
-    for (let i = 0; i < moveHistory.length; i++) {
-      const row = Math.floor(i / maxPerRow);
-      const col = i % maxPerRow;
-      const x = startX + col * (circleSize + margin);
-      const y = startY + row * (circleSize + margin);
+    const circleSize = 20; // Slightly smaller circles
+    const margin = 8;
+    const maxPerRow = Math.min(10, Math.floor(playAreaWidth / (circleSize + margin))); // Limit based on play area width
+    const rowWidth = Math.min(moveHistory.length, maxPerRow) * (circleSize + margin) - margin;
+    const startX = playAreaX + playAreaWidth/2 - rowWidth / 2;
+    const startY = playAreaY + playAreaHeight * 0.6;
+    
+    // Calculate how many rows we need
+    const numRows = Math.ceil(moveHistory.length / maxPerRow);
+    
+    // Ensure we don't overlap with buttons
+    if (startY + numRows * (circleSize + margin) > playAreaY + playAreaHeight * 0.85) {
+      // If we would overlap, reduce the circle size
+      const reducedCircleSize = 15;
+      const reducedMargin = 6;
       
-      fill(moveHistory[i]);
-      stroke('black');
-      strokeWeight(2);
-      circle(x, y, circleSize);
+      // Recalculate with smaller circles
+      const reducedMaxPerRow = Math.min(12, Math.floor(playAreaWidth / (reducedCircleSize + reducedMargin)));
+      const reducedRowWidth = Math.min(moveHistory.length, reducedMaxPerRow) * (reducedCircleSize + reducedMargin) - reducedMargin;
+      const reducedStartX = playAreaX + playAreaWidth/2 - reducedRowWidth / 2;
+      
+      // Draw smaller circles
+      for (let i = 0; i < moveHistory.length; i++) {
+        const row = Math.floor(i / reducedMaxPerRow);
+        const col = i % reducedMaxPerRow;
+        const x = reducedStartX + col * (reducedCircleSize + reducedMargin);
+        const y = startY + row * (reducedCircleSize + reducedMargin);
+        
+        fill(moveHistory[i]);
+        noStroke();
+        circle(x, y, reducedCircleSize);
+      }
+    } else {
+      // Draw regular sized circles
+      for (let i = 0; i < moveHistory.length; i++) {
+        const row = Math.floor(i / maxPerRow);
+        const col = i % maxPerRow;
+        const x = startX + col * (circleSize + margin);
+        const y = startY + row * (circleSize + margin);
+        
+        fill(moveHistory[i]);
+        noStroke();
+        circle(x, y, circleSize);
+      }
     }
   }
   
   // Keep the regular move history for during gameplay
   function drawMoveHistory() {
+    if (moveHistory.length === 0) return;
+    
+    // Position the move history below the hint button
     const circleSize = 15;
-    const margin = 5;
-    const startX = 90;
-    const startY = height - 20;
+    const margin = 8;
+    const maxPerRow = 10; // Reduced from 15 to allow more rows
+    const rowWidth = Math.min(moveHistory.length, maxPerRow) * (circleSize + margin) - margin;
+    
+    // Center horizontally within the play area
+    const startX = playAreaX + (playAreaWidth / 2) - (rowWidth / 2);
+    
+    // Calculate a fixed position for the move history
+    // This will be below the hint button area, regardless of whether the hint is active
+    const moveHistoryY = playAreaY + playAreaHeight * 0.8; // Fixed position at 80% of play area height
+    
+    // Calculate how many rows we need
+    const numRows = Math.ceil(moveHistory.length / maxPerRow);
+    const totalHeight = numRows * (circleSize + margin) - margin;
+    
+    // Ensure we're within the play area
+    if (moveHistoryY + totalHeight > playAreaY + playAreaHeight - 10) return;
     
     for (let i = 0; i < moveHistory.length; i++) {
+      const row = Math.floor(i / maxPerRow);
+      const col = i % maxPerRow;
+      const x = startX + col * (circleSize + margin);
+      const y = moveHistoryY + row * (circleSize + margin);
+      
       fill(moveHistory[i]);
-      stroke('black');
-      strokeWeight(1);
-      circle(startX + i * (circleSize + margin), startY - circleSize/2, circleSize);
+      noStroke(); // Remove stroke from circles
+      circle(x, y, circleSize);
     }
   }
   
@@ -1196,44 +1265,68 @@ let intermediate_combinations = [
     // Check if hint is active before creating any new vessels
     let hintActive = showingHint && hintVessel;
     
+    // Case 1: Both vessels are base ingredients (white vessels)
     if (v1.ingredients.length > 0 && v2.ingredients.length > 0 && v1.complete_combinations.length === 0 && v2.complete_combinations.length === 0) {
       let U = [...new Set([...v1.ingredients, ...v2.ingredients])];
-      let C_candidates = intermediate_combinations.filter(C => U.every(ing => C.required.includes(ing)));
       
-      if (C_candidates.length > 0) {
-        let C = C_candidates[0];
+      // Special handling for hint: If all ingredients are part of the hint, create a yellow vessel
+      // This will be detected by checkForMatchingVessels and added to the hint vessel
+      if (hintActive) {
+        // Check if all ingredients are required for the hint
+        let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
         
-        // If hint is active, check if these ingredients are part of the hint
-        if (hintActive) {
-          // Check if all ingredients are required for the hint
-          let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
-          
-          // Check if any of these ingredients are already collected in the hint
-          let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
-          
-          // If all ingredients are part of the hint and none are already collected,
-          // we should add them to the hint vessel instead of creating a new vessel
-          if (allIngredientsInHint && !anyAlreadyCollected) {
-            // We'll handle this in mouseReleased by returning a yellow vessel
-            // that will be detected by checkForMatchingVessels
-            let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
-            return new_v;
-          }
+        // Check if any of these ingredients are already collected in the hint
+        let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
+        
+        // If all ingredients are part of the hint and none are already collected,
+        // create a yellow vessel that will be detected by checkForMatchingVessels
+        if (allIngredientsInHint && !anyAlreadyCollected) {
+          console.log(`Creating yellow vessel for hint with ingredients: ${U.join(', ')}`);
+          let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+          return new_v;
         }
-        
+      }
+      
+      // Check if this combination matches or partially matches any recipe
+      let C_candidates = intermediate_combinations.filter(C => {
+        // Check if there's any overlap between the required ingredients and our combined set
+        let overlap = C.required.filter(ing => U.includes(ing));
+        // Only consider it a match if ALL ingredients in U are part of the recipe
+        // AND there's at least one ingredient from the recipe in U
+        return overlap.length > 0 && U.every(ing => C.required.includes(ing));
+      });
+      
+      // Only create a new vessel if we have valid recipe candidates
+      if (C_candidates.length > 0) {
         // Create a new vessel (yellow or green)
         let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+        
+        let C = C_candidates[0];
+        
+        // Check if we have all required ingredients for this combination
+        // Only turn green if we have exactly the required ingredients (no extras)
         if (U.length === C.required.length && C.required.every(ing => U.includes(ing))) {
           // Only turn green if not part of an active hint
-          if (!hintActive || !C.name === hintVessel.name) {
-          new_v.name = C.name;
-          new_v.color = 'green';
+          if (!hintActive || C.name !== hintVessel.name) {
+            new_v.name = C.name;
+            new_v.color = 'green';
             new_v.ingredients = []; // Clear ingredients since this is now a complete combination
+            console.log(`Created green vessel for ${C.name} with ingredients: ${U.join(', ')}`);
           }
+        } else {
+          console.log(`Created yellow vessel with ingredients: ${U.join(', ')}`);
+          console.log(`Missing ingredients for ${C.name}: ${C.required.filter(ing => !U.includes(ing)).join(', ')}`);
         }
+        
         return new_v;
+      } else {
+        // No matching recipe, don't create a vessel
+        console.log(`Cannot combine unrelated ingredients: ${U.join(', ')}`);
+        return null;
       }
-    } else if ((v1.name || v1.complete_combinations.length > 0) && (v2.name || v2.complete_combinations.length > 0)) {
+    } 
+    // Case 2: Both vessels are completed combinations (green vessels)
+    else if ((v1.name || v1.complete_combinations.length > 0) && (v2.name || v2.complete_combinations.length > 0)) {
       // Handle combining completed combinations (green vessels)
       let set1 = v1.complete_combinations.length > 0 ? v1.complete_combinations : (v1.name ? [v1.name] : []);
       let set2 = v2.complete_combinations.length > 0 ? v2.complete_combinations : (v2.name ? [v2.name] : []);
@@ -1248,10 +1341,65 @@ let intermediate_combinations = [
           new_v.name = final_combination.name;
           new_v.color = 'green';
           new_v.complete_combinations = []; // Clear since this is the final combination
+          console.log(`Created green vessel for final combination ${final_combination.name}`);
+        } else {
+          console.log(`Created yellow vessel with combinations: ${U.join(', ')}`);
+          console.log(`Missing combinations for ${final_combination.name}: ${final_combination.required.filter(name => !U.includes(name)).join(', ')}`);
         }
         return new_v;
       }
     }
+    // Case 3: Mixing a base ingredient (white vessel) with a completed combination (green/yellow vessel)
+    else if ((v1.ingredients.length > 0 && (v2.name || v2.complete_combinations.length > 0)) || 
+             (v2.ingredients.length > 0 && (v1.name || v1.complete_combinations.length > 0))) {
+      
+      // Determine which vessel is the base ingredient and which is the combination
+      let baseVessel = v1.ingredients.length > 0 ? v1 : v2;
+      let comboVessel = v1.ingredients.length > 0 ? v2 : v1;
+      
+      // Get the base ingredient name(s)
+      let baseIngredients = baseVessel.ingredients;
+      
+      // Get the completed combinations
+      let completedCombos = comboVessel.complete_combinations.length > 0 ? 
+                            comboVessel.complete_combinations : 
+                            (comboVessel.name ? [comboVessel.name] : []);
+      
+      // Check if any base ingredient is directly required in the final combination
+      let baseInFinal = baseIngredients.some(ing => final_combination.required.includes(ing));
+      
+      // Check if any completed combo is required in the final combination
+      let comboInFinal = completedCombos.some(combo => final_combination.required.includes(combo));
+      
+      // If either the base ingredient or the combo is part of the final recipe, proceed
+      if (baseInFinal || comboInFinal) {
+        // Create a combined set of all components (both base ingredients and completed combos)
+        let allComponents = [...baseIngredients, ...completedCombos];
+        
+        // Create a yellow vessel for the partial combination
+        let new_v = new Vessel([], allComponents, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+        
+        // Check if we have all required components for the final combination
+        let hasAllRequired = final_combination.required.every(req => 
+          allComponents.includes(req) || 
+          // For each required component, check if we have it directly or as a base ingredient
+          (baseIngredients.includes(req) || completedCombos.includes(req))
+        );
+        
+        if (hasAllRequired) {
+          new_v.name = final_combination.name;
+          new_v.color = 'green';
+          new_v.complete_combinations = []; // Clear since this is the final combination
+          console.log(`Created green vessel for final combination ${final_combination.name} with base ingredients and combos`);
+        } else {
+          console.log(`Created yellow vessel with base ingredients and combinations`);
+          console.log(`Base ingredients: ${baseIngredients.join(', ')}`);
+          console.log(`Completed combinations: ${completedCombos.join(', ')}`);
+        }
+        return new_v;
+      }
+    }
+    
     return null;
   }
   
@@ -1285,14 +1433,16 @@ let intermediate_combinations = [
   }
   
   function mouseMoved() {
-    // Update button hover states
-    if (!gameStarted) {
+    // Check if buttons exist before trying to use them
+    if (!gameStarted && startButton) {
       startButton.checkHover(mouseX, mouseY);
-    } else if (gameWon) {
-      shareButton.checkHover(mouseX, mouseY);
-      recipeButton.checkHover(mouseX, mouseY);
-    } else if (!showingHint) {
-      hintButton.checkHover(mouseX, mouseY);
+    }
+    
+    if (gameStarted) {
+      // Only check these buttons if they exist and the game has started
+      if (shareButton) shareButton.checkHover(mouseX, mouseY);
+      if (recipeButton) recipeButton.checkHover(mouseX, mouseY);
+      if (hintButton) hintButton.checkHover(mouseX, mouseY);
     }
   }
   
@@ -1371,6 +1521,7 @@ let intermediate_combinations = [
           
           if (canAddAll) {
             matchesHint = true;
+            console.log("Adding ingredients to hint: " + v.ingredients.join(', '));
             
             // Add all ingredients to the hint vessel
             for (let ing of v.ingredients) {
@@ -1411,12 +1562,6 @@ let intermediate_combinations = [
       // Reset hint
       hintVessel = null;
       showingHint = false;
-      
-      // Check win condition
-      if (vessels.length === 1 && vessels[0].name === final_combination.name) {
-        gameWon = true;
-        triggerHapticFeedback('completion'); // Haptic feedback on game completion
-      }
     }
   }
   
@@ -1425,18 +1570,216 @@ let intermediate_combinations = [
   }
   
   function triggerHapticFeedback(type) {
+    // Only trigger haptic feedback if the device supports it
     if (navigator.vibrate) {
-      switch(type) {
-        case 'success':
-          navigator.vibrate([50, 30, 50]); // Short double vibration
-          break;
-        case 'error':
-          navigator.vibrate(100); // Single short vibration
-          break;
-        case 'completion':
-          navigator.vibrate([100, 50, 100, 50, 200]); // Celebratory pattern
-          break;
+      if (type === 'success') {
+        navigator.vibrate(50);
+      } else if (type === 'error') {
+        navigator.vibrate([50, 30, 50]);
+      } else if (type === 'complete') {
+        navigator.vibrate([50, 30, 50, 30, 100]);
       }
     }
   }
   
+  // Add touch support for mobile devices
+  function touchStarted() {
+    // Prevent default touch behavior to avoid scrolling
+    if (touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Handle the same logic as mousePressed but with touch coordinates
+      if (!gameStarted) {
+        // Check if start button was touched
+        if (startButton.isInside(touchX, touchY)) {
+          startButton.handleClick();
+          return false;
+        }
+      } else if (gameWon) {
+        // Check if buttons were touched
+        if (shareButton.isInside(touchX, touchY)) {
+          shareButton.handleClick();
+          return false;
+        }
+        if (recipeButton.isInside(touchX, touchY)) {
+          recipeButton.handleClick();
+          return false;
+        }
+      } else {
+        // Check if hint button was touched
+        if (!showingHint && hintButton.isInside(touchX, touchY)) {
+          hintButton.handleClick();
+          return false;
+        }
+        
+        // Check if a vessel was touched
+        for (let v of vessels) {
+          if (v.isInside(touchX, touchY)) {
+            draggedVessel = v;
+            offsetX = touchX - v.x;
+            offsetY = touchY - v.y;
+            v.targetScale = 1.1; // Slight scale up when dragging
+            triggerHapticFeedback('success'); // Haptic feedback on successful drag
+            return false;
+          }
+        }
+      }
+    }
+    return false; // Prevent default
+  }
+  
+  // New function to initialize the game after data is loaded
+  function initializeGame() {
+    // Create vessels for each ingredient
+    ingredients.forEach((ing) => {
+      let v = new Vessel([ing], [], null, 'white', 0, 0, 0, 0); // Size will be set in arrangeVessels
+      vessels.push(v);
+    });
+    
+    // Randomize the order of vessels
+    shuffleArray(vessels);
+    
+    // Initial arrangement of vessels
+    arrangeVessels();
+    
+    // Calculate the lowest vessel position
+    let lowestY = 0;
+    vessels.forEach(v => {
+      lowestY = Math.max(lowestY, v.y + v.h/2);
+    });
+    
+    // Set hint button position 20 pixels below the lowest vessel
+    hintButtonY = lowestY + 20;
+    
+    // Adjust button sizes based on play area width
+    let buttonWidth = min(120, playAreaWidth * 0.25);
+    let buttonHeight = min(40, buttonWidth * 0.4);
+    let startButtonWidth = min(180, playAreaWidth * 0.4);
+    let startButtonHeight = min(60, startButtonWidth * 0.33);
+    
+    // Create share and recipe buttons - position relative to play area
+    shareButton = new Button(
+      playAreaX + playAreaWidth * 0.35, 
+      playAreaY + playAreaHeight * 0.85, 
+      buttonWidth, 
+      buttonHeight, 
+      "Share Score", 
+      shareScore
+    );
+    
+    recipeButton = new Button(
+      playAreaX + playAreaWidth * 0.65, 
+      playAreaY + playAreaHeight * 0.85, 
+      buttonWidth, 
+      buttonHeight, 
+      "View Recipe", 
+      viewRecipe
+    );
+    
+    // Create hint button with white background and grey outline
+    hintButton = new Button(
+      playAreaX + playAreaWidth * 0.5, 
+      hintButtonY, 
+      buttonWidth, 
+      buttonHeight, 
+      "Hint", 
+      showHint, 
+      'white', 
+      '#FF5252'
+    );
+    
+    // Create start button
+    startButton = new Button(
+      playAreaX + playAreaWidth * 0.5, 
+      playAreaY + playAreaHeight * 0.85, 
+      startButtonWidth, 
+      startButtonHeight, 
+      "Let's Get Cooking!", 
+      startGame, 
+      COLORS.secondary, 
+      'white'
+    );
+    
+    // Reset game state
+    gameWon = false;
+    turnCounter = 0;
+    moveHistory = [];
+    animations = [];
+    gameStarted = false;
+    showingHint = false;
+    hintVessel = null;
+  }
+  
+  // Function to get current time in EST for debugging
+  function getCurrentESTTime() {
+    const now = new Date();
+    const options = {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    };
+    return now.toLocaleString('en-US', options);
+  }
+  
+  // Function to draw the floral pattern border
+  function drawFloralBorder() {
+    // Only draw the border if there's space around the play area
+    if (windowWidth <= maxPlayWidth + 2 * playAreaPadding) return;
+    
+    // Draw flowers in a grid pattern only on the left and right sides of the play area
+    const flowerSpacing = 40; // Increased from 30 for larger pattern
+    const petalSize = 6; // Increased from 4 for larger flowers
+    
+    // Draw on the left side (from left edge to play area)
+    for (let x = flowerSpacing/2; x < playAreaX - flowerSpacing/2; x += flowerSpacing) {
+      for (let y = flowerSpacing/2; y < height - flowerSpacing/2; y += flowerSpacing) {
+        // Alternate between different colors for variety
+        if ((x + y) % (flowerSpacing * 3) < flowerSpacing) {
+          drawFlower(x, y, petalSize, COLORS.primary); // Green
+        } else if ((x + y) % (flowerSpacing * 3) < flowerSpacing * 2) {
+          drawFlower(x, y, petalSize, COLORS.secondary); // Red/Orange
+        } else {
+          drawFlower(x, y, petalSize, COLORS.tertiary); // Yellow
+        }
+      }
+    }
+    
+    // Draw on the right side (from play area to right edge)
+    for (let x = playAreaX + playAreaWidth + flowerSpacing/2; x < width - flowerSpacing/2; x += flowerSpacing) {
+      for (let y = flowerSpacing/2; y < height - flowerSpacing/2; y += flowerSpacing) {
+        // Alternate between different colors for variety
+        if ((x + y) % (flowerSpacing * 3) < flowerSpacing) {
+          drawFlower(x, y, petalSize, COLORS.primary); // Green
+        } else if ((x + y) % (flowerSpacing * 3) < flowerSpacing * 2) {
+          drawFlower(x, y, petalSize, COLORS.secondary); // Red/Orange
+        } else {
+          drawFlower(x, y, petalSize, COLORS.tertiary); // Yellow
+        }
+      }
+    }
+  }
+  
+  // Function to draw a single flower
+  function drawFlower(x, y, petalSize, color) {
+    // Set the flower color
+    fill(color);
+    noStroke();
+    
+    // Draw petals
+    for (let i = 0; i < 6; i++) {
+      let angle = i * PI / 3;
+      let px = x + cos(angle) * petalSize * 1.5;
+      let py = y + sin(angle) * petalSize * 1.5;
+      ellipse(px, py, petalSize * 1.2, petalSize * 1.2);
+    }
+    
+    // Draw center with a slightly different shade
+    fill(255, 255, 255, 100); // Semi-transparent white for a highlight
+    ellipse(x, y, petalSize, petalSize);
+  }
