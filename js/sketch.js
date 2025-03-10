@@ -12,6 +12,9 @@ let intermediate_combinations = [
   // Define the final combination (will be replaced with data from Supabase)
   let final_combination = { name: "Chicken Parm", required: ["Fried Chicken Cutlet", "Tomato Sauce", "Mixed Cheeses"] };
   
+  // Define easter eggs (will be replaced with data from Supabase)
+  let easter_eggs = [];
+  
   // Extract all individual ingredients (will be replaced with data from Supabase)
   let ingredients = [...new Set(intermediate_combinations.flatMap(c => c.required))];
   
@@ -23,6 +26,7 @@ let intermediate_combinations = [
   let turnCounter = 0;
   let moveHistory = []; // Array to store move history with colors
   let animations = []; // Array to store active animations
+  let eggModals = []; // Array to store active easter egg modals
   let titleFont, bodyFont, buttonFont;
   let recipeUrl = "https://www.bonappetit.com/recipe/chicken-parm"; // Will be replaced with data from Supabase
   let hintButton;
@@ -266,6 +270,7 @@ let intermediate_combinations = [
       this.ingredients = ingredients;
       this.complete_combinations = complete_combinations;
       this.name = name;
+      this.verb = null; // Add verb property
       
       // Map color names to our new color palette
       if (color === 'white') this.color = COLORS.vesselBase;
@@ -283,6 +288,7 @@ let intermediate_combinations = [
       this.isAdvanced = color !== 'white'; // Yellow or green vessels are advanced
       this.scale = 1; // For animation
       this.targetScale = 1;
+      this.verbDisplayTime = 0; // Time to display the verb (in frames)
     }
   
     getDisplayText() {
@@ -303,12 +309,23 @@ let intermediate_combinations = [
     update() {
       // Scale animation only (removed floating animation)
       this.scale = lerp(this.scale, this.targetScale, 0.2);
+      
+      // Update verb display time
+      if (this.verbDisplayTime > 0) {
+        this.verbDisplayTime--;
+      }
     }
     
     draw() {
       push();
       translate(this.x, this.y);
       scale(this.scale);
+      
+      // Update color for base vessels to be pure white
+      let vesselColor = this.color;
+      if (vesselColor === COLORS.vesselBase) {
+        vesselColor = 'white'; // Use pure white instead of cream for base vessels
+      }
       
       if (this.isAdvanced) {
         // Advanced vessel (pot or pan based on color)
@@ -345,7 +362,7 @@ let intermediate_combinations = [
         }
         
         // Draw vessel body
-        fill(this.color);
+        fill(vesselColor);
         stroke('black');
         strokeWeight(3);
         
@@ -355,7 +372,7 @@ let intermediate_combinations = [
         
       } else {
         // Basic ingredient vessel (rectangle with extremely rounded bottom corners)
-        fill(this.color);
+        fill(vesselColor);
         stroke('black');
         strokeWeight(3);
         
@@ -370,6 +387,9 @@ let intermediate_combinations = [
       textAlign(CENTER, CENTER);
       textSize(12);
       
+      // Set text style to bold
+      textStyle(BOLD);
+      
       // Calculate text position to be inside the vessel
       let displayText = this.getDisplayText();
       let lines = splitTextIntoLines(displayText, this.w * 0.7);
@@ -380,12 +400,48 @@ let intermediate_combinations = [
         text(lines[i], 0, yOffset - this.h * 0.1);
       }
       
+      // Reset text style
+      textStyle(NORMAL);
+      
       pop();
+      
+      // Display the verb above the vessel - AFTER pop() to use screen coordinates
+      this.displayVerb();
     }
     
     pulse() {
       this.targetScale = 1.2;
       setTimeout(() => { this.targetScale = 1; }, 300);
+    }
+    
+    // Display the verb above the vessel
+    displayVerb() {
+      if (this.verb && this.verbDisplayTime > 0) {
+        // Important: Don't use push/translate here since we need to use the actual screen coordinates
+        // The vessel's x/y are already in screen coordinates
+        
+        // Set text properties
+        textAlign(CENTER);
+        textSize(18);
+        
+        // Position the verb directly above the vessel
+        // Use a smaller offset to keep it closer to the vessel
+        let yPosition = this.y - this.h * 0.5;
+        
+        // Draw a small white background for better readability
+        fill(255, 255, 255, 200);
+        noStroke();
+        rectMode(CENTER);
+        let verbWidth = textWidth(this.verb);
+        rect(this.x, yPosition, verbWidth + 20, 25, 5);
+        
+        // Draw the verb text
+        fill('black');
+        text(this.verb, this.x, yPosition + 6);
+        
+        // Decrement the display time
+        this.verbDisplayTime--;
+      }
     }
   }
   
@@ -451,21 +507,34 @@ let intermediate_combinations = [
   // Function to load recipe data from Supabase
   async function loadRecipeData() {
     try {
-      console.log("Loading recipe data from Supabase...");
-      const recipeData = await fetchTodayRecipe();
+      // Check if there's a date parameter in the URL for playtesting
+      const urlParams = new URLSearchParams(window.location.search);
+      const testDate = urlParams.get('date');
       
-      if (recipeData) {
-        // Update game variables with recipe data
-        intermediate_combinations = recipeData.intermediateCombinations;
-        final_combination = recipeData.finalCombination;
-        ingredients = recipeData.baseIngredients;
-        recipeUrl = recipeData.recipeUrl;
-        
-        console.log("Recipe data loaded successfully");
-        isLoadingRecipe = false;
+      let recipeData;
+      if (testDate) {
+        console.log(`Playtesting recipe for date: ${testDate}`);
+        recipeData = await fetchRecipeByDate(testDate);
       } else {
-        throw new Error("Failed to process recipe data");
+        recipeData = await fetchTodayRecipe();
       }
+      
+      if (!recipeData) {
+        console.error("No recipe data found");
+        return;
+      }
+      
+      console.log("Loading recipe data from Supabase...");
+      
+      // Update game variables with recipe data
+      intermediate_combinations = recipeData.intermediateCombinations;
+      final_combination = recipeData.finalCombination;
+      easter_eggs = recipeData.easterEggs;
+      ingredients = recipeData.baseIngredients;
+      recipeUrl = recipeData.recipeUrl;
+      
+      console.log("Recipe data loaded successfully");
+      isLoadingRecipe = false;
     } catch (error) {
       console.error("Error loading recipe data:", error);
       loadingError = true;
@@ -513,7 +582,7 @@ let intermediate_combinations = [
 
     // Create an array to hold our row arrangements
     let rowArrangements = [];
-    
+
     // Create rows with optimal arrangements
     while (advancedVessels.length > 0 || basicVessels.length > 0) {
       let currentRow = [];
@@ -522,20 +591,20 @@ let intermediate_combinations = [
       if (advancedVessels.length > 0 && basicVessels.length > 0) {
         currentRow.push(advancedVessels.shift()); // Add 1 advanced vessel (takes 2 slots)
         currentRow.push(basicVessels.shift()); // Add 1 basic vessel (takes 1 slot)
-        rowArrangements.push(currentRow);
+            rowArrangements.push(currentRow);
       }
       // If we only have advanced vessels left, add 1 per row
       else if (advancedVessels.length > 0) {
-        currentRow.push(advancedVessels.shift());
+                currentRow.push(advancedVessels.shift());
         rowArrangements.push(currentRow);
       }
       // If we only have basic vessels left, add 3 per row (or fewer if that's all we have)
       else if (basicVessels.length > 0) {
         // Add up to 3 basic vessels
         for (let i = 0; i < 3 && basicVessels.length > 0; i++) {
-          currentRow.push(basicVessels.shift());
+                    currentRow.push(basicVessels.shift());
         }
-        rowArrangements.push(currentRow);
+            rowArrangements.push(currentRow);
       }
     }
 
@@ -544,35 +613,35 @@ let intermediate_combinations = [
 
     // Position all vessels based on row arrangements
     rowArrangements.forEach((row, rowIndex) => {
-      // Calculate total width of this row
-      let rowWidth = row.reduce((width, v) => {
-        return width + (v.isAdvanced ? advanced_w : basic_w);
-      }, 0) + (row.length - 1) * margin;
+        // Calculate total width of this row
+        let rowWidth = row.reduce((width, v) => {
+            return width + (v.isAdvanced ? advanced_w : basic_w);
+        }, 0) + (row.length - 1) * margin;
 
       // Calculate starting x position to center the row within the play area
       let startX = playAreaX + (playAreaWidth - rowWidth) / 2;
-      let currentX = startX;
+        let currentX = startX;
 
-      // Position each vessel in the row
-      row.forEach((v) => {
-        // Update vessel dimensions
-        if (v.isAdvanced) {
-          v.w = advanced_w;
-          v.h = advanced_h;
-        } else {
-          v.w = basic_w;
-          v.h = basic_h;
-        }
+        // Position each vessel in the row
+        row.forEach((v) => {
+            // Update vessel dimensions
+            if (v.isAdvanced) {
+                v.w = advanced_w;
+                v.h = advanced_h;
+            } else {
+                v.w = basic_w;
+                v.h = basic_h;
+            }
 
-        // Set vessel position
-        v.x = currentX + v.w / 2;
-        v.y = startY + rowIndex * (advanced_h + vertical_margin);
-        v.originalX = v.x;
-        v.originalY = v.y;
+            // Set vessel position
+            v.x = currentX + v.w / 2;
+            v.y = startY + rowIndex * (advanced_h + vertical_margin);
+            v.originalX = v.x;
+            v.originalY = v.y;
 
-        // Move x position for next vessel
-        currentX += v.w + margin;
-      });
+            // Move x position for next vessel
+            currentX += v.w + margin;
+        });
     });
     
     // Calculate the lowest vessel position for hint button placement
@@ -589,9 +658,10 @@ let intermediate_combinations = [
   }
   
   function draw() {
+    // Set background color
     background(COLORS.background);
     
-    // Draw the floral pattern border
+    // Draw floral pattern border if there's space
     drawFloralBorder();
     
     // Ensure no stroke for all text elements
@@ -599,13 +669,13 @@ let intermediate_combinations = [
     
     // Check if we're still loading recipe data
     if (isLoadingRecipe) {
-      // Display loading screen
+      // Draw loading screen
       textAlign(CENTER, CENTER);
       textSize(24);
-      fill(0);
+      fill('#333');
       text("Loading today's recipe...", width/2, height/2);
       
-      // Display current time in EST for debugging
+      // Show current EST time for debugging
       textSize(14);
       const estTime = getCurrentESTTime();
       text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
@@ -688,6 +758,13 @@ let intermediate_combinations = [
       
       // Draw move history
       drawMoveHistory();
+    }
+    
+    // Draw any active easter egg modals
+    for (let i = 0; i < eggModals.length; i++) {
+      if (eggModals[i].active) {
+        eggModals[i].draw();
+      }
     }
     
     // Update cursor if hovering over a vessel or button
@@ -820,8 +897,8 @@ let intermediate_combinations = [
     // Draw vessel
     if (color === "white") {
       // Basic ingredient vessel (white)
-      fill('white');
-      stroke('black');
+      fill('white'); // Pure white for base vessels
+        stroke('black');
       strokeWeight(2);
       
       // Draw rounded rectangle
@@ -829,50 +906,55 @@ let intermediate_combinations = [
       rect(0, 0, vesselWidth, vesselHeight, 5, 5, 30, 30);
     } else if (color === "yellow") {
       // Draw handles behind the vessel
-      fill('#888888');
-      stroke('black');
+        fill('#888888');
+        stroke('black');
       strokeWeight(2);
       circle(-vesselWidth * 0.4, -5, 15);
       circle(vesselWidth * 0.4, -5, 15);
       
       // Yellow vessel (partial combination)
-      fill(COLORS.tertiary); // Mustard yellow
-      stroke('black');
+      fill(COLORS.vesselYellow); // Use the exact vessel color
+        stroke('black');
       strokeWeight(2);
-      
+        
       // Draw rectangle with rounded corners
-      rectMode(CENTER);
+        rectMode(CENTER);
       rect(0, 0, vesselWidth, vesselHeight, 0, 0, 10, 10);
     } else if (color === "green") {
       // Draw handle behind the vessel
-      fill('#888888');
-      stroke('black');
+        fill('#888888');
+        stroke('black');
       strokeWeight(2);
       rectMode(CENTER);
       rect(vesselWidth * 0.6, 0, vesselWidth * 0.5, vesselHeight * 0.15, 5);
       
       // Green vessel (complete combination)
-      fill(COLORS.primary); // Avocado green
-      stroke('black');
+      fill(COLORS.vesselGreen); // Use the exact vessel color
+        stroke('black');
       strokeWeight(2);
-      
+        
       // Draw rectangle with rounded corners
-      rectMode(CENTER);
+        rectMode(CENTER);
       rect(0, 0, vesselWidth, vesselHeight, 0, 0, 10, 10);
-    }
-    
-    // Draw text
-    fill('black');
-    noStroke();
-    textAlign(CENTER, CENTER);
+      }
+      
+      // Draw text
+      fill('black');
+      noStroke();
+      textAlign(CENTER, CENTER);
     textSize(12);
+    textStyle(BOLD); // Make text bold
     
     // Split text into lines if needed
-    let lines = splitTextIntoLines(name, vesselWidth * 0.7);
+    let lines = splitTextIntoLines(name, vesselWidth * 0.8);
+    
     for (let i = 0; i < lines.length; i++) {
       let yOffset = (i - (lines.length - 1) / 2) * 15;
       text(lines[i], 0, yOffset);
     }
+    
+    // Reset text style
+    textStyle(NORMAL);
     
     pop();
   }
@@ -994,49 +1076,99 @@ let intermediate_combinations = [
         const x = reducedStartX + col * (reducedCircleSize + reducedMargin);
         const y = startY + row * (reducedCircleSize + reducedMargin);
         
-        // Use the exact same colors as the vessels
-        let circleColor;
-        if (moveHistory[i] === 'white') {
-          circleColor = COLORS.vesselBase; // Use vesselBase instead of white
-        } else if (moveHistory[i] === 'yellow') {
-          circleColor = COLORS.tertiary; // Use tertiary (mustard yellow) instead of yellow
-        } else if (moveHistory[i] === 'green') {
-          circleColor = COLORS.primary; // Use primary (avocado green) instead of green
-        } else if (moveHistory[i] === 'black') {
-          circleColor = COLORS.text; // Use text color instead of black
+        // Check if this is an Easter Egg counter
+        if (moveHistory[i] && typeof moveHistory[i] === 'object' && moveHistory[i].type === 'easterEgg') {
+          // Draw the larger white circle first
+          fill('white');
+          stroke('black');
+          strokeWeight(1);
+          circle(x, y, reducedCircleSize * 1.3); // 30% larger than normal
+          
+          // Draw the inner yellow circle
+          fill(moveHistory[i].color);
+          stroke('black');
+          strokeWeight(0.5);
+          circle(x, y, reducedCircleSize * 0.8); // 80% of normal size
         } else {
-          circleColor = moveHistory[i]; // Use the original color if it's not one of the above
+          // Regular counter - Map color names to the exact COLORS values
+          let circleColor;
+          switch(moveHistory[i]) {
+            case 'yellow':
+              circleColor = COLORS.vesselYellow;
+              break;
+            case 'green':
+              circleColor = COLORS.vesselGreen;
+              break;
+            case 'red':
+            case '#FF5252':
+              circleColor = COLORS.vesselHint;
+              break;
+            case 'white':
+              circleColor = COLORS.vesselBase;
+              break;
+            case 'black':
+              circleColor = '#333333'; // Keep black for unsuccessful moves
+              break;
+            default:
+              circleColor = moveHistory[i]; // Use the original color if not matched
+          }
+          
+          fill(circleColor);
+          stroke('black');
+          strokeWeight(1);
+          circle(x, y, reducedCircleSize);
         }
-        
-        fill(circleColor);
-        noStroke();
-        circle(x, y, reducedCircleSize);
       }
     } else {
       // Draw regular sized circles
-      for (let i = 0; i < moveHistory.length; i++) {
-        const row = Math.floor(i / maxPerRow);
-        const col = i % maxPerRow;
-        const x = startX + col * (circleSize + margin);
-        const y = startY + row * (circleSize + margin);
-        
-        // Use the exact same colors as the vessels
-        let circleColor;
-        if (moveHistory[i] === 'white') {
-          circleColor = COLORS.vesselBase; // Use vesselBase instead of white
-        } else if (moveHistory[i] === 'yellow') {
-          circleColor = COLORS.tertiary; // Use tertiary (mustard yellow) instead of yellow
-        } else if (moveHistory[i] === 'green') {
-          circleColor = COLORS.primary; // Use primary (avocado green) instead of green
-        } else if (moveHistory[i] === 'black') {
-          circleColor = COLORS.text; // Use text color instead of black
+    for (let i = 0; i < moveHistory.length; i++) {
+      const row = Math.floor(i / maxPerRow);
+      const col = i % maxPerRow;
+      const x = startX + col * (circleSize + margin);
+      const y = startY + row * (circleSize + margin);
+      
+        // Check if this is an Easter Egg counter
+        if (moveHistory[i] && typeof moveHistory[i] === 'object' && moveHistory[i].type === 'easterEgg') {
+          // Draw the larger white circle first
+          fill('white');
+      stroke('black');
+          strokeWeight(1);
+          circle(x, y, circleSize * 1.3); // 30% larger than normal
+          
+          // Draw the inner yellow circle
+          fill(moveHistory[i].color);
+          stroke('black');
+          strokeWeight(0.5);
+          circle(x, y, circleSize * 0.8); // 80% of normal size
         } else {
-          circleColor = moveHistory[i]; // Use the original color if it's not one of the above
+          // Regular counter - Map color names to the exact COLORS values
+          let circleColor;
+          switch(moveHistory[i]) {
+            case 'yellow':
+              circleColor = COLORS.vesselYellow;
+              break;
+            case 'green':
+              circleColor = COLORS.vesselGreen;
+              break;
+            case 'red':
+            case '#FF5252':
+              circleColor = COLORS.vesselHint;
+              break;
+            case 'white':
+              circleColor = COLORS.vesselBase;
+              break;
+            case 'black':
+              circleColor = '#333333'; // Keep black for unsuccessful moves
+              break;
+            default:
+              circleColor = moveHistory[i]; // Use the original color if not matched
+          }
+          
+          fill(circleColor);
+          stroke('black');
+          strokeWeight(1);
+      circle(x, y, circleSize);
         }
-        
-        fill(circleColor);
-        noStroke();
-        circle(x, y, circleSize);
       }
     }
   }
@@ -1045,7 +1177,7 @@ let intermediate_combinations = [
   function drawMoveHistory() {
     if (moveHistory.length === 0) return;
     
-    // Position the move history as a footer at the very bottom of the play area
+    // Position the move history at the bottom of the play area
     const circleSize = 15;
     const margin = 8;
     const maxPerRow = 10; // Reduced from 15 to allow more rows
@@ -1054,16 +1186,23 @@ let intermediate_combinations = [
     // Center horizontally within the play area
     const startX = playAreaX + (playAreaWidth / 2) - (rowWidth / 2);
     
-    // Position the move history at the very bottom of the play area (footer)
-    // Leave just enough space for the circles and a small margin
-    const moveHistoryY = playAreaY + playAreaHeight - (Math.ceil(moveHistory.length / maxPerRow) * (circleSize + margin)) - 10;
+    // Position the move history as a footer at the very bottom of the play area
+    // This ensures it's well below the hint button and any vessels
+    const moveHistoryY = playAreaY + playAreaHeight * 0.95;
     
     // Calculate how many rows we need
     const numRows = Math.ceil(moveHistory.length / maxPerRow);
     const totalHeight = numRows * (circleSize + margin) - margin;
     
     // Ensure we're within the play area
-    if (moveHistoryY < playAreaY) return;
+    if (moveHistoryY + totalHeight > playAreaY + playAreaHeight - 5) return;
+    
+    // Draw a subtle background for the move history
+    fill(240, 240, 240, 100);
+    noStroke();
+    rectMode(CENTER);
+    rect(playAreaX + playAreaWidth/2, moveHistoryY + totalHeight/2, 
+         rowWidth + margin*2, totalHeight + margin*2, 5);
     
     for (let i = 0; i < moveHistory.length; i++) {
       const row = Math.floor(i / maxPerRow);
@@ -1072,23 +1211,48 @@ let intermediate_combinations = [
       const x = startX + col * (circleSize + margin);
       const y = moveHistoryY + row * (circleSize + margin);
       
-      // Use the exact same colors as the vessels
-      let circleColor;
-      if (moveHistory[i] === 'white') {
-        circleColor = COLORS.vesselBase; // Use vesselBase instead of white
-      } else if (moveHistory[i] === 'yellow') {
-        circleColor = COLORS.tertiary; // Use tertiary (mustard yellow) instead of yellow
-      } else if (moveHistory[i] === 'green') {
-        circleColor = COLORS.primary; // Use primary (avocado green) instead of green
-      } else if (moveHistory[i] === 'black') {
-        circleColor = COLORS.text; // Use text color instead of black
+      // Check if this is an Easter Egg counter (object with type property)
+      if (moveHistory[i] && typeof moveHistory[i] === 'object' && moveHistory[i].type === 'easterEgg') {
+        // Draw the larger white circle first
+        fill('white');
+      stroke('black');
+      strokeWeight(1);
+        circle(x, y, circleSize * 1.3); // 30% larger than normal
+        
+        // Draw the inner yellow circle
+        fill(moveHistory[i].color);
+        stroke('black');
+        strokeWeight(0.5);
+        circle(x, y, circleSize * 0.8); // 80% of normal size
       } else {
-        circleColor = moveHistory[i]; // Use the original color if it's not one of the above
+        // Regular counter - Map color names to the exact COLORS values
+        let circleColor;
+        switch(moveHistory[i]) {
+          case 'yellow':
+            circleColor = COLORS.vesselYellow;
+            break;
+          case 'green':
+            circleColor = COLORS.vesselGreen;
+            break;
+          case 'red':
+          case '#FF5252':
+            circleColor = COLORS.vesselHint;
+            break;
+          case 'white':
+            circleColor = COLORS.vesselBase;
+            break;
+          case 'black':
+            circleColor = '#333333'; // Keep black for unsuccessful moves
+            break;
+          default:
+            circleColor = moveHistory[i]; // Use the original color if not matched
+        }
+        
+        fill(circleColor);
+        stroke('black');
+        strokeWeight(1);
+        circle(x, y, circleSize);
       }
-      
-      fill(circleColor);
-      noStroke();
-      circle(x, y, circleSize);
     }
   }
   
@@ -1130,6 +1294,14 @@ let intermediate_combinations = [
   }
   
   function mousePressed() {
+    // Check if any easter egg modal is active and handle the click
+    for (let i = eggModals.length - 1; i >= 0; i--) {
+      if (eggModals[i].active && eggModals[i].checkClick(mouseX, mouseY)) {
+        // Modal was clicked, don't process any other clicks
+        return;
+      }
+    }
+    
     if (!gameStarted) {
       // Check if start button was clicked
       if (startButton.isInside(mouseX, mouseY)) {
@@ -1137,8 +1309,15 @@ let intermediate_combinations = [
         return;
       }
     } else if (gameWon) {
-      // Check if buttons were clicked
-      if (shareButton.handleClick() || recipeButton.handleClick()) {
+      // Check if share button was clicked
+      if (shareButton.isInside(mouseX, mouseY)) {
+        shareButton.handleClick();
+        return;
+      }
+      
+      // Check if recipe button was clicked
+      if (recipeButton.isInside(mouseX, mouseY)) {
+        recipeButton.handleClick();
         return;
       }
     } else {
@@ -1197,6 +1376,28 @@ let intermediate_combinations = [
         // Increment turn counter
         turnCounter++;
         
+        // Check for easter eggs before combining
+        const easterEgg = checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])]);
+        if (easterEgg) {
+          // Easter egg was found
+          // Add a special move to history with a marker to indicate it's an Easter Egg
+          moveHistory.push({ type: 'easterEgg', color: COLORS.vesselYellow });
+          
+          // Trigger haptic feedback
+          triggerHapticFeedback('completion');
+          
+          // Immediately snap vessels back to their original positions
+          draggedVessel.snapBack();
+          
+          // Display the easter egg modal
+          displayEasterEgg(easterEgg, draggedVessel, overVessel);
+          
+          // Set draggedVessel to null to prevent further interaction until modal is closed
+          draggedVessel = null;
+          return;
+        }
+        
+        // If not an easter egg, proceed with normal combination
         let new_v = combineVessels(draggedVessel, overVessel);
         if (new_v) {
           // Create animation particles
@@ -1231,7 +1432,18 @@ let intermediate_combinations = [
           // Only add to move history if it wasn't already added by checkForMatchingVessels
           if (moveHistory.length === originalMoveHistoryLength) {
             // Add successful move to history with the color of the new vessel
-            moveHistory.push(new_v.color);
+            // Ensure we're using the COLORS object for consistency
+            if (new_v.color === 'yellow') {
+              moveHistory.push(COLORS.vesselYellow);
+            } else if (new_v.color === 'green') {
+              moveHistory.push(COLORS.vesselGreen);
+            } else if (new_v.color === 'white') {
+              moveHistory.push(COLORS.vesselBase);
+            } else if (new_v.color === '#FF5252') {
+              moveHistory.push(COLORS.vesselHint);
+            } else {
+              moveHistory.push(new_v.color); // Fallback to the actual color
+            }
           }
           
           // Check if the game is won
@@ -1243,11 +1455,61 @@ let intermediate_combinations = [
             triggerHapticFeedback('medium');
           }
         } else {
-          // Combination failed, snap back
+          // If new_v is null, it could mean one of two things:
+          // 1. The combination failed
+          // 2. The ingredients were added directly to the hint vessel
+          
+          // Check if the hint vessel has changed (ingredients were added)
+          if (showingHint && hintVessel && hintVessel.collected.some(ing => 
+              draggedVessel.ingredients.includes(ing) || overVessel.ingredients.includes(ing))) {
+            // Ingredients were added to the hint vessel
+            
+            // Remove the vessels that were combined
+            vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
+            arrangeVessels();
+            
+            // Check if the hint is now complete
+            if (hintVessel.isComplete()) {
+              // Convert hint to regular vessel
+              let newVessel = hintVessel.toVessel();
+              vessels.push(newVessel);
+              arrangeVessels();
+              
+              // Reset hint
+              hintVessel = null;
+              showingHint = false;
+              
+              // Check win condition
+              if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+                gameWon = true;
+                triggerHapticFeedback('completion'); // Haptic feedback on game completion
+              }
+            }
+            
+            // Trigger haptic feedback for successful combination
+            triggerHapticFeedback('medium');
+          } 
+          // Check if this was an easter egg (we don't need to do anything special, just don't snap back)
+          else if (checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])])) {
+            // Easter egg was found and displayed
+            // Add a special move to history
+            moveHistory.push(COLORS.vesselYellow);
+            
+            // Don't snap back or remove vessels - they will be reset when the modal is closed
+            // Just trigger haptic feedback
+            triggerHapticFeedback('completion');
+            
+            // Set draggedVessel to null to prevent further interaction until modal is closed
+            draggedVessel = null;
+            return;
+          }
+          else {
+            // Combination failed, snap back
           draggedVessel.snapBack();
           // Add unsuccessful move to history (black)
           moveHistory.push('black');
           triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+          }
         }
       } else if (overHintVessel) {
         // Trying to add to the hint vessel
@@ -1321,6 +1583,7 @@ let intermediate_combinations = [
         draggedVessel.snapBack();
       }
       
+      // Reset draggedVessel
       draggedVessel = null;
     }
   }
@@ -1335,34 +1598,57 @@ let intermediate_combinations = [
     // Check if hint is active before creating any new vessels
     let hintActive = showingHint && hintVessel;
     
-    // Log the vessels being combined for debugging
-    console.log(`Combining vessels: 
-      Vessel 1: ${v1.name || 'unnamed'} (${v1.color}), 
-      ingredients: [${v1.ingredients.join(', ')}], 
-      combinations: [${v1.complete_combinations.join(', ')}]
-      Vessel 2: ${v2.name || 'unnamed'} (${v2.color}), 
-      ingredients: [${v2.ingredients.join(', ')}], 
-      combinations: [${v2.complete_combinations.join(', ')}]`);
-    
     // Case 1: Both vessels are base ingredients (white vessels)
     if (v1.ingredients.length > 0 && v2.ingredients.length > 0 && v1.complete_combinations.length === 0 && v2.complete_combinations.length === 0) {
       let U = [...new Set([...v1.ingredients, ...v2.ingredients])];
       
-      // Special handling for hint: If all ingredients are part of the hint, create a yellow vessel
-      // This will be detected by checkForMatchingVessels and added to the hint vessel
-      if (hintActive) {
-        // Check if all ingredients are required for the hint
-        let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
-        
-        // Check if any of these ingredients are already collected in the hint
-        let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
-        
-        // If all ingredients are part of the hint and none are already collected,
-        // create a yellow vessel that will be detected by checkForMatchingVessels
-        if (allIngredientsInHint && !anyAlreadyCollected) {
-          console.log(`Creating yellow vessel for hint with ingredients: ${U.join(', ')}`);
-          let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
-          return new_v;
+      // Special handling for hint: If all ingredients are part of the hint
+        if (hintActive) {
+          // Check if all ingredients are required for the hint
+          let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
+          
+          // Check if any of these ingredients are already collected in the hint
+          let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
+          
+          // If all ingredients are part of the hint and none are already collected,
+        // we should add them directly to the hint vessel instead of creating a new vessel
+          if (allIngredientsInHint && !anyAlreadyCollected) {
+          console.log(`Adding ingredients directly to hint: ${U.join(', ')}`);
+          
+          // Create a temporary vessel just for the animation
+          let tempVessel = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+          
+          // Add all ingredients to the hint vessel
+          for (let ing of U) {
+            hintVessel.addIngredient(ing);
+          }
+          
+          // Create animation from the temp vessel to the hint vessel
+          createCombineAnimation(tempVessel.x, tempVessel.y, tempVessel.color, hintVessel.x, hintVessel.y);
+          
+          // Add red moves to history - one for each ingredient (or at least one if it was a combination)
+          // This ensures we count the proper number of turns when adding multiple ingredients at once
+          let numIngredientsAdded = Math.max(1, U.length);
+          for (let j = 0; j < numIngredientsAdded; j++) {
+            moveHistory.push('#FF5252');
+          }
+          
+          // Check if hint is complete
+          if (hintVessel.isComplete()) {
+            // Convert hint to regular vessel
+            let newVessel = hintVessel.toVessel();
+            
+            // Reset hint
+            hintVessel = null;
+            showingHint = false;
+            
+            // Return the new vessel
+            return newVessel;
+          }
+          
+          // Return null to indicate no new vessel should be created
+          // The ingredients were added directly to the hint vessel
+          return null;
         }
       }
       
@@ -1387,9 +1673,19 @@ let intermediate_combinations = [
         if (U.length === C.required.length && C.required.every(ing => U.includes(ing))) {
           // Only turn green if not part of an active hint
           if (!hintActive || C.name !== hintVessel.name) {
-            new_v.name = C.name;
-            new_v.color = 'green';
+          new_v.name = C.name;
+          new_v.color = 'green';
             new_v.ingredients = []; // Clear ingredients since this is now a complete combination
+            
+            // Set the verb from the combination and display it
+            for (let combo of intermediate_combinations) {
+              if (combo.name === C.name && combo.verb) {
+                new_v.verb = combo.verb;
+                new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
+                break;
+              }
+            }
+            
             console.log(`Created green vessel for ${C.name} with ingredients: ${U.join(', ')}`);
           }
         } else {
@@ -1411,30 +1707,118 @@ let intermediate_combinations = [
       let set2 = v2.complete_combinations.length > 0 ? v2.complete_combinations : (v2.name ? [v2.name] : []);
       let U = [...new Set([...set1, ...set2])];
       
-      console.log(`Combining completed combinations: ${U.join(', ')}`);
-      console.log(`Final combination requires: ${final_combination.required.join(', ')}`);
+      console.log("Combining completed combinations:", U);
       
-      // Check if the combined set contains valid components for the final combination
-      let validComponents = U.filter(name => final_combination.required.includes(name));
-      console.log(`Valid components found: ${validComponents.join(', ')}`);
+      // Find the combinations in our intermediate_combinations array
+      let combo1 = null;
+      let combo2 = null;
       
-      if (validComponents.length > 0) {
+      // Find the combination objects for the vessels being combined
+      for (let name of set1) {
+        const found = intermediate_combinations.find(c => c.name === name);
+        if (found) {
+          combo1 = found;
+          break;
+        }
+      }
+      
+      for (let name of set2) {
+        const found = intermediate_combinations.find(c => c.name === name);
+        if (found) {
+          combo2 = found;
+          break;
+        }
+      }
+      
+      console.log("Combo 1:", combo1);
+      console.log("Combo 2:", combo2);
+      
+      // Check if both combinations have the same parent_combo
+      if (combo1 && combo2 && combo1.parent_combo && combo2.parent_combo && 
+          combo1.parent_combo === combo2.parent_combo) {
+        
+        console.log("Both combinations have the same parent:", combo1.parent_combo);
+        
+        // Find the parent combination
+        const parentCombo = intermediate_combinations.find(c => c.combo_id === combo1.parent_combo) || 
+                           (final_combination.combo_id === combo1.parent_combo ? final_combination : null);
+        
+        if (parentCombo) {
+          console.log("Found parent combination:", parentCombo.name);
+          
+          // Create a new vessel for the parent combination
+          let new_v = new Vessel([], U, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+          
+          // Check if we have all required components for the parent combination
+          // Get all combinations that have this parent
+          const requiredCombos = intermediate_combinations
+            .filter(c => c.parent_combo === parentCombo.combo_id)
+            .map(c => c.name);
+            
+          console.log("Required combinations for parent:", requiredCombos);
+          
+          // Check if we have all the required combinations
+          const hasAllRequired = requiredCombos.every(name => U.includes(name));
+          
+          if (hasAllRequired) {
+            new_v.name = parentCombo.name;
+            new_v.color = 'green';
+            new_v.complete_combinations = []; // Clear since this is now a complete combination
+            
+            // Set the verb from the parent combination and display it
+            if (parentCombo.verb) {
+              new_v.verb = parentCombo.verb;
+              new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
+            }
+            
+            console.log(`Created green vessel for ${parentCombo.name}`);
+          } else {
+            console.log(`Created yellow vessel with combinations: ${U.join(', ')}`);
+            console.log(`Missing combinations for ${parentCombo.name}: ${requiredCombos.filter(name => !U.includes(name)).join(', ')}`);
+          }
+          
+          return new_v;
+        }
+      }
+      
+      // If we don't have parent_combo information or they don't match, check if they're part of the final recipe
+      // Only allow combinations if they're part of the final recipe's required combinations
+      let finalRecipeComponents = final_combination.required || [];
+      
+      // Check if both vessels contain combinations that are part of the final recipe
+      let v1ContainsFinalComponent = set1.some(name => finalRecipeComponents.includes(name));
+      let v2ContainsFinalComponent = set2.some(name => finalRecipeComponents.includes(name));
+      
+      if (v1ContainsFinalComponent && v2ContainsFinalComponent) {
+        console.log("Both vessels contain components of the final recipe");
+        
+        // Create a new vessel for the combined components
         let new_v = new Vessel([], U, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
         
         // Check if we have all required components for the final combination
-        let hasAllComponents = final_combination.required.every(name => U.includes(name));
-        console.log(`Has all components for final recipe: ${hasAllComponents}`);
-        
-        if (hasAllComponents) {
+        if (finalRecipeComponents.every(name => U.includes(name))) {
           new_v.name = final_combination.name;
           new_v.color = 'green';
           new_v.complete_combinations = []; // Clear since this is the final combination
+          
+          // Set the verb from the final combination and display it
+          if (final_combination.verb) {
+            new_v.verb = final_combination.verb;
+            new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
+          }
+          
           console.log(`Created green vessel for final combination ${final_combination.name}`);
         } else {
           console.log(`Created yellow vessel with combinations: ${U.join(', ')}`);
-          console.log(`Missing combinations for ${final_combination.name}: ${final_combination.required.filter(name => !U.includes(name)).join(', ')}`);
+          console.log(`Missing combinations for ${final_combination.name}: ${finalRecipeComponents.filter(name => !U.includes(name)).join(', ')}`);
         }
+        
         return new_v;
+      } else {
+        // If the combinations don't have the same parent and aren't both part of the final recipe,
+        // don't allow them to be combined
+        console.log("Invalid combination: Combinations don't share the same parent and aren't both part of the final recipe");
+        return null;
       }
     }
     // Case 3: Mixing a base ingredient (white vessel) with a completed combination (green/yellow vessel)
@@ -1453,43 +1837,137 @@ let intermediate_combinations = [
                             comboVessel.complete_combinations : 
                             (comboVessel.name ? [comboVessel.name] : []);
       
-      console.log(`Mixing base ingredients [${baseIngredients.join(', ')}] with combinations [${completedCombos.join(', ')}]`);
+      // Check if this combination is valid for any recipe
+      let validCombination = false;
+      let targetRecipe = null;
       
-      // Check if any base ingredient is directly required in the final combination
-      let baseInFinal = baseIngredients.some(ing => final_combination.required.includes(ing));
+      // First, check if this is a valid combination for the final recipe
+      if (final_combination.required.some(req => completedCombos.includes(req))) {
+        // This is a valid combination for the final recipe
+        // Check if any of the base ingredients are also required for the final recipe
+        if (baseIngredients.some(ing => final_combination.required.includes(ing))) {
+          validCombination = true;
+          targetRecipe = final_combination;
+        }
+      }
       
-      // Check if any completed combo is required in the final combination
-      let comboInFinal = completedCombos.some(combo => final_combination.required.includes(combo));
+      // If not valid for the final recipe, check intermediate combinations
+      if (!validCombination) {
+        // Check each intermediate combination
+        for (let combo of intermediate_combinations) {
+          // Check if the base ingredients are part of this recipe
+          if (baseIngredients.every(ing => combo.required.includes(ing))) {
+            // Check if any of the completed combinations are also part of this recipe
+            // This is a special case where a completed combination might be a component of another recipe
+            if (completedCombos.some(c => {
+              // Find the intermediate combination with this name
+              let matchingCombo = intermediate_combinations.find(ic => ic.name === c);
+              // Check if all ingredients of this combination are part of the target recipe
+              return matchingCombo && matchingCombo.required.every(ing => combo.required.includes(ing));
+            })) {
+              validCombination = true;
+              targetRecipe = combo;
+              break;
+            }
+          }
+        }
+      }
       
-      console.log(`Base in final: ${baseInFinal}, Combo in final: ${comboInFinal}`);
-      
-      // If either the base ingredient or the combo is part of the final recipe, proceed
-      if (baseInFinal || comboInFinal) {
-        // Create a combined set of all components (both base ingredients and completed combos)
-        let allComponents = [...baseIngredients, ...completedCombos];
+      // Only proceed if this is a valid combination
+      if (validCombination && targetRecipe) {
+        // Create a combined set of all components
+        let allComponents = [];
+        
+        // If we're building toward the final recipe, use the combination names
+        if (targetRecipe === final_combination) {
+          allComponents = [...baseIngredients, ...completedCombos];
+        } else {
+          // For intermediate recipes, we need to extract the ingredients
+          let allIngredients = [...baseIngredients];
+          
+          // Add ingredients from completed combinations
+          for (let combo of completedCombos) {
+            let matchingCombo = intermediate_combinations.find(ic => ic.name === combo);
+            if (matchingCombo) {
+              allIngredients = [...allIngredients, ...matchingCombo.required];
+            }
+          }
+          
+          // Remove duplicates
+          allIngredients = [...new Set(allIngredients)];
+          
+          // Only keep ingredients that are part of the target recipe
+          allIngredients = allIngredients.filter(ing => targetRecipe.required.includes(ing));
+          
+          allComponents = allIngredients;
+        }
         
         // Create a yellow vessel for the partial combination
-        let new_v = new Vessel([], allComponents, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+        let new_v;
         
-        // Check if we have all required components for the final combination
-        let hasAllComponents = final_combination.required.every(name => allComponents.includes(name));
-        console.log(`Has all components for final recipe: ${hasAllComponents}`);
-        
-        if (hasAllComponents) {
-          new_v.name = final_combination.name;
-          new_v.color = 'green';
-          console.log(`Created green vessel for final combination ${final_combination.name}`);
+        if (targetRecipe === final_combination) {
+          // For final recipe, store combination names
+          new_v = new Vessel([], allComponents, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
         } else {
-          console.log(`Created yellow vessel with mixed components: ${allComponents.join(', ')}`);
-          console.log(`Missing components for ${final_combination.name}: ${final_combination.required.filter(name => !allComponents.includes(name)).join(', ')}`);
+          // For intermediate recipes, store ingredients
+          new_v = new Vessel(allComponents, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+        }
+        
+        // Check if we have all required components for the target recipe
+        let hasAllRequired = false;
+        
+        if (targetRecipe === final_combination) {
+          // For final recipe, check if all required combinations are present
+          hasAllRequired = targetRecipe.required.every(req => allComponents.includes(req));
+        } else {
+          // For intermediate recipes, check if all required ingredients are present
+          hasAllRequired = targetRecipe.required.length === allComponents.length && 
+                           targetRecipe.required.every(req => allComponents.includes(req));
+        }
+        
+        if (hasAllRequired) {
+          new_v.name = targetRecipe.name;
+          new_v.color = 'green';
+          
+          if (targetRecipe === final_combination) {
+            new_v.complete_combinations = []; // Clear since this is the final combination
+            
+            // Set the verb from the final combination and display it
+            if (final_combination.verb) {
+              new_v.verb = final_combination.verb;
+              new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
+            }
+          } else {
+            new_v.ingredients = []; // Clear ingredients since this is a complete intermediate combination
+            
+            // Set the verb from the intermediate combination and display it
+            for (let combo of intermediate_combinations) {
+              if (combo.name === targetRecipe.name && combo.verb) {
+                new_v.verb = combo.verb;
+                new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
+                break;
+              }
+            }
+          }
+          
+          console.log(`Created green vessel for ${targetRecipe.name}`);
+        } else {
+          if (targetRecipe === final_combination) {
+            console.log(`Created yellow vessel with combinations for final recipe`);
+            console.log(`Missing combinations: ${targetRecipe.required.filter(req => !allComponents.includes(req)).join(', ')}`);
+          } else {
+            console.log(`Created yellow vessel with ingredients for ${targetRecipe.name}`);
+            console.log(`Missing ingredients: ${targetRecipe.required.filter(req => !allComponents.includes(req)).join(', ')}`);
+          }
         }
         
         return new_v;
+      } else {
+        console.log("Invalid combination of base ingredient and completed combination");
+        return null;
       }
     }
     
-    // If we reach here, the combination is not valid
-    console.log("Invalid combination, no vessel created");
     return null;
   }
   
@@ -1544,44 +2022,172 @@ let intermediate_combinations = [
         .filter(v => v.name !== null)
         .map(v => v.name);
       
-      // Find partial combinations that exist in vessels
-      let partialCombos = [];
-      for (let v of vessels) {
-        if (v.ingredients.length > 0 && v.name === null) {
-          // This is a partial combination (yellow vessel without a name)
-          for (let combo of intermediate_combinations) {
-            // Check if this partial combination is working toward a specific combo
-            if (v.ingredients.every(ing => combo.required.includes(ing))) {
-              partialCombos.push(combo.name);
-            }
-          }
-        }
-      }
+      // Get all ingredients currently visible on the board
+      let visibleIngredients = [];
+      vessels.forEach(v => {
+        visibleIngredients.push(...v.ingredients);
+      });
       
-      // First check intermediate combinations that aren't partial or completed
+      console.log("Visible ingredients on board:", visibleIngredients);
+      
+      // Calculate which combinations can be made with visible ingredients
+      let possibleCombos = [];
+      
+      // Check all intermediate combinations that aren't completed yet
       let availableCombos = intermediate_combinations.filter(combo => 
-        !completedCombos.includes(combo.name) && !partialCombos.includes(combo.name));
-      
-      // If no non-partial combos are available, then allow partial combos
-      if (availableCombos.length === 0) {
-        availableCombos = intermediate_combinations.filter(combo => 
-          !completedCombos.includes(combo.name));
-      }
+        !completedCombos.includes(combo.name));
       
       // If all intermediate combinations are done, check final combination
       if (availableCombos.length === 0 && !completedCombos.includes(final_combination.name)) {
         availableCombos = [final_combination];
       }
       
-      // If there are available combinations, show a hint
-      if (availableCombos.length > 0) {
-        // Choose a random combination to hint
-        let combo = availableCombos[Math.floor(Math.random() * availableCombos.length)];
-        hintVessel = new HintVessel(combo);
+      // For each available combination, calculate what percentage of its ingredients are visible
+      availableCombos.forEach(combo => {
+        let requiredCount = combo.required.length;
+        let availableCount = 0;
+        
+        // Count how many required ingredients are visible on the board
+        combo.required.forEach(ing => {
+          if (visibleIngredients.includes(ing)) {
+            availableCount++;
+          }
+        });
+        
+        // Calculate percentage of available ingredients
+        let percentage = availableCount / requiredCount;
+        
+        // Only consider combinations where at least one ingredient is available
+        if (availableCount > 0) {
+          possibleCombos.push({
+            combo: combo,
+            percentage: percentage,
+            availableCount: availableCount
+          });
+        }
+      });
+      
+      console.log("Possible combinations with percentages:", possibleCombos);
+      
+      // Sort by percentage (highest first), then by available count (highest first)
+      possibleCombos.sort((a, b) => {
+        if (b.percentage !== a.percentage) {
+          return b.percentage - a.percentage;
+        }
+        return b.availableCount - a.availableCount;
+      });
+      
+      // If there are possible combinations, show a hint for the one with highest percentage
+      if (possibleCombos.length > 0) {
+        let selectedCombo = possibleCombos[0].combo;
+        hintVessel = new HintVessel(selectedCombo);
         showingHint = true;
         
-        // Check if any existing yellow vessels match ingredients needed for this hint
-        checkForMatchingVessels();
+        console.log("Created hint vessel for:", selectedCombo.name);
+        console.log("Required ingredients:", selectedCombo.required);
+        console.log("Percentage of ingredients available:", possibleCombos[0].percentage * 100 + "%");
+        
+        // Find vessels that have ingredients needed for this hint
+        let vesselsToAbsorb = [];
+        
+        // First pass: identify vessels with ingredients that match the hint
+        for (let i = 0; i < vessels.length; i++) {
+          let v = vessels[i];
+          
+          // Only consider yellow vessels (partial combinations)
+          if (v.color === COLORS.vesselYellow && v.ingredients.length > 0) {
+            // Find which ingredients in this vessel are part of the hint
+            let matchingIngredients = v.ingredients.filter(ing => 
+              hintVessel.required.includes(ing) && !hintVessel.collected.includes(ing)
+            );
+            
+            // Only consider vessels where ALL ingredients are part of the hint
+            if (matchingIngredients.length > 0 && matchingIngredients.length === v.ingredients.length) {
+              console.log(`Found partial combination with ${matchingIngredients.length} matching ingredients:`, matchingIngredients);
+              vesselsToAbsorb.push({
+                vessel: v,
+                index: i,
+                matchingIngredients: matchingIngredients
+              });
+            }
+          }
+        }
+        
+        // Sort vessels by number of matching ingredients (descending)
+        vesselsToAbsorb.sort((a, b) => b.matchingIngredients.length - a.matchingIngredients.length);
+        
+        console.log(`Found ${vesselsToAbsorb.length} partial combinations with matching ingredients`);
+        
+        // Now absorb the vessels
+        let absorbedVessels = [];
+        
+        for (let i = 0; i < vesselsToAbsorb.length; i++) {
+          let vesselInfo = vesselsToAbsorb[i];
+          let v = vesselInfo.vessel;
+          
+          // Skip vessels that have already been absorbed
+          if (absorbedVessels.includes(v)) continue;
+          
+          console.log("Absorbing partial combination with ingredients:", vesselInfo.matchingIngredients.join(', '));
+          
+          // Add matching ingredients to the hint vessel
+          let ingredientsAdded = 0;
+          for (let ing of vesselInfo.matchingIngredients) {
+            if (!hintVessel.collected.includes(ing)) {
+              hintVessel.addIngredient(ing);
+              ingredientsAdded++;
+            }
+          }
+          
+          if (ingredientsAdded > 0) {
+            // Create animation from the vessel to the hint vessel
+            createCombineAnimation(v.x, v.y, v.color, hintVessel.x, hintVessel.y);
+            
+            // Add this vessel to the absorbed list
+            absorbedVessels.push(v);
+            
+            // Mark for removal since all ingredients were absorbed
+            v.markedForRemoval = true;
+            
+            // Add moves to history for each absorbed ingredient
+            for (let j = 0; j < ingredientsAdded; j++) {
+              // Use the string '#FF5252' instead of COLORS.vesselHint to ensure compatibility with drawMoveHistory
+              moveHistory.push('#FF5252');
+            }
+            
+            // Increment turn counter for each absorbed ingredient
+            turnCounter += ingredientsAdded;
+          }
+        }
+        
+        // Remove vessels marked for removal
+        vessels = vessels.filter(v => !v.markedForRemoval);
+        
+        // Re-arrange vessels after potential removals
+        arrangeVessels();
+        
+        // Check if hint is complete after absorbing vessels
+        if (hintVessel && hintVessel.isComplete()) {
+          // Convert hint to regular vessel
+          let newVessel = hintVessel.toVessel();
+          vessels.push(newVessel);
+          arrangeVessels();
+          
+          // Reset hint
+          hintVessel = null;
+          showingHint = false;
+        }
+      } else {
+        console.log("No possible combinations found with visible ingredients");
+        
+        // If no combinations can be made with visible ingredients, fall back to a random available combo
+      if (availableCombos.length > 0) {
+          let randomCombo = availableCombos[Math.floor(Math.random() * availableCombos.length)];
+          hintVessel = new HintVessel(randomCombo);
+        showingHint = true;
+        
+          console.log("Falling back to random hint for:", randomCombo.name);
+        }
       }
     }
   }
@@ -1679,8 +2285,6 @@ let intermediate_combinations = [
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
-      console.log(`Touch started at ${touchX}, ${touchY}`);
-      
       // Handle the same logic as mousePressed but with touch coordinates
       if (!gameStarted) {
         // Check if start button was touched
@@ -1700,10 +2304,8 @@ let intermediate_combinations = [
         }
       } else {
         // Check if hint button was touched
-        if (!showingHint && hintButton && hintButton.isInside(touchX, touchY)) {
-          console.log("Hint button touched");
-          showHint(); // Directly call showHint instead of using handleClick
-          triggerHapticFeedback('success');
+        if (!showingHint && hintButton.isInside(touchX, touchY)) {
+          hintButton.handleClick();
           return false;
         }
         
@@ -1719,150 +2321,6 @@ let intermediate_combinations = [
           }
         }
       }
-    }
-    return false; // Prevent default
-  }
-  
-  // Add touch moved handler for dragging vessels
-  function touchMoved() {
-    if (draggedVessel) {
-      if (touches.length > 0) {
-        let touchX = touches[0].x;
-        let touchY = touches[0].y;
-        
-        draggedVessel.x = touchX - offsetX;
-        draggedVessel.y = touchY - offsetY;
-      }
-      return false; // Prevent default
-    }
-    return true;
-  }
-  
-  // Add touch ended handler for dropping vessels
-  function touchEnded() {
-    if (draggedVessel) {
-      draggedVessel.targetScale = 1; // Reset scale
-      
-      let overVessel = null;
-      let overVesselIndex = -1;
-      let overHintVessel = false;
-      
-      if (touches.length > 0) {
-        let touchX = touches[0].x;
-        let touchY = touches[0].y;
-        
-        // Check if dragged over another vessel
-        for (let i = 0; i < vessels.length; i++) {
-          let v = vessels[i];
-          if (v !== draggedVessel && v.isInside(touchX, touchY)) {
-            overVessel = v;
-            overVesselIndex = i;
-            break;
-          }
-        }
-        
-        // Check if dragged over hint vessel
-        if (showingHint && hintVessel && hintVessel.isInside(touchX, touchY)) {
-          overHintVessel = true;
-        }
-      }
-      
-      // Process the same logic as mouseReleased
-      if (overVessel) {
-        // Regular vessel combination
-        // Increment turn counter
-        turnCounter++;
-        
-        let new_v = combineVessels(draggedVessel, overVessel);
-        if (new_v) {
-          // Create animation particles
-          createCombineAnimation(draggedVessel.x, draggedVessel.y, draggedVessel.color, new_v.x, new_v.y);
-          createCombineAnimation(overVessel.x, overVessel.y, overVessel.color, new_v.x, new_v.y);
-          
-          // Get the index of the dragged vessel
-          let draggedIndex = vessels.indexOf(draggedVessel);
-          
-          // Remove old vessels
-          vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
-          
-          // Insert the new vessel at the position of the target vessel
-          vessels.splice(overVesselIndex, 0, new_v);
-          
-          // Re-arrange vessels with the new vessel in place
-          arrangeVessels();
-          
-          // Pulse the new vessel
-          new_v.pulse();
-          
-          // Store the current move history length to detect if checkForMatchingVessels adds moves
-          let originalMoveHistoryLength = moveHistory.length;
-          
-          // Check if the new vessel matches the current hint
-          if (showingHint && hintVessel) {
-            // Check if this vessel matches the hint
-            checkForMatchingVessels();
-          }
-          
-          // Only add to move history if it wasn't already added by checkForMatchingVessels
-          if (moveHistory.length === originalMoveHistoryLength) {
-            // Add successful move to history with the color of the new vessel
-            moveHistory.push(new_v.color);
-          }
-          
-          // Check if the game is won
-          if (vessels.length === 1 && vessels[0].name === final_combination.name) {
-            gameWon = true;
-            triggerHapticFeedback('completion'); // Haptic feedback on game completion
-          } else {
-            // Trigger haptic feedback for successful combination
-            triggerHapticFeedback('medium');
-          }
-        } else {
-          // Combination failed, snap back
-          draggedVessel.snapBack();
-          // Add unsuccessful move to history (black)
-          moveHistory.push('black');
-          triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
-        }
-      } else if (overHintVessel) {
-        // Try to add the dragged vessel to the hint
-        if (hintVessel.addIngredient(draggedVessel)) {
-          // Successfully added to hint
-          // Remove the vessel that was added to the hint
-          vessels = vessels.filter(v => v !== draggedVessel);
-          arrangeVessels();
-          
-          // Add red move to history (not the original vessel color)
-          moveHistory.push('#FF5252');
-          
-          // Check if hint is complete
-          if (hintVessel.isComplete()) {
-            // Convert hint to regular vessel
-            let newVessel = hintVessel.toVessel();
-            vessels.push(newVessel);
-            arrangeVessels();
-            
-            // Reset hint
-            hintVessel = null;
-            showingHint = false;
-            
-            // Check win condition
-            if (vessels.length === 1 && vessels[0].name === final_combination.name) {
-              gameWon = true;
-              triggerHapticFeedback('completion'); // Haptic feedback on game completion
-            }
-          }
-        } else {
-          draggedVessel.snapBack();
-          // Add unsuccessful move to history (black)
-          moveHistory.push('black');
-          triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
-        }
-      } else {
-        draggedVessel.snapBack();
-      }
-      
-      draggedVessel = null;
     }
     return false; // Prevent default
   }
@@ -2033,3 +2491,291 @@ let intermediate_combinations = [
     fill(255, 255, 255, 100); // Semi-transparent white for a highlight
     ellipse(x, y, petalSize, petalSize);
   }
+  
+  // Function to check if a combination matches any easter egg
+  function checkForEasterEgg(ingredients) {
+    if (!easter_eggs || easter_eggs.length === 0) return null;
+    
+    console.log("Checking for easter eggs with ingredients:", ingredients);
+    
+    // Check each easter egg
+    for (let egg of easter_eggs) {
+      // Check if all required ingredients for this easter egg are present
+      // and if the number of ingredients matches exactly
+      if (egg.required.length === ingredients.length && 
+          egg.required.every(ing => ingredients.includes(ing))) {
+        console.log("Found easter egg:", egg.name);
+        return egg;
+      }
+    }
+    
+    return null;
+  }
+  
+  // Function to display an easter egg
+  function displayEasterEgg(egg, draggedVesselRef, targetVesselRef) {
+    console.log("Displaying easter egg:", egg.name);
+    
+    // Store references to the vessels that triggered the easter egg
+    let draggedVesselCopy = null;
+    let targetVesselCopy = null;
+    
+    if (draggedVesselRef) {
+      // Store the original positions of the vessels
+      draggedVesselCopy = {
+        vessel: draggedVesselRef,
+        originalX: draggedVesselRef.x,
+        originalY: draggedVesselRef.y
+      };
+    }
+    
+    if (targetVesselRef) {
+      targetVesselCopy = {
+        vessel: targetVesselRef,
+        originalX: targetVesselRef.x,
+        originalY: targetVesselRef.y
+      };
+    }
+    
+    // Create a modal dialogue that stays until clicked
+    let eggModal = {
+      active: true,
+      x: playAreaX + playAreaWidth / 2,
+      y: playAreaY + playAreaHeight / 2,
+      radius: min(playAreaWidth, playAreaHeight) * 0.2, // Half the previous size
+      draggedVessel: draggedVesselCopy,
+      targetVessel: targetVesselCopy,
+      
+      // Define small splatter droplets
+      splatters: [
+        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(8, 15) },
+        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(8, 15) },
+        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(8, 15) },
+        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(5, 10) },
+        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(5, 10) }
+      ],
+      
+      draw: function() {
+        if (!this.active) return;
+        
+        push();
+        // Semi-transparent overlay for the entire canvas
+        rectMode(CORNER);
+        fill(0, 0, 0, 100);
+        noStroke();
+        rect(0, 0, width, height);
+        
+        // Draw egg white (simple, rounded splat shape)
+        fill(255, 255, 255, 240);
+        noStroke();
+        
+        // Draw the main egg white blob (simple, rounded shape)
+        push();
+        translate(this.x, this.y);
+        
+        // Main circular base
+        const baseRadius = this.radius * 1.8;
+        ellipse(0, 0, baseRadius * 2, baseRadius * 2);
+        
+        // Add 5-7 rounded gloops around the main circle
+        // Bottom drip (longer)
+        const bottomDripWidth = baseRadius * 0.7;
+        const bottomDripHeight = baseRadius * 1.5;
+        const bottomDripY = baseRadius * 0.8;
+        
+        // Draw the bottom drip with rounded corners
+        rectMode(CENTER);
+        rect(0, bottomDripY, bottomDripWidth, bottomDripHeight, 
+             bottomDripWidth/2, bottomDripWidth/2, bottomDripWidth/2, bottomDripWidth/2);
+        
+        // Add a circle at the bottom of the drip for a rounded end
+        ellipse(0, bottomDripY + bottomDripHeight/2, bottomDripWidth, bottomDripWidth);
+        
+        // Add 4-6 more rounded gloops around the circle
+        // Top-right gloop
+        const tr = {
+          x: baseRadius * 0.6,
+          y: -baseRadius * 0.6,
+          width: baseRadius * 0.6,
+          height: baseRadius * 0.8
+        };
+        push();
+        translate(tr.x, tr.y);
+        rotate(PI/4); // Rotate to point outward
+        rect(0, 0, tr.width, tr.height, tr.width/2);
+        ellipse(0, tr.height/2 - tr.width/4, tr.width, tr.width);
+        pop();
+        
+        // Top-left gloop
+        const tl = {
+          x: -baseRadius * 0.6,
+          y: -baseRadius * 0.6,
+          width: baseRadius * 0.5,
+          height: baseRadius * 0.7
+        };
+        push();
+        translate(tl.x, tl.y);
+        rotate(-PI/4); // Rotate to point outward
+        rect(0, 0, tl.width, tl.height, tl.width/2);
+        ellipse(0, tl.height/2 - tl.width/4, tl.width, tl.width);
+        pop();
+        
+        // Right gloop
+        const right = {
+          x: baseRadius * 0.8,
+          y: baseRadius * 0.1,
+          width: baseRadius * 0.5,
+          height: baseRadius * 0.6
+        };
+        push();
+        translate(right.x, right.y);
+        rotate(PI/2.5); // Rotate to point outward
+        rect(0, 0, right.width, right.height, right.width/2);
+        ellipse(0, right.height/2 - right.width/4, right.width, right.width);
+        pop();
+        
+        // Left gloop
+        const left = {
+          x: -baseRadius * 0.8,
+          y: baseRadius * 0.1,
+          width: baseRadius * 0.5,
+          height: baseRadius * 0.6
+        };
+        push();
+        translate(left.x, left.y);
+        rotate(-PI/2.5); // Rotate to point outward
+        rect(0, 0, left.width, left.height, left.width/2);
+        ellipse(0, left.height/2 - left.width/4, left.width, left.width);
+        pop();
+        
+        // Bottom-right small gloop
+        const br = {
+          x: baseRadius * 0.4,
+          y: baseRadius * 0.7,
+          size: baseRadius * 0.4
+        };
+        ellipse(br.x, br.y, br.size, br.size);
+        
+        // Bottom-left small gloop
+        const bl = {
+          x: -baseRadius * 0.4,
+          y: baseRadius * 0.7,
+          size: baseRadius * 0.4
+        };
+        ellipse(bl.x, bl.y, bl.size, bl.size);
+        
+        pop(); // End of egg white drawing
+        
+        // Draw small splatter droplets
+        fill(255, 255, 255, 240);
+        noStroke();
+        for (let splat of this.splatters) {
+          const x = this.x + this.radius * 3 * splat.x;
+          const y = this.y + this.radius * 3 * splat.y;
+          circle(x, y, splat.size);
+        }
+        
+        // Draw yellow yolk (circular dialogue)
+        // Add a subtle gradient to the yolk
+        for (let i = 10; i >= 0; i--) {
+          const yolkSize = this.radius * 2 * (1 - i * 0.03);
+          const alpha = 255 - i * 10;
+          fill(255, 204, 0, alpha); // Bright egg yolk yellow with gradient
+          noStroke();
+          circle(this.x, this.y, yolkSize);
+        }
+        
+        // Add highlight to the yolk
+        fill(255, 255, 255, 100);
+        noStroke();
+        ellipse(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.7, this.radius * 0.5);
+        
+        // Add a thin outline to the yolk
+        noFill();
+        stroke(200, 150, 0, 100);
+        strokeWeight(1);
+        circle(this.x, this.y, this.radius * 2);
+        
+        // Close button (x)
+        fill(255);
+        stroke(0);
+        strokeWeight(1);
+        const closeButtonSize = 20; // Smaller close button
+        circle(this.x + this.radius * 0.7, this.y - this.radius * 0.7, closeButtonSize);
+        
+        // X mark
+        stroke(0);
+        strokeWeight(1.5);
+        const xOffset = 6; // Smaller x mark
+        line(this.x + this.radius * 0.7 - xOffset, this.y - this.radius * 0.7 - xOffset, 
+             this.x + this.radius * 0.7 + xOffset, this.y - this.radius * 0.7 + xOffset);
+        line(this.x + this.radius * 0.7 - xOffset, this.y - this.radius * 0.7 + xOffset, 
+             this.x + this.radius * 0.7 + xOffset, this.y - this.radius * 0.7 - xOffset);
+        
+        // "You found the egg!" text
+        fill(0);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(12); // Smaller text
+        textStyle(NORMAL);
+        text("You found the egg!", this.x, this.y - this.radius * 0.4);
+        
+        // Easter egg name
+        textSize(20); // Smaller text
+        textStyle(BOLD);
+        text(egg.name, this.x, this.y);
+        
+        // "Keep going!" text
+        textSize(12); // Smaller text
+        textStyle(NORMAL);
+        text("Keep going!", this.x, this.y + this.radius * 0.4);
+        
+        pop();
+      },
+      
+      checkClick: function(x, y) {
+        // Check if click is inside the modal or close button
+        if (this.active) {
+          // Clicking anywhere closes the modal
+          this.active = false;
+          
+          // Return vessels to their original positions
+          if (this.draggedVessel && this.draggedVessel.vessel) {
+            this.draggedVessel.vessel.x = this.draggedVessel.originalX;
+            this.draggedVessel.vessel.y = this.draggedVessel.originalY;
+          }
+          
+          if (this.targetVessel && this.targetVessel.vessel) {
+            this.targetVessel.vessel.x = this.targetVessel.originalX;
+            this.targetVessel.vessel.y = this.targetVessel.originalY;
+          }
+          
+          return true;
+        }
+        return false;
+      }
+    };
+    
+    // Add the modal to a global array
+    eggModals.push(eggModal);
+    
+    // Trigger haptic feedback
+    triggerHapticFeedback('completion');
+  }
+  
+  // Helper function to draw a star
+  function star(x, y, radius1, radius2, npoints) {
+    let angle = TWO_PI / npoints;
+    let halfAngle = angle / 2.0;
+    beginShape();
+    for (let a = 0; a < TWO_PI; a += angle) {
+      let sx = x + cos(a) * radius2;
+      let sy = y + sin(a) * radius2;
+      vertex(sx, sy);
+      sx = x + cos(a + halfAngle) * radius1;
+      sy = y + sin(a + halfAngle) * radius1;
+      vertex(sx, sy);
+    }
+    endShape(CLOSE);
+  }
+  

@@ -35,68 +35,162 @@ function getCurrentDateEST() {
 // Function to fetch recipe for the current day
 async function fetchTodayRecipe() {
   try {
-    // Get current date in EST
     const today = getCurrentDateEST();
-    console.log("Fetching recipe for date:", today);
+    console.log(`Fetching recipe for today: ${today}`);
     
-    // Query the recipes table for today's recipe
-    const { data: recipes, error: recipeError } = await supabase
+    // Fetch recipe for today's date
+    const { data: recipes, error } = await supabase
       .from('recipes')
       .select('*')
-      .eq('date', today);
+      .eq('date', today)
+      .limit(1);
     
-    console.log("Recipes data:", recipes);
-    if (recipeError) {
-      console.error("Recipe error:", recipeError);
-      throw recipeError;
+    if (error) {
+      console.error("Error fetching today's recipe:", error);
+      return null;
     }
     
     if (!recipes || recipes.length === 0) {
-      console.error("No recipe found for today");
-      throw new Error('No recipe found for today');
+      console.error(`No recipe found for today: ${today}`);
+      return null;
     }
     
-    // Get the first recipe (in case there are multiple for the same date)
     const recipe = recipes[0];
-    console.log("Selected recipe:", recipe);
+    console.log("Found today's recipe:", recipe);
     
-    // Get all combinations for this recipe
+    // Now fetch combinations, ingredients, and easter eggs
+    return await fetchRecipeDetails(recipe);
+  } catch (error) {
+    console.error("Error in fetchTodayRecipe:", error);
+    return null;
+  }
+}
+
+// Fetch Recipe Details (combinations, ingredients, easter eggs)
+async function fetchRecipeDetails(recipe) {
+  try {
+    // Fetch combinations for this recipe
     const { data: combinations, error: combosError } = await supabase
       .from('combinations')
       .select('*')
       .eq('rec_id', recipe.rec_id);
     
-    console.log("Combinations data:", combinations);
     if (combosError) {
-      console.error("Combinations error:", combosError);
-      throw combosError;
+      console.error("Error fetching combinations:", combosError);
+      return null;
     }
     
-    // Get all ingredients for these combinations
-    const comboIds = combinations.map(combo => combo.combo_id);
+    // Fetch ingredients for all combinations
+    const comboIds = combinations.map(c => c.combo_id);
     const { data: ingredients, error: ingredientsError } = await supabase
       .from('ingredients')
       .select('*')
       .in('combo_id', comboIds);
     
-    console.log("Ingredients data:", ingredients);
     if (ingredientsError) {
-      console.error("Ingredients error:", ingredientsError);
-      throw ingredientsError;
+      console.error("Error fetching ingredients:", ingredientsError);
+      return null;
     }
     
-    // Process the data into the format expected by the game
-    return processRecipeData(recipe, combinations, ingredients);
+    // Fetch easter eggs for this recipe
+    const easterEggs = await fetchEasterEggs(recipe.rec_id);
+    
+    // Process the data
+    return processRecipeData(recipe, combinations, ingredients, easterEggs);
   } catch (error) {
-    console.error('Error fetching recipe:', error);
-    // Return the default recipe as fallback
+    console.error("Error in fetchRecipeDetails:", error);
     return null;
   }
 }
 
+// Function to fetch easter eggs for a specific recipe
+async function fetchEasterEggs(recipeId) {
+  try {
+    console.log("Fetching easter eggs for recipe ID:", recipeId);
+    
+    // Query the eastereggs table for this recipe
+    const { data: easterEggs, error } = await supabase
+      .from('eastereggs')
+      .select('*')
+      .eq('rec_id', recipeId);
+    
+    if (error) {
+      console.error("Easter eggs error:", error);
+      return [];
+    }
+    
+    console.log("Easter eggs data:", easterEggs);
+    
+    // We need to get the ingredient names for ing_id_1 and ing_id_2
+    if (easterEggs && easterEggs.length > 0) {
+      // Collect all ingredient IDs
+      const ingredientIds = [];
+      easterEggs.forEach(egg => {
+        if (egg.ing_id_1) ingredientIds.push(egg.ing_id_1);
+        if (egg.ing_id_2) ingredientIds.push(egg.ing_id_2);
+      });
+      
+      // Fetch the ingredient names for these IDs
+      if (ingredientIds.length > 0) {
+        const { data: ingredientData, error: ingredientError } = await supabase
+          .from('ingredients')
+          .select('ing_id, name')
+          .in('ing_id', ingredientIds);
+        
+        if (ingredientError) {
+          console.error("Error fetching ingredient names:", ingredientError);
+        } else {
+          console.log("Ingredient data for easter eggs:", ingredientData);
+          
+          // Create a map of ing_id to name
+          const ingredientMap = {};
+          ingredientData.forEach(ing => {
+            ingredientMap[ing.ing_id] = ing.name;
+          });
+          
+          // Format the easter eggs data with ingredient names
+          const formattedEasterEggs = easterEggs.map(egg => {
+            const required = [];
+            if (egg.ing_id_1 && ingredientMap[egg.ing_id_1]) {
+              required.push(ingredientMap[egg.ing_id_1]);
+            }
+            if (egg.ing_id_2 && ingredientMap[egg.ing_id_2]) {
+              required.push(ingredientMap[egg.ing_id_2]);
+            }
+            
+            return {
+              id: egg.egg_id,
+              name: egg.name || "Secret Combination",
+              required: required
+            };
+          });
+          
+          console.log("Formatted easter eggs:", formattedEasterEggs);
+          return formattedEasterEggs;
+        }
+      }
+    }
+    
+    // If we couldn't get ingredient names, return a simplified version
+    const simpleEasterEggs = easterEggs.map(egg => {
+      return {
+        id: egg.egg_id,
+        name: egg.name || "Secret Combination",
+        required: [] // Empty array since we couldn't get the ingredient names
+      };
+    });
+    
+    console.log("Simplified easter eggs:", simpleEasterEggs);
+    return simpleEasterEggs;
+  } catch (error) {
+    console.error('Error fetching easter eggs:', error);
+    return [];
+  }
+}
+
 // Process the database data into the format expected by the game
-function processRecipeData(recipe, combinations, ingredients) {
-  console.log("Processing recipe data:", { recipe, combinations, ingredients });
+function processRecipeData(recipe, combinations, ingredients, easterEggs = []) {
+  console.log("Processing recipe data:", { recipe, combinations, ingredients, easterEggs });
   
   // Find the final combination
   const finalCombo = combinations.find(combo => combo.is_final === true);
@@ -117,6 +211,14 @@ function processRecipeData(recipe, combinations, ingredients) {
     .map(ing => ing.name);
   console.log("All base ingredients:", baseIngredients);
   
+  // Create maps for easier lookups
+  const comboIdToName = {};
+  const comboNameToId = {};
+  combinations.forEach(combo => {
+    comboIdToName[combo.combo_id] = combo.name;
+    comboNameToId[combo.name] = combo.combo_id;
+  });
+  
   // Group ingredients by combination
   const ingredientsByCombo = {};
   ingredients.forEach(ing => {
@@ -124,67 +226,111 @@ function processRecipeData(recipe, combinations, ingredients) {
       ingredientsByCombo[ing.combo_id] = [];
     }
     
-    // Only add the ingredient if it's a base ingredient
-    if (ing.is_base === true) {
-      ingredientsByCombo[ing.combo_id].push(ing.name);
-    }
+    // Add all ingredients (both base and non-base)
+    ingredientsByCombo[ing.combo_id].push({
+      name: ing.name,
+      isBase: ing.is_base
+    });
   });
   console.log("Ingredients by combo:", ingredientsByCombo);
   
   // Format intermediate combinations
   const intermediateCombinations = intermediateCombos.map(combo => {
-    // Get the base ingredients for this combo
+    // Get all ingredients for this combo
     const comboIngredients = ingredientsByCombo[combo.combo_id] || [];
+    
+    // Separate base ingredients and combination ingredients
+    const baseIngs = comboIngredients
+      .filter(ing => ing.isBase)
+      .map(ing => ing.name);
+      
+    const comboIngs = comboIngredients
+      .filter(ing => !ing.isBase)
+      .map(ing => ing.name);
+    
+    // For display purposes, we want to show all required ingredients
+    const allRequired = [...baseIngs, ...comboIngs];
     
     return {
       name: combo.name,
-      required: comboIngredients
+      required: allRequired,
+      verb: combo.verb || "mix", // Include the verb from the combinations table, with a default fallback
+      combo_id: combo.combo_id,
+      parent_combo: combo.parent_combo // Include the parent_combo information
     };
   });
   console.log("Formatted intermediate combinations:", intermediateCombinations);
   
-  // For the final combination, we need to find which intermediate combinations are required
+  // For the final combination, we need to find which combinations are directly required
   // Get all ingredients for the final combination
-  const finalComboIngredients = ingredients
-    .filter(ing => ing.combo_id === finalCombo.combo_id)
+  const finalComboIngredients = ingredientsByCombo[finalCombo.combo_id] || [];
+  
+  // Separate base ingredients and combination ingredients
+  const finalBaseIngs = finalComboIngredients
+    .filter(ing => ing.isBase)
     .map(ing => ing.name);
-  console.log("Final combo ingredients:", finalComboIngredients);
-  
-  // Find which intermediate combinations are required for the final combination
-  // Method 1: Check if intermediate combo names are in the final combo ingredients
-  const requiredCombos = [];
-  for (const combo of intermediateCombos) {
-    if (finalComboIngredients.includes(combo.name)) {
-      requiredCombos.push(combo.name);
-    }
-  }
-  
-  // Method 2: If method 1 didn't work, check if any ingredients from the final combo
-  // match the names of intermediate combinations
-  if (requiredCombos.length === 0) {
-    // Get all intermediate combo names
-    const intermediateNames = intermediateCombos.map(combo => combo.name);
     
-    // Check if any of the final combo ingredients match intermediate combo names
-    for (const ing of finalComboIngredients) {
-      if (intermediateNames.includes(ing)) {
-        requiredCombos.push(ing);
+  const finalComboIngs = finalComboIngredients
+    .filter(ing => !ing.isBase)
+    .map(ing => ing.name);
+  
+  console.log("Final combination ingredients:", {
+    base: finalBaseIngs,
+    combinations: finalComboIngs
+  });
+  
+  // Find combinations that have this final combo as their parent
+  const childCombos = combinations
+    .filter(combo => combo.parent_combo === finalCombo.combo_id)
+    .map(combo => combo.name);
+  
+  console.log("Child combinations of final:", childCombos);
+  
+  // The required combinations for the final recipe are the direct children of the final combo
+  let finalRequired = childCombos.length > 0 ? childCombos : finalComboIngs;
+  
+  // If we still don't have any required combinations, fall back to previous methods
+  if (finalRequired.length === 0) {
+    // Method 1: Check if intermediate combo names are in the final base ingredients
+    const requiredCombos = [];
+    for (const combo of intermediateCombos) {
+      if (finalBaseIngs.includes(combo.name)) {
+        requiredCombos.push(combo.name);
       }
     }
+    
+    // Method 2: If method 1 didn't work, check if any ingredients from the final combo
+    // match the names of intermediate combinations
+    if (requiredCombos.length === 0) {
+      // Get all intermediate combo names
+      const intermediateNames = intermediateCombos.map(combo => combo.name);
+      
+      // Check if any of the final combo ingredients match intermediate combo names
+      for (const ing of finalBaseIngs) {
+        if (intermediateNames.includes(ing)) {
+          requiredCombos.push(ing);
+        }
+      }
+    }
+    
+    // If we found any required combos, use them
+    if (requiredCombos.length > 0) {
+      finalRequired = requiredCombos;
+    } else {
+      // Last resort: use all intermediate combinations as a fallback
+      finalRequired = intermediateCombos.map(combo => combo.name);
+    }
   }
   
-  console.log("Required intermediate combos for final:", requiredCombos);
-  
-  // If we still couldn't find the required combinations, use all intermediate combinations as a fallback
-  const finalRequired = requiredCombos.length > 0 
-    ? requiredCombos 
-    : intermediateCombos.map(combo => combo.name);
   console.log("Final required combinations:", finalRequired);
   
   // Format final combination
   const finalCombination = {
     name: finalCombo.name,
-    required: finalRequired
+    required: finalRequired,
+    verb: finalCombo.verb || "prepare", // Include the verb from the combinations table, with a default fallback
+    combo_id: finalCombo.combo_id,
+    parent_combo: finalCombo.parent_combo // Include the parent_combo information
   };
   
   const result = {
@@ -192,9 +338,43 @@ function processRecipeData(recipe, combinations, ingredients) {
     recipeUrl: recipe.recipe_url || "https://www.example.com/recipe",
     intermediateCombinations,
     finalCombination,
-    baseIngredients: [...new Set(baseIngredients)]
+    baseIngredients: [...new Set(baseIngredients)],
+    easterEggs: easterEggs || []
   };
   
   console.log("Processed result:", result);
   return result;
+}
+
+// Fetch Recipe by Specific Date (for playtesting)
+async function fetchRecipeByDate(dateString) {
+  try {
+    console.log(`Fetching recipe for date: ${dateString}`);
+    
+    // Fetch recipe for the specified date
+    const { data: recipes, error } = await supabase
+      .from('recipes')
+      .select('*')
+      .eq('date', dateString)
+      .limit(1);
+    
+    if (error) {
+      console.error("Error fetching recipe by date:", error);
+      return null;
+    }
+    
+    if (!recipes || recipes.length === 0) {
+      console.error(`No recipe found for date: ${dateString}`);
+      return null;
+    }
+    
+    const recipe = recipes[0];
+    console.log("Found recipe:", recipe);
+    
+    // Now fetch combinations, ingredients, and easter eggs
+    return await fetchRecipeDetails(recipe);
+  } catch (error) {
+    console.error("Error in fetchRecipeByDate:", error);
+    return null;
+  }
 } 
