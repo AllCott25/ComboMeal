@@ -576,35 +576,31 @@ let intermediate_combinations = [
       advanced_h = basic_h * 1.2;
     }
 
-    // First, separate vessels into advanced and basic
-    let advancedVessels = vessels.filter(v => v.isAdvanced);
-    let basicVessels = vessels.filter(v => !v.isAdvanced);
+    // First, separate vessels into categories
+    let baseVessels = vessels.filter(v => v.color === 'white'); // Base ingredients (white)
+    let yellowVessels = vessels.filter(v => v.color === COLORS.vesselYellow); // Partial combinations (yellow)
+    let greenVessels = vessels.filter(v => v.color === COLORS.vesselGreen); // Complete combinations (green)
 
     // Create an array to hold our row arrangements
     let rowArrangements = [];
 
-    // Create rows with optimal arrangements
-    while (advancedVessels.length > 0 || basicVessels.length > 0) {
-      let currentRow = [];
-      
-      // Try to create rows with 1 advanced vessel and 1 basic vessel when possible
-      if (advancedVessels.length > 0 && basicVessels.length > 0) {
-        currentRow.push(advancedVessels.shift()); // Add 1 advanced vessel (takes 2 slots)
-        currentRow.push(basicVessels.shift()); // Add 1 basic vessel (takes 1 slot)
-            rowArrangements.push(currentRow);
-      }
-      // If we only have advanced vessels left, add 1 per row
-      else if (advancedVessels.length > 0) {
-                currentRow.push(advancedVessels.shift());
-        rowArrangements.push(currentRow);
-      }
-      // If we only have basic vessels left, add 3 per row (or fewer if that's all we have)
-      else if (basicVessels.length > 0) {
-        // Add up to 3 basic vessels
-        for (let i = 0; i < 3 && basicVessels.length > 0; i++) {
-                    currentRow.push(basicVessels.shift());
-        }
-            rowArrangements.push(currentRow);
+    // First place green vessels (1 per row)
+    while (greenVessels.length > 0) {
+      rowArrangements.push([greenVessels.shift()]);
+    }
+
+    // Then place yellow vessels (1 per row)
+    while (yellowVessels.length > 0) {
+      rowArrangements.push([yellowVessels.shift()]);
+    }
+
+    // Finally place base vessels (3 per row)
+    let currentRow = [];
+    for (let i = 0; i < baseVessels.length; i++) {
+      currentRow.push(baseVessels[i]);
+      if (currentRow.length === 3 || i === baseVessels.length - 1) {
+        rowArrangements.push([...currentRow]);
+        currentRow = [];
       }
     }
 
@@ -613,35 +609,37 @@ let intermediate_combinations = [
 
     // Position all vessels based on row arrangements
     rowArrangements.forEach((row, rowIndex) => {
-        // Calculate total width of this row
-        let rowWidth = row.reduce((width, v) => {
-            return width + (v.isAdvanced ? advanced_w : basic_w);
-        }, 0) + (row.length - 1) * margin;
+      // Calculate total width of this row
+      let rowWidth = row.reduce((width, v) => {
+        return width + (v.color !== 'white' ? advanced_w : basic_w);
+      }, 0) + (row.length - 1) * margin;
 
       // Calculate starting x position to center the row within the play area
       let startX = playAreaX + (playAreaWidth - rowWidth) / 2;
-        let currentX = startX;
+      let currentX = startX;
 
-        // Position each vessel in the row
-        row.forEach((v) => {
-            // Update vessel dimensions
-            if (v.isAdvanced) {
-                v.w = advanced_w;
-                v.h = advanced_h;
-            } else {
-                v.w = basic_w;
-                v.h = basic_h;
-            }
+      // Position each vessel in the row
+      row.forEach((v) => {
+        // Update vessel dimensions
+        if (v.color !== 'white') {
+          v.w = advanced_w;
+          v.h = advanced_h;
+          v.isAdvanced = true;
+        } else {
+          v.w = basic_w;
+          v.h = basic_h;
+          v.isAdvanced = false;
+        }
 
-            // Set vessel position
-            v.x = currentX + v.w / 2;
-            v.y = startY + rowIndex * (advanced_h + vertical_margin);
-            v.originalX = v.x;
-            v.originalY = v.y;
+        // Set vessel position
+        v.x = currentX + v.w / 2;
+        v.y = startY + rowIndex * (advanced_h + vertical_margin);
+        v.originalX = v.x;
+        v.originalY = v.y;
 
-            // Move x position for next vessel
-            currentX += v.w + margin;
-        });
+        // Move x position for next vessel
+        currentX += v.w + margin;
+      });
     });
     
     // Calculate the lowest vessel position for hint button placement
@@ -653,8 +651,10 @@ let intermediate_combinations = [
     // Set hint button position 20 pixels below the lowest vessel
     hintButtonY = lowestY + 20;
     
-    // Ensure the hint button stays within the play area
-    hintButtonY = Math.min(hintButtonY, playAreaY + playAreaHeight - 60);
+    // Update hint button position if it exists
+    if (hintButton) {
+      hintButton.y = hintButtonY;
+    }
   }
   
   function draw() {
@@ -2805,12 +2805,20 @@ let intermediate_combinations = [
         }
       }
       
+      // Check if dragged over hint vessel
+      let overHintVessel = false;
+      if (showingHint && hintVessel && hintVessel.isInside(touchX, touchY)) {
+        overHintVessel = true;
+      }
+      
       // If we found a vessel to combine with
       if (overVessel) {
         // Check for easter eggs before combining
         const easterEgg = checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])]);
         if (easterEgg) {
           // Easter egg was found
+          console.log("Easter egg found in touchEnded:", easterEgg.name);
+          
           // Add a special move to history with a marker to indicate it's an Easter Egg
           moveHistory.push({ type: 'easterEgg', color: COLORS.vesselYellow });
           
@@ -2819,6 +2827,10 @@ let intermediate_combinations = [
           
           // Play sound
           playSound('easterEgg');
+          
+          // Immediately snap vessels back to their original positions
+          draggedVessel.x = draggedVessel.originalX;
+          draggedVessel.y = draggedVessel.originalY;
           
           // Display the easter egg modal
           displayEasterEgg(easterEgg, draggedVessel, overVessel);
@@ -2857,6 +2869,50 @@ let intermediate_combinations = [
           arrangeVessels();
         } else {
           // Snap back to original position
+          draggedVessel.x = draggedVessel.originalX;
+          draggedVessel.y = draggedVessel.originalY;
+          
+          // Play error sound
+          playSound('error');
+        }
+      } else if (overHintVessel) {
+        // Dragged to hint vessel
+        // Check if the ingredient is needed for the hint
+        if (hintVessel.addIngredient(draggedVessel.ingredients[0])) {
+          // Successfully added to hint vessel
+          // Remove the dragged vessel
+          vessels = vessels.filter(v => v !== draggedVessel);
+          
+          // Add a move to history with the hint color
+          moveHistory.push(COLORS.vesselHint);
+          
+          // Update the turn counter
+          updateTurnCounter();
+          
+          // Play sound
+          playSound('combine');
+          
+          // Check if hint is complete
+          if (hintVessel.isComplete()) {
+            // Convert hint vessel to a regular vessel
+            let newVessel = hintVessel.toVessel();
+            vessels.push(newVessel);
+            
+            // Hide hint
+            showingHint = false;
+            hintVessel = null;
+            
+            // Check if we've won
+            if (newVessel.isFinalDish) {
+              gameWon = true;
+              playSound('win');
+            }
+            
+            // Rearrange vessels
+            arrangeVessels();
+          }
+        } else {
+          // Not needed for hint, snap back
           draggedVessel.x = draggedVessel.originalX;
           draggedVessel.y = draggedVessel.originalY;
           
