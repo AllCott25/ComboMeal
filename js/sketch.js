@@ -2280,6 +2280,14 @@ let intermediate_combinations = [
   
   // Add touch support for mobile devices
   function touchStarted() {
+    // Check if any easter egg modal is active and handle the click
+    for (let i = eggModals.length - 1; i >= 0; i--) {
+      if (eggModals[i].active && eggModals[i].checkClick(touches[0].x, touches[0].y)) {
+        // Modal was clicked, don't process any other clicks
+        return false;
+      }
+    }
+
     // Prevent default touch behavior to avoid scrolling
     if (touches.length > 0) {
       let touchX = touches[0].x;
@@ -2777,5 +2785,116 @@ let intermediate_combinations = [
       vertex(sx, sy);
     }
     endShape(CLOSE);
+  }
+  
+  // Add touch release support for mobile devices
+  function touchEnded() {
+    // If we have a dragged vessel, handle the release
+    if (draggedVessel) {
+      // Find the vessel under the touch point
+      let touchX = touches.length > 0 ? touches[0].x : mouseX;
+      let touchY = touches.length > 0 ? touches[0].y : mouseY;
+      
+      let overVessel = null;
+      for (let v of vessels) {
+        if (v !== draggedVessel && v.isInside(touchX, touchY)) {
+          overVessel = v;
+          break;
+      }
+    }
+      
+      // If we found a vessel to combine with
+      if (overVessel) {
+        // Check for easter eggs before combining
+        const easterEgg = checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])]);
+        if (easterEgg) {
+          // Easter egg was found
+          // Add a special move to history with a marker to indicate it's an Easter Egg
+          moveHistory.push({ type: 'easterEgg', color: COLORS.vesselYellow });
+          
+          // Update the turn counter
+          updateTurnCounter();
+          
+          // Play sound
+          playSound('easterEgg');
+          
+          // Display the easter egg modal
+          displayEasterEgg(easterEgg, draggedVessel, overVessel);
+          
+          // Set draggedVessel to null to prevent further interaction until modal is closed
+          draggedVessel = null;
+          return false;
+        }
+        
+        // If not an easter egg, proceed with normal combination
+        let newVessel = combineVessels(draggedVessel, overVessel);
+        
+        if (newVessel) {
+          // Remove the original vessels
+          vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
+          
+          // Add the new vessel
+          vessels.push(newVessel);
+          
+          // Add a move to history
+          moveHistory.push(1);
+          
+          // Update the turn counter
+          updateTurnCounter();
+          
+          // Play sound
+          playSound('combine');
+          
+          // Check if we've won
+          if (newVessel.isFinalDish) {
+            gameWon = true;
+            playSound('win');
+          }
+          
+          // Rearrange vessels
+          arrangeVessels();
+        } else {
+          // Snap back to original position
+          draggedVessel.targetX = draggedVessel.originalX;
+          draggedVessel.targetY = draggedVessel.originalY;
+          
+          // Play error sound
+          playSound('error');
+        }
+      } else {
+        // Snap back to original position
+        draggedVessel.targetX = draggedVessel.originalX;
+        draggedVessel.targetY = draggedVessel.originalY;
+      }
+      
+      // Reset scale
+      draggedVessel.targetScale = 1.0;
+      
+      // Clear dragged vessel
+      draggedVessel = null;
+    }
+    
+    return false; // Prevent default
+  }
+  
+  // Add touch move support for mobile devices
+  function touchMoved() {
+    // If we have a dragged vessel, update its position
+    if (draggedVessel) {
+      if (touches.length > 0) {
+        let touchX = touches[0].x;
+        let touchY = touches[0].y;
+        
+        // Update vessel position
+        draggedVessel.x = touchX - offsetX;
+        draggedVessel.y = touchY - offsetY;
+        
+        // Keep vessel within play area bounds
+        draggedVessel.x = constrain(draggedVessel.x, playAreaX + draggedVessel.w/2, playAreaX + playAreaWidth - draggedVessel.w/2);
+        draggedVessel.y = constrain(draggedVessel.y, playAreaY + draggedVessel.h/2, playAreaY + playAreaHeight - draggedVessel.h/2);
+      }
+    }
+    
+    return false; // Prevent default
   }
   
