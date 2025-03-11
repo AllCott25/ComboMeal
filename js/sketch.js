@@ -2280,40 +2280,40 @@ let intermediate_combinations = [
   
   // Add touch support for mobile devices
   function touchStarted() {
-    // Check if any easter egg modal is active and handle the click
-    for (let i = eggModals.length - 1; i >= 0; i--) {
-      if (eggModals[i].active && eggModals[i].checkClick(touches[0].x, touches[0].y)) {
-        // Modal was clicked, don't process any other clicks
-        return false;
-      }
-    }
-
     // Prevent default touch behavior to avoid scrolling
     if (touches.length > 0) {
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
+      // Check if any easter egg modal is active
+      for (let i = eggModals.length - 1; i >= 0; i--) {
+        if (eggModals[i].active) {
+          eggModals[i].checkClick(touchX, touchY);
+          return false;
+        }
+      }
+      
       // Handle the same logic as mousePressed but with touch coordinates
       if (!gameStarted) {
         // Check if start button was touched
         if (startButton.isInside(touchX, touchY)) {
-          startButton.handleClick();
+          startGame();
           return false;
         }
       } else if (gameWon) {
         // Check if buttons were touched
         if (shareButton.isInside(touchX, touchY)) {
-          shareButton.handleClick();
+          shareScore();
           return false;
         }
         if (recipeButton.isInside(touchX, touchY)) {
-          recipeButton.handleClick();
+          viewRecipe();
           return false;
         }
       } else {
         // Check if hint button was touched
         if (!showingHint && hintButton.isInside(touchX, touchY)) {
-          hintButton.handleClick();
+          showHint();
           return false;
         }
         
@@ -2321,6 +2321,8 @@ let intermediate_combinations = [
         for (let v of vessels) {
           if (v.isInside(touchX, touchY)) {
             draggedVessel = v;
+            draggedVessel.originalX = v.x;
+            draggedVessel.originalY = v.y;
             offsetX = touchX - v.x;
             offsetY = touchY - v.y;
             v.targetScale = 1.1; // Slight scale up when dragging
@@ -2800,8 +2802,8 @@ let intermediate_combinations = [
         if (v !== draggedVessel && v.isInside(touchX, touchY)) {
           overVessel = v;
           break;
+        }
       }
-    }
       
       // If we found a vessel to combine with
       if (overVessel) {
@@ -2855,16 +2857,16 @@ let intermediate_combinations = [
           arrangeVessels();
         } else {
           // Snap back to original position
-          draggedVessel.targetX = draggedVessel.originalX;
-          draggedVessel.targetY = draggedVessel.originalY;
+          draggedVessel.x = draggedVessel.originalX;
+          draggedVessel.y = draggedVessel.originalY;
           
           // Play error sound
           playSound('error');
         }
       } else {
         // Snap back to original position
-        draggedVessel.targetX = draggedVessel.originalX;
-        draggedVessel.targetY = draggedVessel.originalY;
+        draggedVessel.x = draggedVessel.originalX;
+        draggedVessel.y = draggedVessel.originalY;
       }
       
       // Reset scale
