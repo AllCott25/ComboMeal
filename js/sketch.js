@@ -1,5 +1,5 @@
 /*
-* Culinary Logic Puzzle v0.0515.08
+* Culinary Logic Puzzle v0.0515.09
 * Created: March 6, 2025
 * Last Updated: May 15, 2025
 *
@@ -12,6 +12,7 @@
 * View Recipe and Share Score buttons with an ultra-simplified approach.
 * Fixed persistent hover states on win screen CTAs after tapping them.
 * Limited tutorial text width to ensure instructions remain readable on all screen sizes.
+* Implemented dedicated Button objects for win screen CTAs to fix interaction issues.
 *
 * The following are intermediate combinations defined for testing.
 * These will be replaced with data from Supabase.
@@ -59,6 +60,9 @@ let intermediate_combinations = [
   let maxPlayWidth = 400; // Max width for the play area (phone-sized)
   let playAreaPadding = 20; // Padding around the play area
   let playAreaX, playAreaY, playAreaWidth, playAreaHeight; // Will be calculated in setup
+  
+  // Win screen buttons
+  let shareButton, recipeButton;
   
   // Color palette
   const COLORS = {
@@ -1856,15 +1860,33 @@ let intermediate_combinations = [
     // Remove the "Egg found!" text
     // (Removed the if(eggFound) block that displayed this text)
     
-    // Add "Share Score" text at the bottom of the letter score area, similar to "View Full Recipe"
-    textAlign(CENTER, CENTER);
-    textSize(12);
-    if (isMouseOverLetterScore) {
-      fill(COLORS.primary); // Green text when hovered
-    } else {
-      fill('#666'); // Gray text normally
-    }
-    text("Share Score →", scoreX, scoreY + scoreHeight/2 - 15);
+    // Create or update the share and recipe buttons
+    shareButton = new Button(
+      width * 0.35, 
+      height * 0.82, 
+      200, 
+      50, 
+      "SHARE SCORE", 
+      shareScore,
+      COLORS.primary
+    );
+    
+    recipeButton = new Button(
+      width * 0.65, 
+      height * 0.82, 
+      200, 
+      50, 
+      "VIEW RECIPE", 
+      viewRecipe,
+      COLORS.secondary
+    );
+    
+    // Draw the buttons
+    shareButton.draw();
+    recipeButton.draw();
+    
+    // No longer need these text elements since we have actual buttons
+    // text("Share Score →", scoreX, scoreY + scoreHeight/2 - 15);
     
     // Add "New Recipe Everyday!" text at the bottom
     textAlign(CENTER, CENTER);
@@ -1878,8 +1900,10 @@ let intermediate_combinations = [
     isMouseOverCard = mouseX > cardX - cardWidth/2 && mouseX < cardX + cardWidth/2 && 
                      mouseY > cardY - cardHeight/2 && mouseY < cardY + cardHeight/2;
     
-    // Change cursor to pointer if over the card or letter score area
-    if (isMouseOverCard || isMouseOverLetterScore) {
+    // Change cursor to pointer if over the card or letter score area or buttons
+    if (isMouseOverCard || isMouseOverLetterScore || 
+        (shareButton && shareButton.isInside(mouseX, mouseY)) || 
+        (recipeButton && recipeButton.isInside(mouseX, mouseY))) {
       cursor(HAND);
     }
   }
@@ -2019,6 +2043,17 @@ let intermediate_combinations = [
         return;
       }
     } else if (gameWon) {
+      // Check if win screen buttons were clicked
+      if (shareButton && shareButton.isInside(mouseX, mouseY)) {
+        shareButton.handleClick();
+        return;
+      }
+      
+      if (recipeButton && recipeButton.isInside(mouseX, mouseY)) {
+        recipeButton.handleClick();
+        return;
+      }
+      
       // Check if recipe card was clicked
       if (isMouseOverCard) {
         viewRecipe();
@@ -2747,6 +2782,12 @@ let intermediate_combinations = [
     if (gameStarted) {
       // Only check these buttons if they exist and the game has started
       if (hintButton) hintButton.checkHover(mouseX, mouseY);
+      
+      // Check win screen buttons
+      if (gameWon) {
+        if (shareButton) shareButton.checkHover(mouseX, mouseY);
+        if (recipeButton) recipeButton.checkHover(mouseX, mouseY);
+      }
     }
   }
   
@@ -3096,15 +3137,26 @@ let intermediate_combinations = [
           return false;
         }
       } else if (gameWon) {
-        // DIRECT APPROACH: Check if recipe card was touched - with simplified bounds check
-        // Make the entire top half of the screen trigger the recipe view
+        // Check if win screen buttons were touched
+        if (shareButton && shareButton.isInside(touchX, touchY)) {
+          shareScore();
+          return false;
+        }
+        
+        if (recipeButton && recipeButton.isInside(touchX, touchY)) {
+          viewRecipe();
+          return false;
+        }
+        
+        // Fallback to the simplified half-screen approach if buttons missed
+        // Top half of the screen trigger the recipe view
         if (touchY < height/2) {
           console.log("View Recipe triggered");
           viewRecipe();
           return false;
         }
         
-        // Make the entire bottom half of the screen trigger the share score
+        // Bottom half of the screen trigger the share score
         if (touchY >= height/2) {
           console.log("Share Score triggered");
           shareScore();
@@ -3815,7 +3867,18 @@ let intermediate_combinations = [
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
-      // Using the same simplified approach as touchStarted
+      // Check win screen buttons first
+      if (shareButton && shareButton.isInside(touchX, touchY)) {
+        shareScore();
+        return false;
+      }
+      
+      if (recipeButton && recipeButton.isInside(touchX, touchY)) {
+        viewRecipe();
+        return false;
+      }
+      
+      // Fallback to the simplified approach
       // Top half of screen = recipe view
       if (touchY < height/2) {
         console.log("View Recipe triggered from touchEnded");
@@ -3851,10 +3914,14 @@ let intermediate_combinations = [
         draggedVessel.y = constrain(draggedVessel.y, playAreaY + draggedVessel.h/2, playAreaY + playAreaHeight - draggedVessel.h/2);
       }
     }
-    // Update hover states for win screen elements - simplify to match touchStarted approach
+    // Update hover states for win screen elements
     else if (gameWon && touches.length > 0) {
       let touchX = touches[0].x;
       let touchY = touches[0].y;
+      
+      // Check win screen buttons
+      if (shareButton) shareButton.checkHover(touchX, touchY);
+      if (recipeButton) recipeButton.checkHover(touchX, touchY);
       
       // Top half of the screen = recipe card
       isMouseOverCard = (touchY < height/2);
