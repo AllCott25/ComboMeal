@@ -340,7 +340,8 @@ function processRecipeData(recipe, combinations, ingredients, easterEggs = []) {
     finalCombination,
     baseIngredients: [...new Set(baseIngredients)],
     easterEggs: easterEggs || [],
-    description: recipe.description
+    description: recipe.description,
+    author: recipe.author
   };
   
   console.log("Processed result:", result);

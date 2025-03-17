@@ -1,6 +1,6 @@
-// Culinary Logic Puzzle - Version v0.0603.01
+// Culinary Logic Puzzle v0.0313.11
 // Created: March 6, 2025
-// Last Updated: March 6, 2025
+// Last Updated: March 13, 2025
 
 // Define intermediate combinations (will be replaced with data from Supabase)
 let intermediate_combinations = [
@@ -38,6 +38,8 @@ let intermediate_combinations = [
   let isLoadingRecipe = true; // Flag to track if we're still loading recipe data
   let loadingError = false; // Flag to track if there was an error loading recipe data
   let recipeDescription = "A delicious recipe that's sure to please everyone at the table!"; // New variable to store recipe description
+  let recipeAuthor = ""; // New variable to store recipe author
+  let hintCount = 0; // Track number of hints used
   
   // Play area constraints
   let maxPlayWidth = 400; // Max width for the play area (phone-sized)
@@ -134,12 +136,18 @@ let intermediate_combinations = [
       this.color = color;
       this.textColor = textColor;
       this.hovered = false;
+      this.disabled = false; // Add disabled state
     }
     
     draw() {
       // Draw button
       rectMode(CENTER);
-      if (this.hovered) {
+      if (this.disabled) {
+        // Use 50% opacity for disabled state
+        let buttonColor = color(this.color);
+        buttonColor.setAlpha(128); // 128 is 50% opacity (0-255)
+        fill(buttonColor);
+      } else if (this.hovered) {
         fill(lerpColor(color(this.color), color(255), 0.2));
       } else {
         fill(this.color);
@@ -149,7 +157,14 @@ let intermediate_combinations = [
       rect(this.x, this.y, this.w, this.h, 8);
       
       // Draw label
-      fill(this.textColor);
+      if (this.disabled) {
+        // Use 50% opacity for text too
+        let textCol = color(this.textColor);
+        textCol.setAlpha(128);
+        fill(textCol);
+      } else {
+        fill(this.textColor);
+      }
       noStroke();
       textAlign(CENTER, CENTER);
       textFont(buttonFont);
@@ -158,16 +173,16 @@ let intermediate_combinations = [
     }
     
     isInside(x, y) {
-      return x > this.x - this.w/2 && x < this.x + this.w/2 && 
+      return !this.disabled && x > this.x - this.w/2 && x < this.x + this.w/2 && 
              y > this.y - this.h/2 && y < this.y + this.h/2;
     }
     
     checkHover(x, y) {
-      this.hovered = this.isInside(x, y);
+      this.hovered = !this.disabled && this.isInside(x, y);
     }
     
     handleClick() {
-      if (this.hovered) {
+      if (!this.disabled && this.hovered) {
         this.action();
         return true;
       }
@@ -276,7 +291,7 @@ let intermediate_combinations = [
       // Map color names to our new color palette
       if (color === 'white') this.color = COLORS.vesselBase;
       else if (color === 'yellow') this.color = COLORS.vesselYellow;
-      else if (color === 'green') this.color = COLORS.vesselGreen;
+      else if (color === 'green') this.color = COLORS.primary; // Changed from COLORS.vesselGreen to COLORS.primary
       else if (color === '#FF5252') this.color = COLORS.vesselHint; // Hint vessel color
       else this.color = color; // Use provided color if it doesn't match any of our mappings
       
@@ -290,6 +305,12 @@ let intermediate_combinations = [
       this.scale = 1; // For animation
       this.targetScale = 1;
       this.verbDisplayTime = 0; // Time to display the verb (in frames)
+      
+      // Shake animation properties
+      this.shaking = false;
+      this.shakeTime = 0;
+      this.shakeAmount = 0;
+      this.shakeDuration = 30; // 0.5 seconds at 60fps
     }
   
     getDisplayText() {
@@ -307,6 +328,12 @@ let intermediate_combinations = [
       this.y = this.originalY;
     }
     
+    // Add shake method
+    shake() {
+      this.shaking = true;
+      this.shakeTime = 0;
+    }
+    
     update() {
       // Scale animation only (removed floating animation)
       this.scale = lerp(this.scale, this.targetScale, 0.2);
@@ -315,11 +342,31 @@ let intermediate_combinations = [
       if (this.verbDisplayTime > 0) {
         this.verbDisplayTime--;
       }
+      
+      // Update shake animation
+      if (this.shaking) {
+        this.shakeTime++;
+        if (this.shakeTime >= this.shakeDuration) {
+          this.shaking = false;
+          this.shakeTime = 0;
+        }
+      }
     }
     
     draw() {
       push();
-      translate(this.x, this.y);
+      
+      // Apply shake effect if shaking
+      let shakeX = 0;
+      let shakeY = 0;
+      if (this.shaking) {
+        // Calculate shake amount (decreases over time)
+        this.shakeAmount = map(this.shakeTime, 0, this.shakeDuration, 5, 0);
+        // Alternate direction based on frame count
+        shakeX = sin(this.shakeTime * 1.5) * this.shakeAmount;
+      }
+      
+      translate(this.x + shakeX, this.y + shakeY);
       scale(this.scale);
       
       // Update color for base vessels to be pure white
@@ -341,8 +388,8 @@ let intermediate_combinations = [
           // Move handles a bit past the edge of the pot
           circle(-this.w * 0.4, -this.h * 0.15, this.h * 0.2);
           circle(this.w * 0.4, -this.h * 0.15, this.h * 0.2);
-        } else if (this.color === 'green') {
-          // Green vessel (pan with long handle)
+        } else if (this.color === 'green' || this.color === COLORS.vesselGreen || this.color === COLORS.primary) {
+          // Green vessel (pan with long handle) - standardized for all green vessels
           // Draw handle BEHIND the main shape
           fill('#888888');
           stroke('black');
@@ -535,6 +582,9 @@ let intermediate_combinations = [
       recipeUrl = recipeData.recipeUrl;
       recipeDescription = recipeData.description || "A delicious recipe that's sure to please everyone at the table!";
       
+      // Get author information from the database if it exists
+      recipeAuthor = recipeData.author || "";
+      
       console.log("Recipe data loaded successfully");
       isLoadingRecipe = false;
     } catch (error) {
@@ -593,20 +643,20 @@ let intermediate_combinations = [
       if (advancedVessels.length > 0 && basicVessels.length > 0) {
         currentRow.push(advancedVessels.shift()); // Add 1 advanced vessel (takes 2 slots)
         currentRow.push(basicVessels.shift()); // Add 1 basic vessel (takes 1 slot)
-        rowArrangements.push(currentRow);
+            rowArrangements.push(currentRow);
       }
       // If we only have advanced vessels left, add 1 per row
       else if (advancedVessels.length > 0) {
-        currentRow.push(advancedVessels.shift());
+                currentRow.push(advancedVessels.shift());
         rowArrangements.push(currentRow);
       }
       // If we only have basic vessels left, add 3 per row (or fewer if that's all we have)
       else if (basicVessels.length > 0) {
         // Add up to 3 basic vessels
         for (let i = 0; i < 3 && basicVessels.length > 0; i++) {
-          currentRow.push(basicVessels.shift());
+                    currentRow.push(basicVessels.shift());
         }
-        rowArrangements.push(currentRow);
+            rowArrangements.push(currentRow);
       }
     }
 
@@ -615,35 +665,35 @@ let intermediate_combinations = [
 
     // Position all vessels based on row arrangements
     rowArrangements.forEach((row, rowIndex) => {
-      // Calculate total width of this row
-      let rowWidth = row.reduce((width, v) => {
-        return width + (v.isAdvanced ? advanced_w : basic_w);
-      }, 0) + (row.length - 1) * margin;
+        // Calculate total width of this row
+        let rowWidth = row.reduce((width, v) => {
+            return width + (v.isAdvanced ? advanced_w : basic_w);
+        }, 0) + (row.length - 1) * margin;
 
       // Calculate starting x position to center the row within the play area
       let startX = playAreaX + (playAreaWidth - rowWidth) / 2;
-      let currentX = startX;
+        let currentX = startX;
 
-      // Position each vessel in the row
-      row.forEach((v) => {
-        // Update vessel dimensions
-        if (v.isAdvanced) {
-          v.w = advanced_w;
-          v.h = advanced_h;
-        } else {
-          v.w = basic_w;
-          v.h = basic_h;
-        }
+        // Position each vessel in the row
+        row.forEach((v) => {
+            // Update vessel dimensions
+            if (v.isAdvanced) {
+                v.w = advanced_w;
+                v.h = advanced_h;
+            } else {
+                v.w = basic_w;
+                v.h = basic_h;
+            }
 
-        // Set vessel position
-        v.x = currentX + v.w / 2;
+            // Set vessel position
+            v.x = currentX + v.w / 2;
         v.y = startY + rowIndex * (basic_h + vertical_margin); // Use basic_h for consistent spacing
-        v.originalX = v.x;
-        v.originalY = v.y;
+            v.originalX = v.x;
+            v.originalY = v.y;
 
-        // Move x position for next vessel
-        currentX += v.w + margin;
-      });
+            // Move x position for next vessel
+            currentX += v.w + margin;
+        });
     });
     
     // Calculate the lowest vessel position for hint button placement
@@ -716,7 +766,7 @@ let intermediate_combinations = [
     
     // Only draw title when not in win state
     if (!gameWon) {
-      drawTitle();
+    drawTitle();
     }
     
     if (!gameStarted) {
@@ -743,6 +793,10 @@ let intermediate_combinations = [
       sortedVessels.forEach(v => {
         v.draw();
       });
+      
+      // Check if only the final combination remains and disable hint button if so
+      let onlyFinalComboRemains = isOnlyFinalComboRemaining();
+      hintButton.disabled = onlyFinalComboRemains;
       
       // Draw hint button or hint vessel
       if (showingHint && hintVessel) {
@@ -776,20 +830,86 @@ let intermediate_combinations = [
   }
   
   function drawTitle() {
-    push();
-    textFont(titleFont);
-    textSize(48);
+    // Set text properties
     textAlign(CENTER, CENTER);
-    fill(COLORS.primary);
-    noStroke(); // Ensure no stroke is applied to the text
-    text("Combo Meal", width / 2, 60);
+    textSize(36);
     
-    textFont(bodyFont);
-    textSize(16);
-    fill(COLORS.text);
-    noStroke(); // Ensure no stroke is applied to the text
-    text("Reveal a new recipe every day!", width / 2, 100);
-    pop();
+    // Use a bold sans-serif font
+    textStyle(BOLD);
+    textFont('Arial, Helvetica, sans-serif');
+    
+    // Title text
+    const title = "COMBO MEAL";
+    
+    // Calculate the total width of the title to center each letter
+    let totalWidth = 0;
+    let letterWidths = [];
+    
+    // First calculate individual letter widths
+    for (let i = 0; i < title.length; i++) {
+      let letterWidth = textWidth(title[i]);
+      letterWidths.push(letterWidth);
+      totalWidth += letterWidth;
+    }
+    
+    // Add kerning (50% increase in spacing)
+    const kerningFactor = 0.5; // 50% extra space
+    let totalKerning = 0;
+    
+    // Calculate total kerning space (only between letters, not at the ends)
+    for (let i = 0; i < title.length - 1; i++) {
+      totalKerning += letterWidths[i] * kerningFactor;
+    }
+    
+    // Starting x position (centered with kerning)
+    let x = playAreaX + playAreaWidth/2 - (totalWidth + totalKerning)/2;
+    
+    // Draw each letter with alternating colors
+    for (let i = 0; i < title.length; i++) {
+      // Choose color based on position (cycle through green, yellow, red)
+      let letterColor;
+      switch (i % 3) {
+        case 0:
+          letterColor = COLORS.primary; // Green
+          break;
+        case 1:
+          letterColor = COLORS.tertiary; // Yellow
+          break;
+        case 2:
+          letterColor = COLORS.secondary; // Red
+          break;
+      }
+      
+      // Calculate letter position
+      let letterX = x + letterWidths[i]/2;
+      let letterY = playAreaY + 40;
+      
+      // Draw black outline by drawing the letter multiple times with slight offsets
+      // This creates a smoother outline than using stroke
+      fill('black');
+      noStroke();
+      
+      // Draw the letter 8 times in different directions to create the outline
+      const outlineWeight = 3;
+      text(title[i], letterX - outlineWeight, letterY); // Left
+      text(title[i], letterX + outlineWeight, letterY); // Right
+      text(title[i], letterX, letterY - outlineWeight); // Top
+      text(title[i], letterX, letterY + outlineWeight); // Bottom
+      text(title[i], letterX - outlineWeight, letterY - outlineWeight); // Top-left
+      text(title[i], letterX + outlineWeight, letterY - outlineWeight); // Top-right
+      text(title[i], letterX - outlineWeight, letterY + outlineWeight); // Bottom-left
+      text(title[i], letterX + outlineWeight, letterY + outlineWeight); // Bottom-right
+      
+      // Draw letter with color
+      fill(letterColor);
+      text(title[i], letterX, letterY);
+      
+      // Move to the next letter position with kerning
+      x += letterWidths[i] * (1 + kerningFactor);
+    }
+    
+    // Reset text style
+    textStyle(NORMAL);
   }
   
   function drawStartScreen() {
@@ -813,23 +933,45 @@ let intermediate_combinations = [
     fill('#333');
     text("How to play:", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.12);
     
-    // Draw the three equations with more compact spacing
-    // Position relative to play area
+    // New language with tutorial equations
+    // First instruction
+    textSize(descriptionSize);
+    text("Drag & drop ingredients to combine them based on the steps of a recipe!", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.20);
+    
+    // First equation
     drawTutorialEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
-                        "Drag & drop ingredients to combine them!", 
-                        playAreaY + playAreaHeight * 0.25, false, descriptionSize);
+                        "", // Empty description as we're using the text above
+                        playAreaY + playAreaHeight * 0.30, false, descriptionSize);
     
+    // Second instruction
+    textSize(descriptionSize);
+    text("Completed combos turn green. Yellow combos need more ingredients.", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.40);
+    
+    // Second equation
     drawTutorialEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
-                        "Yellow combos are incomplete. Add more ingredients", 
-                        playAreaY + playAreaHeight * 0.45, false, descriptionSize);
+                        "", // Empty description
+                        playAreaY + playAreaHeight * 0.50, false, descriptionSize);
     
+    // Third instruction
+    textSize(descriptionSize);
+    text("Complete the recipe with the fewest mistakes to make the grade.", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.60);
+    
+    // Third equation
     drawTutorialEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
-                        "Solve the recipe in as few moves as you can!", 
-                        playAreaY + playAreaHeight * 0.65, true, descriptionSize);
+                        "", // Empty description
+                        playAreaY + playAreaHeight * 0.70, true, descriptionSize);
+    
+    // Final instruction
+    textSize(descriptionSize);
+    text("New recipe everyday!", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.80);
     
     // Position start button relative to play area
     startButton.x = playAreaX + playAreaWidth/2;
-    startButton.y = playAreaY + playAreaHeight * 0.85;
+    startButton.y = playAreaY + playAreaHeight * 0.88;
     startButton.draw();
     startButton.checkHover(mouseX, mouseY);
     
@@ -837,7 +979,7 @@ let intermediate_combinations = [
     push();
     textSize(8);
     fill(100, 100, 100, 180); // Semi-transparent gray
-    text("v0.0603.01", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
+    text("v0.0313.11", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
     pop();
   }
   
@@ -939,7 +1081,7 @@ let intermediate_combinations = [
       rect(vesselWidth * 0.6, 0, vesselWidth * 0.5, vesselHeight * 0.15, 5);
       
       // Green vessel (complete combination)
-      fill(COLORS.vesselGreen); // Use the exact vessel color
+      fill(COLORS.primary); // Changed from COLORS.vesselGreen to COLORS.primary for consistency
         stroke('black');
       strokeWeight(2);
         
@@ -1003,19 +1145,84 @@ let intermediate_combinations = [
     
     // Calculate positions for the Recipe Card
     const cardWidth = playAreaWidth * 0.8 + 70; // Increased by 70px total
-    const cardHeight = playAreaHeight * 0.35;
+    const cardHeight = playAreaHeight * 0.35 + 20; // Increased by 20px
     // Adjust cardX and cardY to account for rectMode(CENTER)
     // Instead of representing the top-left corner, these now represent the center
     const cardX = playAreaX + playAreaWidth/2;
     // Move everything up to fill the void left by removing the header
     const cardY = playAreaY + playAreaHeight * 0.10 + cardHeight/2; // Moved up from 0.15 to 0.10
     
-    // Draw reward message (future-proofed for variable messages)
-    const rewardMessage = "YOU MADE IT!"; // This could be recipe.reward_message in the future
+    // Draw reward message with multicolor treatment (like COMBO MEAL)
+    const rewardMessage = "YOU MADE IT!";
     textSize(32);
-    textStyle(BOLD); // Bold the message
-    fill('#333');
-    text(rewardMessage, playAreaX + playAreaWidth/2, cardY - cardHeight/2 - 40);
+    textStyle(BOLD);
+    
+    // Calculate the total width of the title to center each letter
+    let totalWidth = 0;
+    let letterWidths = [];
+    
+    // First calculate individual letter widths
+    for (let i = 0; i < rewardMessage.length; i++) {
+      let letterWidth = textWidth(rewardMessage[i]);
+      letterWidths.push(letterWidth);
+      totalWidth += letterWidth;
+    }
+    
+    // Add kerning (50% increase in spacing)
+    const kerningFactor = 0.5; // 50% extra space
+    let totalKerning = 0;
+    
+    // Calculate total kerning space (only between letters, not at the ends)
+    for (let i = 0; i < rewardMessage.length - 1; i++) {
+      totalKerning += letterWidths[i] * kerningFactor;
+    }
+    
+    // Starting x position (centered with kerning)
+    let x = playAreaX + playAreaWidth/2 - (totalWidth + totalKerning)/2;
+    
+    // Draw each letter with alternating colors
+    for (let i = 0; i < rewardMessage.length; i++) {
+      // Choose color based on position (cycle through green, yellow, red)
+      let letterColor;
+      switch (i % 3) {
+        case 0:
+          letterColor = COLORS.primary; // Green
+          break;
+        case 1:
+          letterColor = COLORS.tertiary; // Yellow
+          break;
+        case 2:
+          letterColor = COLORS.secondary; // Red
+          break;
+      }
+      
+      // Calculate letter position
+      let letterX = x + letterWidths[i]/2;
+      let letterY = cardY - cardHeight/2 - 40;
+      
+      // Draw black outline by drawing the letter multiple times with slight offsets
+      fill('black');
+      noStroke();
+      
+      // Draw the letter 8 times in different directions to create the outline
+      const outlineWeight = 3;
+      text(rewardMessage[i], letterX - outlineWeight, letterY); // Left
+      text(rewardMessage[i], letterX + outlineWeight, letterY); // Right
+      text(rewardMessage[i], letterX, letterY - outlineWeight); // Top
+      text(rewardMessage[i], letterX, letterY + outlineWeight); // Bottom
+      text(rewardMessage[i], letterX - outlineWeight, letterY - outlineWeight); // Top-left
+      text(rewardMessage[i], letterX + outlineWeight, letterY - outlineWeight); // Top-right
+      text(rewardMessage[i], letterX - outlineWeight, letterY + outlineWeight); // Bottom-left
+      text(rewardMessage[i], letterX + outlineWeight, letterY + outlineWeight); // Bottom-right
+      
+      // Draw letter with color
+      fill(letterColor);
+      text(rewardMessage[i], letterX, letterY);
+      
+      // Move to the next letter position with kerning
+      x += letterWidths[i] * (1 + kerningFactor);
+    }
+    
     textStyle(NORMAL);
     
     // Draw Recipe Card with drop shadow
@@ -1024,16 +1231,42 @@ let intermediate_combinations = [
     noStroke();
     rect(cardX + 5, cardY + 5, cardWidth, cardHeight, 8);
     
-    // Card
-    fill(255);
-    stroke(220);
-    strokeWeight(1);
+    // Card - make it look slightly interactive with a subtle hover effect
+    if (isMouseOverCard) {
+      fill(255); // Keep white background
+      // Add a green outline when hovered, matching the letter score hover effect
+      stroke(COLORS.primary); // Green outline when hovered
+      strokeWeight(3); // Thicker stroke to match letter score hover effect
+    } else {
+      fill(255);
+      stroke(220);
+      strokeWeight(1);
+    }
     rect(cardX, cardY, cardWidth, cardHeight, 8);
     
-    // Draw recipe name
+    // Draw flowers in the corners of the recipe card (in front of white rectangle, behind content)
+    const flowerSize = 8; // Size of flower petals
+    const cornerOffset = 25; // Increased from 15 to 25 to move flowers more towards center
+    
+    // Draw flowers in each corner
+    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
+    drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
+    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
+    drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
+    
+    // Draw recipe name (now bold and raised up by 5px)
     textSize(24);
     fill(COLORS.secondary);
-    text(final_combination.name, playAreaX + playAreaWidth/2, cardY - cardHeight/2 + 30);
+    textStyle(BOLD); // Make recipe name bold
+    text(final_combination.name, playAreaX + playAreaWidth/2, cardY - cardHeight/2 + 25); // Raised from 30 to 25
+    textStyle(NORMAL);
+    
+    // Add author information if it exists (also raised up by 5px)
+    if (recipeAuthor && recipeAuthor.trim() !== "") {
+      textSize(10);
+      fill('#333333');
+      text(`By ${recipeAuthor}`, playAreaX + playAreaWidth/2, cardY - cardHeight/2 + 45); // Raised from 50 to 45
+    }
     
     // Calculate positions for the recipe image placeholder and description
     const imageWidth = 175; // Fixed 175px square
@@ -1053,38 +1286,220 @@ let intermediate_combinations = [
     textSize(14);
     text("Recipe Image", imageX, imageY);
     
-    // Draw recipe description
+    // Draw recipe description (smaller text size)
     // Since we're using textAlign(LEFT, TOP), we need to adjust the position
     const descriptionX = imageX + imageWidth/2 + 40 + 45; // Moved right by 45px more
     const descriptionWidth = cardWidth * 0.35;
     
     textAlign(LEFT, TOP);
-    textSize(12);
+    textSize(10); // Reduced from 12 to 10 (2pts smaller)
     fill('#666');
-    text(recipeDescription, descriptionX, imageY - imageHeight/2 + 110 - 15, descriptionWidth, imageHeight); // Moved up by 15px
     
-    // Draw View Recipe button (centered)
-    recipeButton.x = playAreaX + playAreaWidth/2;
-    recipeButton.y = cardY + cardHeight/2 + 30;
-    recipeButton.w = 180;
-    recipeButton.h = 45;
-    recipeButton.draw();
+    // Calculate the height of the description text
+    const descriptionY = imageY - imageHeight/2 + 110 - 15; // Moved up by 15px
+    const descriptionText = recipeDescription;
+    
+    // Draw the description with a limited height container
+    text(descriptionText, descriptionX, descriptionY, descriptionWidth, 100); // Limit height to 100px
+    
+    // Position ingredients at a fixed distance from description start
+    const ingredientsY = descriptionY + 80; // Fixed 80px from description start
+    const ingredientsX = descriptionX - 70; // Moved left 70px
+    
+    // Draw "Ingredients:" header
+    textSize(10);
+    textStyle(BOLD);
+    fill('#444');
+    text("Ingredients:", ingredientsX, ingredientsY);
+    textStyle(NORMAL);
+    
+    // Calculate columns for ingredients
+    const numIngredients = ingredients.length;
+    const numColumns = 2; // Always use 2 columns regardless of ingredient count
+    const itemsPerColumn = Math.ceil(numIngredients / numColumns);
+    const columnWidth = descriptionWidth / numColumns;
+    
+    // Draw ingredients in columns
+    textSize(9);
+    fill('#666');
+    // Recalculate the layout for ingredients to avoid overlaps and gaps
+    const lineHeight = 12; // Height of a single line of text
+    const ingredientSpacing = 2; // Space between ingredients
+    
+    // First pass: calculate ingredient lengths and store original indices
+    let ingredientData = [];
+    for (let i = 0; i < numIngredients; i++) {
+      ingredientData.push({
+        index: i,
+        text: ingredients[i],
+        totalLength: ingredients[i].length
+      });
+    }
+    
+    // Sort ingredients by length (longest first)
+    ingredientData.sort((a, b) => b.totalLength - a.totalLength);
+    
+    // Assign first half of sorted ingredients to right column, second half to left
+    let rightColumnIngredients = [];
+    let leftColumnIngredients = [];
+    
+    // Distribute ingredients to columns (longer ones to the right)
+    for (let i = 0; i < ingredientData.length; i++) {
+      if (i < Math.ceil(ingredientData.length / 2)) {
+        rightColumnIngredients.push(ingredients[ingredientData[i].index]);
+      } else {
+        leftColumnIngredients.push(ingredients[ingredientData[i].index]);
+      }
+    }
+    
+    // Character limits for each column
+    const leftCharLimit = 12;
+    const rightCharLimit = 18;
+    
+    // Function to process ingredients for a column with a specific character limit
+    function processIngredientsForColumn(ingredientsList, charLimit) {
+      let processedIngredients = [];
+      
+      for (let i = 0; i < ingredientsList.length; i++) {
+        let ingredient = ingredientsList[i];
+        let words = ingredient.split(' ');
+        let lines = [];
+        let currentLine = '';
+        
+        for (let j = 0; j < words.length; j++) {
+          let word = words[j];
+          
+          // If adding this word would exceed the character limit
+          if (currentLine.length + word.length + (currentLine.length > 0 ? 1 : 0) > charLimit) {
+            // Push the current line and start a new one
+            lines.push(currentLine);
+            currentLine = word;
+          } else {
+            // Add the word to the current line
+            if (currentLine.length > 0) {
+              currentLine += ' ' + word;
+            } else {
+              currentLine = word;
+            }
+          }
+        }
+        
+        // Push the last line
+        if (currentLine.length > 0) {
+          lines.push(currentLine);
+        }
+        
+        processedIngredients.push({
+          original: ingredient,
+          lines: lines
+        });
+      }
+      
+      return processedIngredients;
+    }
+    
+    // Process ingredients for both columns
+    const leftColumnProcessed = processIngredientsForColumn(leftColumnIngredients, leftCharLimit);
+    const rightColumnProcessed = processIngredientsForColumn(rightColumnIngredients, rightCharLimit);
+    
+    // Calculate total height needed for ingredients
+    let leftColumnHeight = 0;
+    for (let i = 0; i < leftColumnProcessed.length; i++) {
+      leftColumnHeight += leftColumnProcessed[i].lines.length * lineHeight + ingredientSpacing;
+    }
+    
+    let rightColumnHeight = 0;
+    for (let i = 0; i < rightColumnProcessed.length; i++) {
+      rightColumnHeight += rightColumnProcessed[i].lines.length * lineHeight + ingredientSpacing;
+    }
+    
+    // Check if ingredients list would overflow the card
+    const maxAvailableHeight = cardY + cardHeight/2 - 30 - ingredientsY;
+    const totalIngredientsHeight = Math.max(leftColumnHeight, rightColumnHeight);
+    
+    // If ingredients would overflow, only show what fits
+    const showAllIngredients = totalIngredientsHeight <= maxAvailableHeight;
+    
+    // Draw left column
+    let leftYOffset = ingredientsY + 15;
+    for (let i = 0; i < leftColumnProcessed.length; i++) {
+      // Check if we've run out of space
+      if (!showAllIngredients && leftYOffset + leftColumnProcessed[i].lines.length * lineHeight > ingredientsY + maxAvailableHeight) {
+        break;
+      }
+      
+      const lines = leftColumnProcessed[i].lines;
+      const x = ingredientsX;
+      
+      // Draw each line of this ingredient
+      for (let j = 0; j < lines.length; j++) {
+        if (j === 0) {
+          // Only add bullet to the first line of each ingredient
+          text("• " + lines[j], x, leftYOffset);
+        } else {
+          // Indent subsequent lines to align with text after bullet
+          text("  " + lines[j], x, leftYOffset);
+        }
+        leftYOffset += lineHeight;
+      }
+      
+      // Add spacing between ingredients
+      leftYOffset += ingredientSpacing;
+    }
+    
+    // Draw right column
+    let rightYOffset = ingredientsY + 15;
+    for (let i = 0; i < rightColumnProcessed.length; i++) {
+      // Check if we've run out of space
+      if (!showAllIngredients && rightYOffset + rightColumnProcessed[i].lines.length * lineHeight > ingredientsY + maxAvailableHeight) {
+        break;
+      }
+      
+      const lines = rightColumnProcessed[i].lines;
+      const x = ingredientsX + columnWidth;
+      
+      // Draw each line of this ingredient
+      for (let j = 0; j < lines.length; j++) {
+        if (j === 0) {
+          // Only add bullet to the first line of each ingredient
+          text("• " + lines[j], x, rightYOffset);
+        } else {
+          // Indent subsequent lines to align with text after bullet
+          text("  " + lines[j], x, rightYOffset);
+        }
+        rightYOffset += lineHeight;
+      }
+      
+      // Add spacing between ingredients
+      rightYOffset += ingredientSpacing;
+    }
+    
+    // Add "View Full Recipe" text at the bottom of the card
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    if (isMouseOverCard) {
+      fill(COLORS.primary); // Green text when hovered
+    } else {
+      fill('#666'); // Gray text normally
+    }
+    text("View Full Recipe →", cardX, cardY + cardHeight/2 - 15);
+    
+    // Reset text alignment
+    textAlign(LEFT, TOP);
     
     // ===== BOTTOM HALF: SCORE SECTION =====
     
-    const dividerY = playAreaY + playAreaHeight * 0.60; // Moved up from 0.65 to 0.60
+    // Move the bottom section up by removing the divider and adjusting the position
+    const dividerY = playAreaY + playAreaHeight * 0.55; // Moved up from 0.60 to 0.55
     
-    // Draw a subtle divider
-    stroke(220);
-    strokeWeight(1);
-    line(playAreaX + playAreaWidth * 0.1, dividerY, playAreaX + playAreaWidth * 0.9, dividerY);
-    
+    // Decrease padding between View Recipe button and Letter Score by 5px
     // Calculate positions for the letter score (vertical printer paper)
-    const scoreWidth = playAreaWidth * 0.25 * 1.25 * 1.25; // Increased by 25% twice
-    const scoreHeight = scoreWidth * 1.414; // A4 paper ratio
+    // Increase the letter score by another 10% from its current size
+    const scoreWidth = playAreaWidth * 0.25 * 1.25 * 1.25 * 0.75 * 1.5 * 1.25 * 1.1; // Increased by another 10%
+    const scoreHeight = scoreWidth * 1.414;
     // Adjust scoreX and scoreY to account for rectMode(CENTER)
-    const scoreX = playAreaX + playAreaWidth * 0.25 + scoreWidth/2 - 60 - 35; // Moved 35px more to the left
-    const scoreY = dividerY + 30 + scoreHeight/2;
+    const scoreX = playAreaX + playAreaWidth/2; // Centered in the play area
+    const scoreY = dividerY + 25 + scoreHeight/2 - 15 - 10; // Raised by 10px
     
     // Draw letter score with drop shadow
     // Shadow
@@ -1098,70 +1513,339 @@ let intermediate_combinations = [
     strokeWeight(1);
     rect(scoreX, scoreY, scoreWidth, scoreHeight, 5);
     
-    // Draw grey circle
-    const circleSize = 140; // Fixed 140px diameter
-    fill(220);
-    noStroke();
-    circle(scoreX, scoreY, circleSize);
+    // Check if mouse is over the letter score area
+    isMouseOverLetterScore = mouseX > scoreX - scoreWidth/2 && mouseX < scoreX + scoreWidth/2 && 
+                           mouseY > scoreY - scoreHeight/2 && mouseY < scoreY + scoreHeight/2;
     
-    // Calculate the score: [total moves] - [egg moves] - [starting ingredients]
-    let totalMoves = moveHistory.length;
-    let eggMoves = 0;
+    // Highlight the letter score area when hovered, similar to recipe card
+    if (isMouseOverLetterScore) {
+      // Add a subtle highlight effect
+      noFill();
+      stroke(COLORS.primary); // Green highlight
+      strokeWeight(3);
+      rect(scoreX, scoreY, scoreWidth, scoreHeight, 5);
+    }
     
-    // Count egg moves
+    // Count black moves (incorrect attempts)
+    let blackMoves = 0;
+    
+    // Count black moves
     for (let move of moveHistory) {
-      if (typeof move === 'object' && move.type === 'egg') {
-        eggMoves++;
+      if (move === 'black' || move === '#333333') {
+        blackMoves++;
       }
     }
     
-    // Get number of starting ingredients (base ingredients)
-    // Fix: Use ingredients instead of baseIngredients
-    let startingIngredients = ingredients.length;
+    // Count red hint moves
+    let redHintMoves = 0;
+    for (let move of moveHistory) {
+      if (move === '#FF5252') {
+        redHintMoves++;
+      }
+    }
     
-    // Calculate final score
-    let score = totalMoves - eggMoves - startingIngredients;
+    // Calculate total score (only counting red hint and black moves)
+    const totalScore = blackMoves + redHintMoves;
     
-    // Determine letter grade and color based on score
+    // Determine letter grade and color based on total score
     let letterGrade;
     let letterColor;
+    let isAPlus = false;
     
-    if (score <= 1) {
+    if (totalScore === 0) {
       letterGrade = "A";
       letterColor = color(0, 120, 255); // Blue
-    } else if (score >= 2 && score <= 4) {
+      isAPlus = true; // Mark as A+ for diamond decoration
+    } else if (totalScore === 1) {
+      letterGrade = "A";
+      letterColor = color(0, 120, 255); // Blue
+    } else if (totalScore >= 2 && totalScore <= 3) {
       letterGrade = "B";
-      letterColor = color(40, 180, 40); // Green
-    } else if (score >= 5 && score <= 9) {
+      letterColor = COLORS.primary; // Green from vessels
+    } else if (totalScore >= 4 && totalScore <= 7) {
       letterGrade = "C";
-      letterColor = color(255, 140, 0); // Orange
-    } else { // score >= 10
-      letterGrade = ":(";
-      letterColor = color(255, 60, 60); // Red
+      letterColor = COLORS.tertiary; // Yellow from vessels
+    } else { // totalScore >= 8
+      letterGrade = "X";
+      letterColor = COLORS.secondary; // Red from vessels
+    }
+    
+    // Draw circle with the same color as the letter but with 30% opacity
+    const circleSize = 140 * 0.75 * 1.5 * 1.25 * 1.1; // Increased by another 10% to match the paper size
+    noStroke();
+    
+    // Create a copy of the letter color with 30% opacity
+    let circleBgColor = color(red(letterColor), green(letterColor), blue(letterColor), 76); // 76 is 30% of 255
+    fill(circleBgColor);
+    circle(scoreX, scoreY, circleSize);
+    
+    // Add "COMBO MEAL" header above the letter grade (30px above the circle)
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    fill(0); // Black text
+    textStyle(BOLD);
+    
+    // Apply kerning to "COMBO MEAL" text
+    const comboMealText = "COMBO MEAL";
+    let comboMealWidth = 0;
+    let comboMealLetterWidths = [];
+    
+    // Calculate letter widths
+    for (let i = 0; i < comboMealText.length; i++) {
+      let letterWidth = textWidth(comboMealText[i]);
+      comboMealLetterWidths.push(letterWidth);
+      comboMealWidth += letterWidth;
+    }
+    
+    // Increase kerning by 70% (more than the 50% used for "YOU MADE IT!")
+    const comboMealKerningFactor = 0.7;
+    let comboMealTotalKerning = 0;
+    
+    // Calculate total kerning space
+    for (let i = 0; i < comboMealText.length - 1; i++) {
+      comboMealTotalKerning += comboMealLetterWidths[i] * comboMealKerningFactor;
+    }
+    
+    // Starting x position (centered with kerning)
+    let comboMealX = scoreX - (comboMealWidth + comboMealTotalKerning)/2;
+    
+    // Draw each letter with increased spacing
+    for (let i = 0; i < comboMealText.length; i++) {
+      // Calculate letter position
+      let letterX = comboMealX + comboMealLetterWidths[i]/2;
+      let letterY = scoreY - circleSize/2 - 30; // 30px above the circle
+      
+      // Draw letter
+      text(comboMealText[i], letterX, letterY);
+      
+      // Move to the next letter position with kerning
+      comboMealX += comboMealLetterWidths[i] * (1 + comboMealKerningFactor);
     }
     
     // Draw letter grade
     textAlign(CENTER, CENTER);
-    textSize(letterGrade === ":" ? scoreWidth * 0.3 * 2 : scoreWidth * 0.4 * 1.5 * 2); // Adjust size for frowny face
+    // Increase letter size by 20% and use regular weight instead of bold
+    textSize(((letterGrade === ":" ? scoreWidth * 0.3 * 2 : scoreWidth * 0.4 * 1.5 * 2) * 0.75) * 1.3 * 1.2); // Increased by 20%
     fill(letterColor);
-    textStyle(BOLD);
+    textStyle(NORMAL); // Changed from BOLD to NORMAL
     text(letterGrade, scoreX, scoreY);
+    
+    // Check if Easter Egg was found
+    let eggFound = moveHistory.some(move => 
+      typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')
+    );
+    
+    // Draw sunny-side-up egg indicator if an Easter egg was found
+    if (eggFound) {
+      push();
+      // Position the egg in the top left corner of the letter grade
+      // Move up 14px and left 30px, increase size by 25%
+      const eggX = scoreX - circleSize * 0.3 - 50 + 65 - 30;
+      const eggY = scoreY - circleSize * 0.3 - 100 + 40 - 14;
+      const sizeMultiplier = 1.25; // Increase size by 25%
+      
+      // Draw drop shadow for the entire egg
+      fill(0, 0, 0, 40);
+      noStroke();
+      // Offset shadow by 4px
+      translate(4, 4);
+      
+      // Draw egg white (soft blob shape from Design 3)
+      beginShape();
+      vertex(eggX - 30 * sizeMultiplier, eggY * sizeMultiplier);
+      bezierVertex(
+          eggX - 45 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
+          eggX - 20 * sizeMultiplier, eggY - 45 * sizeMultiplier, // control point 2
+          eggX + 10 * sizeMultiplier, eggY - 30 * sizeMultiplier  // end point
+      );
+      bezierVertex(
+          eggX + 40 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
+          eggX + 30 * sizeMultiplier, eggY + 20 * sizeMultiplier, // control point 2
+          eggX + 10 * sizeMultiplier, eggY + 30 * sizeMultiplier  // end point
+      );
+      // Create a soft, rounded blob shape with no pointiness
+      bezierVertex(
+          eggX - 5 * sizeMultiplier, eggY + 35 * sizeMultiplier,  // control point 1 (moved inward and up)
+          eggX - 20 * sizeMultiplier, eggY + 15 * sizeMultiplier, // control point 2 (moved significantly upward)
+          eggX - 30 * sizeMultiplier, eggY * sizeMultiplier       // end point (connects to start)
+      );
+      endShape(CLOSE);
+      
+      // Reset translation for the actual egg
+      translate(-4, -4);
+      
+      // Draw the egg white (soft blob shape)
+      fill(255, 255, 255); // Pure white
+      noStroke();
+      
+      beginShape();
+      vertex(eggX - 30 * sizeMultiplier, eggY * sizeMultiplier);
+      bezierVertex(
+          eggX - 45 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
+          eggX - 20 * sizeMultiplier, eggY - 45 * sizeMultiplier, // control point 2
+          eggX + 10 * sizeMultiplier, eggY - 30 * sizeMultiplier  // end point
+      );
+      bezierVertex(
+          eggX + 40 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
+          eggX + 30 * sizeMultiplier, eggY + 20 * sizeMultiplier, // control point 2
+          eggX + 10 * sizeMultiplier, eggY + 30 * sizeMultiplier  // end point
+      );
+      // Create a soft, rounded blob shape with no pointiness
+      bezierVertex(
+          eggX - 5 * sizeMultiplier, eggY + 35 * sizeMultiplier,  // control point 1 (moved inward and up)
+          eggX - 20 * sizeMultiplier, eggY + 15 * sizeMultiplier, // control point 2 (moved significantly upward)
+          eggX - 30 * sizeMultiplier, eggY * sizeMultiplier       // end point (connects to start)
+      );
+      endShape(CLOSE);
+      
+      // Draw the yolk - positioned higher up and slightly to the left
+      const yolkSize = 36 * sizeMultiplier;
+      for (let i = 5; i >= 0; i--) {
+        const currentYolkSize = yolkSize * (1 - i * 0.05);
+        const alpha = 255 - i * 10;
+        fill(255, 204, 0, alpha); // Bright egg yolk yellow with gradient
+        noStroke();
+        ellipse(eggX - 5 * sizeMultiplier, eggY - 20 * sizeMultiplier, currentYolkSize, currentYolkSize * 0.9); // Slightly oval
+      }
+      
+      // Add highlight to the yolk
+      fill(255, 255, 255, 100);
+      noStroke();
+      ellipse(eggX - 12 * sizeMultiplier, eggY - 25 * sizeMultiplier, yolkSize * 0.4, yolkSize * 0.3);
+      
+      // Add a thin outline to the yolk
+      noFill();
+      stroke(200, 150, 0, 100);
+      strokeWeight(1);
+      ellipse(eggX - 5 * sizeMultiplier, eggY - 20 * sizeMultiplier, yolkSize, yolkSize * 0.9);
+      pop();
+    }
+    
+    // Remove the old diamond drawing code and replace with the star stickers
+    // Draw star stickers for A+ grade
+    if (isAPlus) {
+      // Star parameters
+      const outerRadius = circleSize * 0.15;
+      const innerRadius = outerRadius * 0.5; // Increased inner radius for rounder appearance
+      const roundness = outerRadius * 0.25; // Increased roundness for more cartoonish look
+      
+      // Function to draw a star sticker
+      const drawStarSticker = (x, y, size) => {
+        push();
+        translate(x, y);
+        
+        // Draw drop shadow
+        fill(0, 0, 0, 40);
+        noStroke();
+        translate(2, 2);
+        starWithRoundedPoints(0, 0, innerRadius * size, outerRadius * size, 5, roundness * size);
+        
+        // Draw white outline
+        translate(-2, -2);
+        fill(255);
+        strokeWeight(3);
+        stroke(255);
+        starWithRoundedPoints(0, 0, innerRadius * size, outerRadius * size, 5, roundness * size);
+        
+        // Draw yellow star with yolk color (255, 204, 0) instead of COLORS.tertiary
+        fill(255, 204, 0);
+        strokeWeight(1);
+        stroke(255, 255, 255, 200);
+        starWithRoundedPoints(0, 0, innerRadius * size, outerRadius * size, 5, roundness * size);
+        
+        pop();
+      };
+      
+      // Top right corner - two stars
+      drawStarSticker(scoreX + circleSize * 0.35, scoreY - circleSize * 0.35, 1);
+      drawStarSticker(scoreX + circleSize * 0.5, scoreY - circleSize * 0.2, 0.8);
+      
+      // Bottom left corner - two stars
+      drawStarSticker(scoreX - circleSize * 0.35, scoreY + circleSize * 0.35, 1);
+      drawStarSticker(scoreX - circleSize * 0.5, scoreY + circleSize * 0.2, 0.8);
+    }
+    
+    // Draw hint indicators if hints were used
+    if (hintCount > 0) {
+      // Function to draw a hint indicator sticker
+      const drawHintIndicator = (x, y, size) => {
+        push();
+        translate(x, y);
+        
+        // Draw drop shadow (doubled in size)
+        fill(0, 0, 0, 40);
+        noStroke();
+        translate(4, 4); // Increased shadow offset for larger stickers
+        ellipse(0, 0, 60 * size, 60 * size); // Doubled from 30 to 60
+        
+        // Draw white outline
+        translate(-4, -4);
+        fill(255);
+        strokeWeight(4); // Increased from 3 to 4 for larger stickers
+        stroke(255);
+        ellipse(0, 0, 60 * size, 60 * size); // Doubled from 30 to 60
+        
+        // Draw white background
+        fill(255);
+        strokeWeight(1);
+        stroke(255, 255, 255, 200);
+        ellipse(0, 0, 60 * size, 60 * size); // Doubled from 30 to 60
+        
+        // Draw red circle outline (closer to the edge)
+        noFill();
+        strokeWeight(3); // Increased from 2 to 3 for larger stickers
+        stroke('#FF5252');
+        ellipse(0, 0, 48 * size, 48 * size); // Increased from 20 to 48 (80% of sticker size)
+        
+        // Draw red question mark using Helvetica font
+        fill('#FF5252');
+        noStroke();
+        textSize(36 * size); // Larger font size for better visibility
+        textFont('Helvetica, Arial, sans-serif'); // Using Helvetica for a classic look
+        textStyle(NORMAL); // Normal weight instead of bold for a cleaner look
+        textAlign(CENTER, CENTER);
+        text("?", 0, 0); // Perfectly centered question mark (removed vertical offset)
+        
+        pop();
+      };
+      
+      // Draw hint indicators based on hint count
+      if (hintCount >= 1) {
+        // First hint indicator - bottom right (adjusted position for larger size)
+        drawHintIndicator(scoreX + circleSize * 0.4, scoreY + circleSize * 0.4, 1);
+      }
+      
+      if (hintCount >= 2) {
+        // Second hint indicator - top right (adjusted position for larger size)
+        drawHintIndicator(scoreX + circleSize * 0.4, scoreY - circleSize * 0.4, 1);
+      }
+      
+      if (hintCount >= 3) {
+        // Third hint indicator - with minimal overlap (reduced from 25% to about 10%)
+        drawHintIndicator(scoreX + circleSize * 0.4 + 25, scoreY + circleSize * 0.4 - 25, 1);
+      }
+    }
+    
     textStyle(NORMAL);
     
-    // Draw move history with grid layout (6 across, up to 5 down)
-    const counterX = scoreX + scoreWidth/2 + 40;
-    const counterY = scoreY - scoreHeight/2 + 20;
-    const counterWidth = playAreaWidth * 0.4;
-    const counterHeight = scoreHeight - 40;
+    // Move the Letter Score to the right to fill the void
+    // We'll adjust the position of the Share button directly without drawing the move history
     
-    drawWinMoveHistory(counterX, counterY, counterWidth, counterHeight);
+    // Position the Share Score button so its bottom aligns with the Letter Score bottom
+    const letterScoreBottom = scoreY + scoreHeight/2;
     
-    // Draw Share Score button (centered at bottom)
-    shareButton.x = playAreaX + playAreaWidth/2;
-    shareButton.y = scoreY + scoreHeight/2 + 30;
-    shareButton.w = 180;
-    shareButton.h = 45;
-    shareButton.draw();
+    // Remove the "Egg found!" text
+    // (Removed the if(eggFound) block that displayed this text)
+    
+    // Add "Share Score" text at the bottom of the letter score area, similar to "View Full Recipe"
+    textAlign(CENTER, CENTER);
+    textSize(12);
+    if (isMouseOverLetterScore) {
+      fill(COLORS.primary); // Green text when hovered
+    } else {
+      fill('#666'); // Gray text normally
+    }
+    text("Share Score →", scoreX, scoreY + scoreHeight/2 - 15);
     
     // Add "New Recipe Everyday!" text at the bottom
     textAlign(CENTER, CENTER);
@@ -1171,169 +1855,93 @@ let intermediate_combinations = [
     text("New Recipe Everyday!", playAreaX + playAreaWidth/2, scoreY + scoreHeight/2 + 80);
     textStyle(NORMAL);
     
-    // Check button hover
-    shareButton.checkHover(mouseX, mouseY);
-    recipeButton.checkHover(mouseX, mouseY);
+    // Check if mouse is over the recipe card
+    isMouseOverCard = mouseX > cardX - cardWidth/2 && mouseX < cardX + cardWidth/2 && 
+                     mouseY > cardY - cardHeight/2 && mouseY < cardY + cardHeight/2;
+    
+    // Change cursor to pointer if over the card or letter score area
+    if (isMouseOverCard || isMouseOverLetterScore) {
+      cursor(HAND);
+    }
   }
   
   // Enhanced move history display for win screen
   function drawWinMoveHistory(x, y, width, height) {
+    // This function is no longer called, but we'll keep it for future reference
     const circleSize = 18;
     const margin = 6;
-    const maxPerRow = 6; // Fixed at 6 across
-    const maxRows = 5; // Maximum 5 rows
+    const maxPerRow = 8;
+    const maxRows = 4;
     
-    // Calculate spacing
-    const rowWidth = maxPerRow * (circleSize + margin) - margin;
-    const startX = x + (width - rowWidth) / 2;
-    const startY = y + 10;
-    
-    // Draw move count text
-    textAlign(CENTER, TOP);
-    textSize(16);
-    fill('black');
-    text(`${moveHistory.length} moves`, x + width/2, y);
-    
-    // Draw move history circles in a grid
-    for (let i = 0; i < Math.min(moveHistory.length, maxPerRow * maxRows); i++) {
-      const row = Math.floor(i / maxPerRow);
-      const col = i % maxPerRow;
-      const circleX = startX + col * (circleSize + margin);
-      const circleY = startY + 25 + row * (circleSize + margin);
-      
-      // Check if this is an Easter Egg counter
-      if (moveHistory[i] && typeof moveHistory[i] === 'object' && moveHistory[i].type === 'easterEgg') {
-        // Draw the larger white circle first
-        fill('white');
-      stroke('black');
-        strokeWeight(1);
-        circle(circleX, circleY, circleSize * 1.3); // 30% larger than normal
-        
-        // Draw the inner yellow circle
-        fill(moveHistory[i].color);
-        stroke('black');
-        strokeWeight(0.5);
-        circle(circleX, circleY, circleSize * 0.8); // 80% of normal size
-      } else {
-        // Regular counter - Map color names to the exact COLORS values
-        let circleColor;
-        switch(moveHistory[i]) {
-          case 'yellow':
-            circleColor = COLORS.vesselYellow;
-            break;
-          case 'green':
-            circleColor = COLORS.vesselGreen;
-            break;
-          case 'red':
-          case '#FF5252':
-            circleColor = COLORS.vesselHint;
-            break;
-          case 'white':
-            circleColor = COLORS.vesselBase;
-            break;
-          case 'black':
-            circleColor = '#333333'; // Keep black for unsuccessful moves
-            break;
-          default:
-            circleColor = moveHistory[i]; // Use the original color if not matched
-        }
-        
-        fill(circleColor);
-        stroke('black');
-        strokeWeight(1);
-        circle(circleX, circleY, circleSize);
-      }
-    }
-    
-    // If we have more moves than can fit, show an indicator
-    if (moveHistory.length > maxPerRow * maxRows) {
-      textAlign(CENTER, CENTER);
-      textSize(14);
-      fill('#666');
-      text(`+${moveHistory.length - maxPerRow * maxRows} more`, 
-           x + width/2, 
-           startY + 25 + maxRows * (circleSize + margin) + 10);
-    }
+    // Make these variables accessible to the parent function
+    window.winMoveHistory = {
+      circleSize: circleSize,
+      margin: margin,
+      maxRows: maxRows
+    };
   }
   
   // Keep the regular move history for during gameplay
   function drawMoveHistory() {
-    if (moveHistory.length === 0) return;
-    
-    // Position the move history at the bottom of the play area
+    // Position at the bottom of the play area
+    const historyY = playAreaY + playAreaHeight * 0.95;
     const circleSize = 15;
-    const margin = 8;
-    const maxPerRow = 10; // Reduced from 15 to allow more rows
-    const rowWidth = Math.min(moveHistory.length, maxPerRow) * (circleSize + margin) - margin;
+    const circleSpacing = 20;
+    const maxCountersPerRow = 10;
+    const rowSpacing = 20;
+    const maxRows = 3; // Maximum 3 rows (30 counters total)
     
-    // Center horizontally within the play area
-    const startX = playAreaX + (playAreaWidth / 2) - (rowWidth / 2);
+    // Filter moveHistory to only include red, black, and Easter Egg counters
+    const filteredMoveHistory = moveHistory.filter(move => 
+      move === 'black' || move === '#333333' || move === '#FF5252' || 
+      (typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')));
     
-    // Position the move history as a footer at the very bottom of the play area
-    // This ensures it's well below the hint button and any vessels
-    const moveHistoryY = playAreaY + playAreaHeight * 0.95;
+    // Limit the number of counters to display
+    const displayCount = Math.min(filteredMoveHistory.length, maxCountersPerRow * maxRows);
     
-    // Calculate how many rows we need
-    const numRows = Math.ceil(moveHistory.length / maxPerRow);
-    const totalHeight = numRows * (circleSize + margin) - margin;
+    // Calculate the number of rows needed
+    const rowsNeeded = Math.ceil(displayCount / maxCountersPerRow);
     
-    // Ensure we're within the play area
-    if (moveHistoryY + totalHeight > playAreaY + playAreaHeight - 5) return;
+    // Move the starting Y position up to accommodate rows below
+    const startY = historyY - ((rowsNeeded - 1) * rowSpacing);
     
-    // Draw a subtle background for the move history
-    fill(240, 240, 240, 100);
-    noStroke();
-    rectMode(CENTER);
-    rect(playAreaX + playAreaWidth/2, moveHistoryY + totalHeight/2, 
-         rowWidth + margin*2, totalHeight + margin*2, 5);
+    // Calculate starting X position to center the counters
+    let startX = playAreaX + playAreaWidth / 2 - (Math.min(maxCountersPerRow, displayCount) * circleSpacing) / 2;
     
-    for (let i = 0; i < moveHistory.length; i++) {
-      const row = Math.floor(i / maxPerRow);
-      const col = i % maxPerRow;
+    // Draw move history circles
+    for (let i = 0; i < displayCount; i++) {
+      // Calculate row and position within row
+      const row = Math.floor(i / maxCountersPerRow);
+      const posInRow = i % maxCountersPerRow;
       
-      const x = startX + col * (circleSize + margin);
-      const y = moveHistoryY + row * (circleSize + margin);
+      // Calculate x and y positions
+      const x = startX + posInRow * circleSpacing;
+      const y = startY + (row * rowSpacing); // New rows appear below previous rows
       
-      // Check if this is an Easter Egg counter (object with type property)
-      if (moveHistory[i] && typeof moveHistory[i] === 'object' && moveHistory[i].type === 'easterEgg') {
-        // Draw the larger white circle first
-        fill('white');
-      stroke('black');
-      strokeWeight(1);
-        circle(x, y, circleSize * 1.3); // 30% larger than normal
+      // Check if this is an Easter Egg counter
+      if (typeof filteredMoveHistory[i] === 'object' && 
+          (filteredMoveHistory[i].type === 'egg' || filteredMoveHistory[i].type === 'easterEgg')) {
+        // Draw Easter Egg counter (nested oval and circle)
+        // Outer white oval
+        fill(255);
+        stroke(0);
+        strokeWeight(2); // Increased to 2px
+        ellipse(x, y, circleSize * 1.1, circleSize * 1.5); // Vertical oval shape
         
-        // Draw the inner yellow circle
-        fill(moveHistory[i].color);
-        stroke('black');
-        strokeWeight(0.5);
-        circle(x, y, circleSize * 0.8); // 80% of normal size
-      } else {
-        // Regular counter - Map color names to the exact COLORS values
-        let circleColor;
-        switch(moveHistory[i]) {
-          case 'yellow':
-            circleColor = COLORS.vesselYellow;
-            break;
-          case 'green':
-            circleColor = COLORS.vesselGreen;
-            break;
-          case 'red':
-          case '#FF5252':
-            circleColor = COLORS.vesselHint;
-            break;
-          case 'white':
-            circleColor = COLORS.vesselBase;
-            break;
-          case 'black':
-            circleColor = '#333333'; // Keep black for unsuccessful moves
-            break;
-          default:
-            circleColor = moveHistory[i]; // Use the original color if not matched
-        }
-        
-        fill(circleColor);
-        stroke('black');
+        // Inner yellow circle
+        fill(COLORS.tertiary); // Use the game's yellow color
+        stroke(0);
         strokeWeight(1);
+        circle(x, y, circleSize * 0.8);
+        strokeWeight(1);
+      } else {
+        // Regular counter
+        let moveColor = filteredMoveHistory[i];
+        
+        // Draw regular counter with 2px black outline
+        fill(moveColor);
+        stroke(0);
+        strokeWeight(2); // Increased to 2px
         circle(x, y, circleSize);
       }
     }
@@ -1348,8 +1956,8 @@ let intermediate_combinations = [
         overInteractive = true;
       }
     } else if (gameWon) {
-      // Check buttons
-      if (shareButton.isInside(mouseX, mouseY) || recipeButton.isInside(mouseX, mouseY)) {
+      // Check buttons and recipe card
+      if (isMouseOverLetterScore || isMouseOverCard) {
         overInteractive = true;
       }
     } else {
@@ -1392,15 +2000,15 @@ let intermediate_combinations = [
         return;
       }
     } else if (gameWon) {
-      // Check if share button was clicked
-      if (shareButton.isInside(mouseX, mouseY)) {
-        shareButton.handleClick();
+      // Check if recipe card was clicked
+      if (isMouseOverCard) {
+        viewRecipe();
         return;
       }
       
-      // Check if recipe button was clicked
-      if (recipeButton.isInside(mouseX, mouseY)) {
-        recipeButton.handleClick();
+      // Check if letter score area was clicked
+      if (isMouseOverLetterScore) {
+        shareScore();
         return;
       }
     } else {
@@ -1464,7 +2072,7 @@ let intermediate_combinations = [
         if (easterEgg) {
           // Easter egg was found
           // Add a special move to history with a marker to indicate it's an Easter Egg
-          moveHistory.push({ type: 'easterEgg', color: COLORS.vesselYellow });
+          moveHistory.push({ type: 'egg', color: 'yellow' });
           
           // Trigger haptic feedback
           triggerHapticFeedback('completion');
@@ -1523,7 +2131,8 @@ let intermediate_combinations = [
             } else if (new_v.color === 'white') {
               moveHistory.push(COLORS.vesselBase);
             } else if (new_v.color === '#FF5252') {
-              moveHistory.push(COLORS.vesselHint);
+              // Red counters have been removed
+              // moveHistory.push(COLORS.vesselHint);
             } else {
               moveHistory.push(new_v.color); // Fallback to the actual color
             }
@@ -1576,7 +2185,7 @@ let intermediate_combinations = [
           else if (checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])])) {
             // Easter egg was found and displayed
             // Add a special move to history
-            moveHistory.push(COLORS.vesselYellow);
+            moveHistory.push({ type: 'egg', color: 'yellow' });
             
             // Don't snap back or remove vessels - they will be reset when the modal is closed
             // Just trigger haptic feedback
@@ -1592,6 +2201,10 @@ let intermediate_combinations = [
           // Add unsuccessful move to history (black)
           moveHistory.push('black');
           triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+          
+          // Trigger shake animation on both vessels
+          draggedVessel.shake();
+          overVessel.shake();
           }
         }
       } else if (overHintVessel) {
@@ -1637,7 +2250,8 @@ let intermediate_combinations = [
           arrangeVessels();
           
           // Add red move to history (not the original vessel color)
-          moveHistory.push('#FF5252');
+          // Red counters have been removed
+          // moveHistory.push('#FF5252');
           
           // Check if hint is complete
           if (hintVessel.isComplete()) {
@@ -1661,9 +2275,24 @@ let intermediate_combinations = [
           // Add unsuccessful move to history (black)
           moveHistory.push('black');
           triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+          
+          // Trigger shake animation on both vessels
+          draggedVessel.shake();
+          hintVessel.shake();
         }
       } else {
         draggedVessel.snapBack();
+        
+        // Only add black counter and shake if the vessel was actually dragged
+        // (not just clicked and released in the same spot)
+        if (dist(draggedVessel.x, draggedVessel.y, draggedVessel.originalX, draggedVessel.originalY) > 10) {
+          // Add unsuccessful move to history (black)
+          moveHistory.push('black');
+          triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+          
+          // Trigger shake animation on the dragged vessel
+          draggedVessel.shake();
+        }
       }
       
       // Reset draggedVessel
@@ -1698,23 +2327,22 @@ let intermediate_combinations = [
           if (allIngredientsInHint && !anyAlreadyCollected) {
           console.log(`Adding ingredients directly to hint: ${U.join(', ')}`);
           
-          // Create a temporary vessel just for the animation
-          let tempVessel = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
-          
           // Add all ingredients to the hint vessel
           for (let ing of U) {
             hintVessel.addIngredient(ing);
           }
           
-          // Create animation from the temp vessel to the hint vessel
-          createCombineAnimation(tempVessel.x, tempVessel.y, tempVessel.color, hintVessel.x, hintVessel.y);
+          // Create animations directly from each original vessel to the hint vessel
+          createCombineAnimation(v1.x, v1.y, v1.color, hintVessel.x, hintVessel.y);
+          createCombineAnimation(v2.x, v2.y, v2.color, hintVessel.x, hintVessel.y);
           
           // Add red moves to history - one for each ingredient (or at least one if it was a combination)
           // This ensures we count the proper number of turns when adding multiple ingredients at once
           let numIngredientsAdded = Math.max(1, U.length);
-          for (let j = 0; j < numIngredientsAdded; j++) {
-            moveHistory.push('#FF5252');
-          }
+          // Red counters have been removed
+          // for (let j = 0; j < numIngredientsAdded; j++) {
+          //   moveHistory.push('#FF5252');
+          // }
           
           // Check if hint is complete
           if (hintVessel.isComplete()) {
@@ -1752,8 +2380,8 @@ let intermediate_combinations = [
         let C = C_candidates[0];
         
         // Check if we have all required ingredients for this combination
-        // Only turn green if we have exactly the required ingredients (no extras)
-        if (U.length === C.required.length && C.required.every(ing => U.includes(ing))) {
+        // Modified: Only check if all required ingredients are present, not requiring exact length match
+        if (C.required.every(ing => U.includes(ing))) {
           // Only turn green if not part of an active hint
           if (!hintActive || C.name !== hintVessel.name) {
           new_v.name = C.name;
@@ -1845,7 +2473,7 @@ let intermediate_combinations = [
           
           if (hasAllRequired) {
             new_v.name = parentCombo.name;
-            new_v.color = 'green';
+            new_v.color = COLORS.primary; // Use avocado green from color palette
             new_v.complete_combinations = []; // Clear since this is now a complete combination
             
             // Set the verb from the parent combination and display it
@@ -1881,7 +2509,7 @@ let intermediate_combinations = [
         // Check if we have all required components for the final combination
         if (finalRecipeComponents.every(name => U.includes(name))) {
           new_v.name = final_combination.name;
-          new_v.color = 'green';
+          new_v.color = COLORS.primary; // Use avocado green from color palette
           new_v.complete_combinations = []; // Clear since this is the final combination
           
           // Set the verb from the final combination and display it
@@ -2010,7 +2638,7 @@ let intermediate_combinations = [
         
         if (hasAllRequired) {
           new_v.name = targetRecipe.name;
-          new_v.color = 'green';
+          new_v.color = COLORS.primary; // Use avocado green from color palette
           
           if (targetRecipe === final_combination) {
             new_v.complete_combinations = []; // Clear since this is the final combination
@@ -2055,8 +2683,12 @@ let intermediate_combinations = [
   }
   
   function shareScore() {
+    // Filter moveHistory to only include red and black counters
+    const filteredMoveHistory = moveHistory.filter(move => 
+      move === 'black' || move === '#333333' || move === '#FF5252');
+    
     // Create share text
-    let shareText = `I made ${final_combination.name} in ${turnCounter} turns in Combo Meal! Can you beat my score?`;
+    let shareText = `I made ${final_combination.name} in ${filteredMoveHistory.length} moves in Combo Meal! Can you beat my score?`;
     
     // Try to use the Web Share API if available
     if (navigator.share) {
@@ -2091,8 +2723,6 @@ let intermediate_combinations = [
     
     if (gameStarted) {
       // Only check these buttons if they exist and the game has started
-      if (shareButton) shareButton.checkHover(mouseX, mouseY);
-      if (recipeButton) recipeButton.checkHover(mouseX, mouseY);
       if (hintButton) hintButton.checkHover(mouseX, mouseY);
     }
   }
@@ -2100,10 +2730,37 @@ let intermediate_combinations = [
   // Function to show a hint
   function showHint() {
     if (!showingHint && !gameWon) {
-      // Find combinations that haven't been completed yet
+      // Check if only the final combination remains
+      if (isOnlyFinalComboRemaining()) {
+        console.log("Only final combination remains, hint disabled");
+        return; // Exit early
+      }
+      
+      hintCount++; // Increment hint counter
+      
+      // Add a bright blue counter for creating a hint vessel
+      moveHistory.push('#FF5252'); // Red color for hint creation (matching hint vessels)
+      turnCounter++; // Increment turn counter for hint creation
+      
+      
+      // Find combinations that have been completed
       let completedCombos = vessels
         .filter(v => v.name !== null)
         .map(v => v.name);
+      
+      // Also check for combinations that are part of partial combinations
+      // These are combinations that are in the complete_combinations array of any vessel
+      let partialCompletedCombos = [];
+      vessels.forEach(v => {
+        if (v.complete_combinations && v.complete_combinations.length > 0) {
+          partialCompletedCombos.push(...v.complete_combinations);
+        }
+      });
+      
+      // Combine both lists to get all combinations that shouldn't be offered as hints
+      let allCompletedCombos = [...new Set([...completedCombos, ...partialCompletedCombos])];
+      
+      console.log("All completed combinations (including partial):", allCompletedCombos);
       
       // Get all ingredients currently visible on the board
       let visibleIngredients = [];
@@ -2112,17 +2769,35 @@ let intermediate_combinations = [
       });
       
       console.log("Visible ingredients on board:", visibleIngredients);
+      console.log("Completed combinations:", completedCombos);
       
       // Calculate which combinations can be made with visible ingredients
       let possibleCombos = [];
       
       // Check all intermediate combinations that aren't completed yet
       let availableCombos = intermediate_combinations.filter(combo => 
-        !completedCombos.includes(combo.name));
+        !allCompletedCombos.includes(combo.name));
+      
+      // Filter out combinations that require completed combinations as ingredients
+      availableCombos = availableCombos.filter(combo => {
+        // Check if any of the required ingredients are completed combinations
+        return !combo.required.some(ingredient => completedCombos.includes(ingredient));
+      });
+      
+      console.log("Available combinations after filtering out those requiring completed combos:", 
+        availableCombos.map(c => c.name));
       
       // If all intermediate combinations are done, check final combination
       if (availableCombos.length === 0 && !completedCombos.includes(final_combination.name)) {
-        availableCombos = [final_combination];
+        // For the final combination, we actually want to use completed combinations
+        // But only if not all required combinations are completed yet
+        let finalComboRequiredCount = final_combination.required.length;
+        let finalComboCompletedCount = final_combination.required.filter(req => 
+          completedCombos.includes(req)).length;
+        
+        if (finalComboCompletedCount > 0 && finalComboCompletedCount < finalComboRequiredCount) {
+          availableCombos = [final_combination];
+        }
       }
       
       // For each available combination, calculate what percentage of its ingredients are visible
@@ -2132,7 +2807,12 @@ let intermediate_combinations = [
         
         // Count how many required ingredients are visible on the board
         combo.required.forEach(ing => {
-          if (visibleIngredients.includes(ing)) {
+          // For the final combination, completed combinations count as available
+          if (combo === final_combination && completedCombos.includes(ing)) {
+            availableCount++;
+          } 
+          // For other combinations, only count visible base ingredients
+          else if (visibleIngredients.includes(ing)) {
             availableCount++;
           }
         });
@@ -2233,10 +2913,11 @@ let intermediate_combinations = [
             v.markedForRemoval = true;
             
             // Add moves to history for each absorbed ingredient
-            for (let j = 0; j < ingredientsAdded; j++) {
-              // Use the string '#FF5252' instead of COLORS.vesselHint to ensure compatibility with drawMoveHistory
-              moveHistory.push('#FF5252');
-            }
+            // Red counters have been removed
+            // for (let j = 0; j < ingredientsAdded; j++) {
+            //   // Use the string '#FF5252' instead of COLORS.vesselHint to ensure compatibility with drawMoveHistory
+            //   moveHistory.push('#FF5252');
+            // }
             
             // Increment turn counter for each absorbed ingredient
             turnCounter += ingredientsAdded;
@@ -2316,9 +2997,10 @@ let intermediate_combinations = [
             // Add red moves to history - one for each ingredient (or at least two if it was a combination)
             // This ensures we count the proper number of turns when adding multiple ingredients at once
             let numIngredientsAdded = Math.max(2, v.ingredients.length);
-            for (let j = 0; j < numIngredientsAdded; j++) {
-              moveHistory.push('#FF5252');
-            }
+            // Red counters have been removed
+            // for (let j = 0; j < numIngredientsAdded; j++) {
+            //   moveHistory.push('#FF5252');
+            // }
             
             // Increment turn counter - add one more turn since the first turn was already counted
             // when the vessel was created in mouseReleased
@@ -2384,13 +3066,17 @@ let intermediate_combinations = [
           return false;
         }
       } else if (gameWon) {
-        // Check if buttons were touched
-        if (shareButton.isInside(touchX, touchY)) {
-          shareScore();
+        // Check if recipe card was touched
+        if (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
+            touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2) {
+          viewRecipe();
           return false;
         }
-        if (recipeButton.isInside(touchX, touchY)) {
-          viewRecipe();
+        
+        // Check if letter score area was touched
+        if (touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
+            touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2) {
+          shareScore();
           return false;
         }
       } else {
@@ -2447,25 +3133,6 @@ let intermediate_combinations = [
     let startButtonWidth = min(180, playAreaWidth * 0.4);
     let startButtonHeight = min(60, startButtonWidth * 0.33);
     
-    // Create share and recipe buttons - position relative to play area
-    shareButton = new Button(
-      playAreaX + playAreaWidth * 0.35, 
-      playAreaY + playAreaHeight * 0.85, 
-      buttonWidth, 
-      buttonHeight, 
-      "Share Score", 
-      shareScore
-    );
-    
-    recipeButton = new Button(
-      playAreaX + playAreaWidth * 0.65, 
-      playAreaY + playAreaHeight * 0.85, 
-      buttonWidth, 
-      buttonHeight, 
-      "View Recipe", 
-      viewRecipe
-    );
-    
     // Create hint button with white background and grey outline
     hintButton = new Button(
       playAreaX + playAreaWidth * 0.5, 
@@ -2498,6 +3165,7 @@ let intermediate_combinations = [
     gameStarted = false;
     showingHint = false;
     hintVessel = null;
+    hintCount = 0; // Reset hint count when game starts
   }
   
   // Function to get current time in EST for debugging
@@ -2643,14 +3311,10 @@ let intermediate_combinations = [
       draggedVessel: draggedVesselCopy,
       targetVessel: targetVesselCopy,
       
-      // Define small splatter droplets
-      splatters: [
-        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(8, 15) },
-        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(8, 15) },
-        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(8, 15) },
-        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(5, 10) },
-        { x: random(-0.8, 0.8), y: random(-0.8, 0.8), size: random(5, 10) }
-      ],
+      // Animation properties for the splat effect
+      animating: true,
+      animationStartTime: millis(),
+      animationDuration: 100, // 100ms for the animation (reduced from 300ms)
       
       draw: function() {
         if (!this.active) return;
@@ -2662,152 +3326,87 @@ let intermediate_combinations = [
         noStroke();
         rect(0, 0, width, height);
         
-        // Draw egg white (simple, rounded splat shape)
-        fill(255, 255, 255, 240);
-        noStroke();
+        // Calculate animation scale factor if animating
+        let scaleFactor = 1.0;
+        if (this.animating) {
+          const elapsed = millis() - this.animationStartTime;
+          const progress = min(elapsed / this.animationDuration, 1.0);
+          // Start at 2.0 scale and shrink to 1.0
+          scaleFactor = 2.0 - progress;
+          
+          // End animation when complete
+          if (progress >= 1.0) {
+            this.animating = false;
+          }
+        }
         
-        // Draw the main egg white blob (simple, rounded shape)
+        // Move to center position for the entire egg (white and yolk)
         push();
         translate(this.x, this.y);
         
-        // Main circular base
-        const baseRadius = this.radius * 1.8;
-        ellipse(0, 0, baseRadius * 2, baseRadius * 2);
+        // Apply scale for animation to EVERYTHING (egg white, yolk, and text)
+        scale(scaleFactor);
         
-        // Add 5-7 rounded gloops around the main circle
-        // Bottom drip (longer)
-        const bottomDripWidth = baseRadius * 0.7;
-        const bottomDripHeight = baseRadius * 1.5;
-        const bottomDripY = baseRadius * 0.8;
-        
-        // Draw the bottom drip with rounded corners
-        rectMode(CENTER);
-        rect(0, bottomDripY, bottomDripWidth, bottomDripHeight, 
-             bottomDripWidth/2, bottomDripWidth/2, bottomDripWidth/2, bottomDripWidth/2);
-        
-        // Add a circle at the bottom of the drip for a rounded end
-        ellipse(0, bottomDripY + bottomDripHeight/2, bottomDripWidth, bottomDripWidth);
-        
-        // Add 4-6 more rounded gloops around the circle
-        // Top-right gloop
-        const tr = {
-          x: baseRadius * 0.6,
-          y: -baseRadius * 0.6,
-          width: baseRadius * 0.6,
-          height: baseRadius * 0.8
-        };
-        push();
-        translate(tr.x, tr.y);
-        rotate(PI/4); // Rotate to point outward
-        rect(0, 0, tr.width, tr.height, tr.width/2);
-        ellipse(0, tr.height/2 - tr.width/4, tr.width, tr.width);
-        pop();
-        
-        // Top-left gloop
-        const tl = {
-          x: -baseRadius * 0.6,
-          y: -baseRadius * 0.6,
-          width: baseRadius * 0.5,
-          height: baseRadius * 0.7
-        };
-        push();
-        translate(tl.x, tl.y);
-        rotate(-PI/4); // Rotate to point outward
-        rect(0, 0, tl.width, tl.height, tl.width/2);
-        ellipse(0, tl.height/2 - tl.width/4, tl.width, tl.width);
-        pop();
-        
-        // Right gloop
-        const right = {
-          x: baseRadius * 0.8,
-          y: baseRadius * 0.1,
-          width: baseRadius * 0.5,
-          height: baseRadius * 0.6
-        };
-        push();
-        translate(right.x, right.y);
-        rotate(PI/2.5); // Rotate to point outward
-        rect(0, 0, right.width, right.height, right.width/2);
-        ellipse(0, right.height/2 - right.width/4, right.width, right.width);
-        pop();
-        
-        // Left gloop
-        const left = {
-          x: -baseRadius * 0.8,
-          y: baseRadius * 0.1,
-          width: baseRadius * 0.5,
-          height: baseRadius * 0.6
-        };
-        push();
-        translate(left.x, left.y);
-        rotate(-PI/2.5); // Rotate to point outward
-        rect(0, 0, left.width, left.height, left.width/2);
-        ellipse(0, left.height/2 - left.width/4, left.width, left.width);
-        pop();
-        
-        // Bottom-right small gloop
-        const br = {
-          x: baseRadius * 0.4,
-          y: baseRadius * 0.7,
-          size: baseRadius * 0.4
-        };
-        ellipse(br.x, br.y, br.size, br.size);
-        
-        // Bottom-left small gloop
-        const bl = {
-          x: -baseRadius * 0.4,
-          y: baseRadius * 0.7,
-          size: baseRadius * 0.4
-        };
-        ellipse(bl.x, bl.y, bl.size, bl.size);
-        
-        pop(); // End of egg white drawing
-        
-        // Draw small splatter droplets
-        fill(255, 255, 255, 240);
+        // Draw egg white with new structured design
+        fill(255, 255, 255); // 100% opacity
         noStroke();
-        for (let splat of this.splatters) {
-          const x = this.x + this.radius * 3 * splat.x;
-          const y = this.y + this.radius * 3 * splat.y;
-          circle(x, y, splat.size);
-        }
         
-        // Draw yellow yolk (circular dialogue)
+        // 1. Main circular base (300px circle under the yolk)
+        const baseRadius = 150; // 300px diameter (increased from 200px)
+        noStroke();
+        fill(255, 255, 255);
+        circle(0, 0, baseRadius * 2);
+        
+        // 2. Two 150w x 275h rectangles with 75px rounded corners that touch each other
+        const rectWidth = 150;
+        const rectHeight = 275;
+        const cornerRadius = 75;
+        
+        // Left rectangle (slightly higher)
+        rectMode(CENTER);
+        rect(-rectWidth/2, -20, rectWidth, rectHeight, cornerRadius);
+        
+        // Right rectangle
+        rect(rectWidth/2, 0, rectWidth, rectHeight, cornerRadius);
+        
+        // New rectangle in between the two existing rectangles, 50px lower and 25px to the left
+        rect(-25, 50, rectWidth, rectHeight, cornerRadius);
+        
+        // 3. 400w x 200h rounded rectangle with 75px corners centered under the yolk
+        // Moved up by 100px (from rectHeight/2 - 50 to rectHeight/2 - 150)
+        const bottomRectWidth = 400;
+        const bottomRectHeight = 200;
+        rect(0, rectHeight/2 - 150, bottomRectWidth, bottomRectHeight, cornerRadius);
+        
+        // Draw yellow yolk (circular dialogue) - now inside the scale transformation
         // Add a subtle gradient to the yolk
         for (let i = 10; i >= 0; i--) {
           const yolkSize = this.radius * 2 * (1 - i * 0.03);
           const alpha = 255 - i * 10;
           fill(255, 204, 0, alpha); // Bright egg yolk yellow with gradient
           noStroke();
-          circle(this.x, this.y, yolkSize);
+          circle(0, 0, yolkSize);
         }
         
         // Add highlight to the yolk
         fill(255, 255, 255, 100);
         noStroke();
-        ellipse(this.x - this.radius * 0.3, this.y - this.radius * 0.3, this.radius * 0.7, this.radius * 0.5);
+        ellipse(-this.radius * 0.3, -this.radius * 0.3, this.radius * 0.7, this.radius * 0.5);
         
         // Add a thin outline to the yolk
         noFill();
         stroke(200, 150, 0, 100);
         strokeWeight(1);
-        circle(this.x, this.y, this.radius * 2);
+        circle(0, 0, this.radius * 2);
         
-        // Close button (x)
-        fill(255);
+        // X mark (without circle)
         stroke(0);
-        strokeWeight(1);
-        const closeButtonSize = 20; // Smaller close button
-        circle(this.x + this.radius * 0.7, this.y - this.radius * 0.7, closeButtonSize);
-        
-        // X mark
-        stroke(0);
-        strokeWeight(1.5);
-        const xOffset = 6; // Smaller x mark
-        line(this.x + this.radius * 0.7 - xOffset, this.y - this.radius * 0.7 - xOffset, 
-             this.x + this.radius * 0.7 + xOffset, this.y - this.radius * 0.7 + xOffset);
-        line(this.x + this.radius * 0.7 - xOffset, this.y - this.radius * 0.7 + xOffset, 
-             this.x + this.radius * 0.7 + xOffset, this.y - this.radius * 0.7 - xOffset);
+        strokeWeight(2);
+        const xOffset = 8;
+        const xPos = this.radius * 0.7;
+        const yPos = -this.radius * 0.7;
+        line(xPos - xOffset, yPos - xOffset, xPos + xOffset, yPos + xOffset);
+        line(xPos - xOffset, yPos + xOffset, xPos + xOffset, yPos - xOffset);
         
         // "You found the egg!" text
         fill(0);
@@ -2815,18 +3414,19 @@ let intermediate_combinations = [
         textAlign(CENTER, CENTER);
         textSize(12); // Smaller text
         textStyle(NORMAL);
-        text("You found the egg!", this.x, this.y - this.radius * 0.4);
+        text("You found the egg!", 0, -this.radius * 0.4);
         
         // Easter egg name
         textSize(20); // Smaller text
         textStyle(BOLD);
-        text(egg.name, this.x, this.y);
+        text(egg.name, 0, 0);
         
         // "Keep going!" text
         textSize(12); // Smaller text
         textStyle(NORMAL);
-        text("Keep going!", this.x, this.y + this.radius * 0.4);
+        text("Keep going!", 0, this.radius * 0.4);
         
+        pop(); // End of scaled drawing
         pop();
       },
       
@@ -2860,18 +3460,55 @@ let intermediate_combinations = [
     triggerHapticFeedback('completion');
   }
   
-  // Helper function to draw a star
-  function star(x, y, radius1, radius2, npoints) {
+  // Helper function to draw a star with very rounded points (cartoonish style)
+  function starWithRoundedPoints(x, y, radius1, radius2, npoints, roundness) {
+    // Create points for the star
+    let points = [];
     let angle = TWO_PI / npoints;
     let halfAngle = angle / 2.0;
-    beginShape();
+    
     for (let a = 0; a < TWO_PI; a += angle) {
+      // Outer point
       let sx = x + cos(a) * radius2;
       let sy = y + sin(a) * radius2;
-      vertex(sx, sy);
+      points.push({x: sx, y: sy});
+      
+      // Inner point
       sx = x + cos(a + halfAngle) * radius1;
       sy = y + sin(a + halfAngle) * radius1;
-      vertex(sx, sy);
+      points.push({x: sx, y: sy});
+    }
+    
+    // Draw the rounded star using curves with much higher roundness
+    beginShape();
+    for (let i = 0; i < points.length; i++) {
+      let p1 = points[i];
+      let p2 = points[(i + 1) % points.length];
+      
+      // Calculate control points for the curve
+      let dx = p2.x - p1.x;
+      let dy = p2.y - p1.y;
+      let dist = sqrt(dx * dx + dy * dy);
+      
+      // Use much higher roundness for cartoonish look - at least 40% of the distance
+      let r = min(roundness * 2.5, dist * 0.4);
+      
+      // Calculate direction vector
+      let nx = dx / dist;
+      let ny = dy / dist;
+      
+      // Calculate curve control points
+      let cp1x = p1.x + nx * r;
+      let cp1y = p1.y + ny * r;
+      let cp2x = p2.x - nx * r;
+      let cp2y = p2.y - ny * r;
+      
+      // If this is the first point, use vertex instead of bezierVertex
+      if (i === 0) {
+        vertex(p1.x, p1.y);
+      }
+      
+      bezierVertex(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
     }
     endShape(CLOSE);
   }
@@ -2899,7 +3536,7 @@ let intermediate_combinations = [
         if (easterEgg) {
           // Easter egg was found
           // Add a special move to history with a marker to indicate it's an Easter Egg
-          moveHistory.push({ type: 'easterEgg', color: COLORS.vesselYellow });
+          moveHistory.push({ type: 'egg', color: 'yellow' });
           
           // Update the turn counter
           updateTurnCounter();
@@ -2986,4 +3623,70 @@ let intermediate_combinations = [
     
     return false; // Prevent default
   }
+  
+  function isOnlyFinalComboRemaining() {
+    // Case 1: Only the final dish remains
+    if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+      return true;
+    }
+    
+    // Case 2: All the required combinations for the final dish are present
+    // Get all completed combinations
+    let completedCombos = vessels
+      .filter(v => v.name !== null)
+      .map(v => v.name);
+    
+    // Also check for combinations that are part of partial combinations
+    // These are combinations that are in the complete_combinations array of any vessel
+    let partialCompletedCombos = [];
+    vessels.forEach(v => {
+      if (v.complete_combinations && v.complete_combinations.length > 0) {
+        partialCompletedCombos.push(...v.complete_combinations);
+      }
+    });
+    
+    // Combine both lists to get all completed combinations
+    let allCompletedCombos = [...new Set([...completedCombos, ...partialCompletedCombos])];
+    
+    // Check if all required combinations for the final dish are present
+    // either as standalone vessels or as part of partial combinations
+    let allFinalIngredientsPresent = final_combination.required.every(req => 
+      allCompletedCombos.includes(req));
+    
+    // Check if only the required combinations for the final dish are present
+    // (plus possibly some base ingredients that can't be used)
+    let onlyFinalIngredientsRemain = true;
+    for (let combo of completedCombos) {
+      // If this is not a required ingredient for the final dish
+      if (!final_combination.required.includes(combo)) {
+        // And it's not a base ingredient (it's an intermediate combination)
+        if (intermediate_combinations.some(ic => ic.name === combo)) {
+          onlyFinalIngredientsRemain = false;
+          break;
+        }
+      }
+    }
+    
+    return allFinalIngredientsPresent && onlyFinalIngredientsRemain;
+  }
+  
+  // Helper function to draw a star
+  function star(x, y, radius1, radius2, npoints) {
+    let angle = TWO_PI / npoints;
+    let halfAngle = angle / 2.0;
+    beginShape();
+    for (let a = 0; a < TWO_PI; a += angle) {
+      let sx = x + cos(a) * radius2;
+      let sy = y + sin(a) * radius2;
+      vertex(sx, sy);
+      sx = x + cos(a + halfAngle) * radius1;
+      sy = y + sin(a + halfAngle) * radius1;
+      vertex(sx, sy);
+    }
+    endShape(CLOSE);
+  }
+  
+  // Add isMouseOverCard variable at the top of the file with other global variables
+  let isMouseOverCard = false;
+  let isMouseOverLetterScore = false;
   

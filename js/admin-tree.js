@@ -682,6 +682,21 @@ async function handleIngredientSubmit(e) {
     });
     
     try {
+        // Check if this is a non-base ingredient with the same name as a combination
+        if (!isBase) {
+            // Check if there's a combination with this name
+            const matchingCombo = currentCombinations.find(combo => combo.name === name);
+            
+            if (matchingCombo) {
+                // If this is a non-base ingredient representing a combination,
+                // make sure it's not assigned to its own combo_id
+                if (matchingCombo.combo_id.toString() === comboId.toString()) {
+                    showMessage('Error: A non-base ingredient representing a combination cannot be assigned to itself. Please assign it to a different combination.', 'error');
+                    return;
+                }
+            }
+        }
+        
         const { data, error } = await supabase
             .from('ingredients')
             .insert([
@@ -1003,6 +1018,21 @@ async function handleEditIngredientSubmit(e) {
     const comboId = document.getElementById('edit-ingredient-combo').value;
     
     try {
+        // Check if this is a non-base ingredient with the same name as a combination
+        if (!isBase) {
+            // Check if there's a combination with this name
+            const matchingCombo = currentCombinations.find(combo => combo.name === name);
+            
+            if (matchingCombo) {
+                // If this is a non-base ingredient representing a combination,
+                // make sure it's not assigned to its own combo_id
+                if (matchingCombo.combo_id.toString() === comboId.toString()) {
+                    showMessage('Error: A non-base ingredient representing a combination cannot be assigned to itself. Please assign it to a different combination.', 'error');
+                    return;
+                }
+            }
+        }
+        
         const { data, error } = await supabase
             .from('ingredients')
             .update({ 
@@ -1134,4 +1164,58 @@ function handlePlaytestRecipe() {
     
     // Open the game in a new tab
     window.open(gameUrl, '_blank');
+}
+
+// Check for circular references in ingredients
+async function checkForCircularReferences() {
+    try {
+        let circularReferencesFound = false;
+        
+        // Check each non-base ingredient
+        for (const ingredient of currentIngredients) {
+            if (!ingredient.is_base) {
+                // Check if there's a combination with this name
+                const matchingCombo = currentCombinations.find(combo => combo.name === ingredient.name);
+                
+                if (matchingCombo && matchingCombo.combo_id.toString() === ingredient.combo_id.toString()) {
+                    console.warn(`Circular reference found: Ingredient "${ingredient.name}" is assigned to its own combination`);
+                    circularReferencesFound = true;
+                    
+                    // Find a suitable parent combination to reassign this ingredient to
+                    let parentCombo = currentCombinations.find(combo => 
+                        combo.combo_id.toString() !== matchingCombo.combo_id.toString() && 
+                        (combo.is_final || combo.parent_combo === matchingCombo.parent_combo)
+                    );
+                    
+                    if (parentCombo) {
+                        console.log(`Fixing circular reference: Reassigning "${ingredient.name}" to combination "${parentCombo.name}"`);
+                        
+                        // Update the ingredient's combo_id
+                        const { error } = await supabase
+                            .from('ingredients')
+                            .update({ combo_id: parentCombo.combo_id })
+                            .eq('ing_id', ingredient.ing_id);
+                        
+                        if (error) {
+                            console.error('Error fixing circular reference:', error);
+                        } else {
+                            console.log(`Successfully fixed circular reference for "${ingredient.name}"`);
+                        }
+                    } else {
+                        console.warn(`Could not find a suitable parent combination to fix circular reference for "${ingredient.name}"`);
+                    }
+                }
+            }
+        }
+        
+        if (circularReferencesFound) {
+            showMessage('Circular references were found and fixed. Reloading recipe data...', 'warning');
+            await loadRecipeData(currentRecipe.rec_id);
+        }
+        
+        return circularReferencesFound;
+    } catch (error) {
+        console.error('Error checking for circular references:', error);
+        return false;
+    }
 } 
