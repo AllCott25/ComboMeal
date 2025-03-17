@@ -9,8 +9,8 @@
 * onto the hint vessel and resolved vessel "sticking" issue by ensuring
 * all vessels properly snap back to grid positions.
 * Added proper touch support for win screen interactions, including
-* View Recipe and Share Score buttons with direct DOM event listeners
-* that bypass the p5.js event system entirely.
+* View Recipe and Share Score buttons with an ultra-simplified approach.
+* Fixed persistent hover states on win screen CTAs after tapping them.
 *
 * The following are intermediate combinations defined for testing.
 * These will be replaced with data from Supabase.
@@ -541,80 +541,28 @@ let intermediate_combinations = [
   }
   
   function setup() {
-    // Create canvas
-    let canvas = createCanvas(windowWidth, windowHeight);
-    
-    // Set up play area based on window size
-    setupPlayArea();
-    
-    // Load fonts
-    titleFont = loadFont('fonts/GaeguRegular.ttf');
-    bodyFont = loadFont('fonts/OxygenRegular.ttf');
-    buttonFont = loadFont('fonts/OxygenBold.ttf');
-    
-    // Create vessels
-    initializeGame();
-    
-    // Create hint button
-    hintButtonY = playAreaY + playAreaHeight - 30;
-    hintButton = new Button(playAreaX + playAreaWidth/2, hintButtonY, 120, 40, "Hint", showHint, COLORS.secondary);
-    
-    // Create start button
-    startButton = new Button(playAreaX + playAreaWidth/2, playAreaY + playAreaHeight/2 + 80, 200, 60, "Start", startGame, COLORS.primary);
-    
-    // Set text properties
+    createCanvas(windowWidth, windowHeight); // Fullscreen canvas for mobile
     textFont(bodyFont);
-    textAlign(CENTER, CENTER);
     
-    // Load recipe data from Supabase
-    loadRecipeData();
+    // Calculate play area dimensions
+    playAreaWidth = min(maxPlayWidth, windowWidth - 2 * playAreaPadding);
+    // Set a fixed aspect ratio for the play area (mobile phone-like)
+    playAreaHeight = min(windowHeight - 2 * playAreaPadding, playAreaWidth * 1.8); // 16:9 aspect ratio
     
-    // Add direct DOM touch event handlers for win screen interactions
-    // This bypasses the p5.js event system entirely
-    canvas.elt.addEventListener('touchstart', function(e) {
-      if (!gameWon) return; // Only handle in win state
-      
-      let touch = e.touches[0];
-      let touchY = touch.clientY;
-      
-      console.log("Direct DOM touch event:", touchY, "Screen height:", window.innerHeight);
-      
-      // Prevent default behavior to avoid scrolling
-      e.preventDefault();
-      
-      // Top half = view recipe
-      if (touchY < window.innerHeight/2) {
-        console.log("DOM handler: View Recipe triggered");
-        window.open(recipeUrl, '_blank');
-      } 
-      // Bottom half = share score
-      else {
-        console.log("DOM handler: Share Score triggered");
-        
-        // Create share text
-        let shareText = `I made ${final_combination.name} in ${moveHistory.length} moves in Combo Meal! Can you beat my score?`;
-        
-        // Try to use the Web Share API if available
-        if (navigator.share) {
-          navigator.share({
-            title: 'Combo Meal Score',
-            text: shareText,
-            url: window.location.href
-          })
-          .catch(error => console.log('Error sharing:', error));
-        } else {
-          // Fallback: copy to clipboard
-          navigator.clipboard.writeText(shareText)
-            .then(() => {
-              alert('Score copied to clipboard!');
-            })
-            .catch(err => {
-              console.error('Failed to copy: ', err);
-              alert(shareText);
-            });
-        }
-      }
-    }, { passive: false });
+    // Center the play area both horizontally and vertically
+    playAreaX = (windowWidth - playAreaWidth) / 2;
+    playAreaY = (windowHeight - playAreaHeight) / 2;
+    
+    // The actual game initialization will happen in initializeGame()
+    // after the recipe data is loaded
+    
+    // Load recipe data from Supabase if not in playtest mode
+    if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
+      loadRecipeData();
+    } else {
+      console.log("Playtest mode: waiting for date selection");
+      isLoadingRecipe = false; // In playtest mode, we'll load the recipe after date selection
+    }
   }
   
   // Function to load recipe data from Supabase
@@ -2770,10 +2718,18 @@ let intermediate_combinations = [
           alert(shareText);
         });
     }
+    
+    // Reset hover states to prevent persistent highlighting
+    isMouseOverCard = false;
+    isMouseOverLetterScore = false;
   }
   
   function viewRecipe() {
     window.open(recipeUrl, '_blank');
+    
+    // Reset hover states to prevent persistent highlighting
+    isMouseOverCard = false;
+    isMouseOverLetterScore = false;
   }
   
   function mouseMoved() {
