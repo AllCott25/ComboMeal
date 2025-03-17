@@ -1,10 +1,12 @@
 /*
-* Culinary Logic Puzzle v0.0515.02
+* Culinary Logic Puzzle v0.0515.03
 * Created: March 6, 2025
 * Last Updated: May 15, 2025
 *
 * Fixed mobile touch interactions to properly handle vessel positioning, 
 * combinations, easter eggs, and hint vessel interactions.
+* Specifically fixed the ability to drag and drop single ingredients
+* onto the hint vessel.
 *
 * The following are intermediate combinations defined for testing.
 * These will be replaced with data from Supabase.
@@ -2255,10 +2257,6 @@ let intermediate_combinations = [
           // Remove the vessel
           vessels = vessels.filter(v => v !== draggedVessel);
           arrangeVessels();
-          
-          // Add red move to history (not the original vessel color)
-          // Red counters have been removed
-          // moveHistory.push('#FF5252');
           
           // Check if hint is complete
           if (hintVessel.isComplete()) {
