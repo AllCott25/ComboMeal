@@ -1,5 +1,5 @@
 /*
-* Culinary Logic Puzzle v0.0515.04
+* Culinary Logic Puzzle v0.0515.05
 * Created: March 6, 2025
 * Last Updated: May 15, 2025
 *
@@ -8,6 +8,8 @@
 * Specifically fixed the ability to drag and drop single ingredients
 * onto the hint vessel and resolved vessel "sticking" issue by ensuring
 * all vessels properly snap back to grid positions.
+* Added proper touch support for win screen interactions, including
+* View Recipe and Share Score buttons.
 *
 * The following are intermediate combinations defined for testing.
 * These will be replaced with data from Supabase.
@@ -3785,6 +3787,26 @@ let intermediate_combinations = [
       draggedVessel = null;
     }
     
+    // Handle win screen touch interactions
+    else if (gameWon && touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Check if recipe card was touched
+      if (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
+          touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2) {
+        viewRecipe();
+        return false;
+      }
+      
+      // Check if letter score area was touched
+      if (touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
+          touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2) {
+        shareScore();
+        return false;
+      }
+    }
+    
     return false; // Prevent default
   }
   
@@ -3804,6 +3826,19 @@ let intermediate_combinations = [
         draggedVessel.x = constrain(draggedVessel.x, playAreaX + draggedVessel.w/2, playAreaX + playAreaWidth - draggedVessel.w/2);
         draggedVessel.y = constrain(draggedVessel.y, playAreaY + draggedVessel.h/2, playAreaY + playAreaHeight - draggedVessel.h/2);
       }
+    }
+    // Update hover states for win screen elements
+    else if (gameWon && touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Update recipe card hover state
+      isMouseOverCard = touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
+                        touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2;
+      
+      // Update letter score hover state
+      isMouseOverLetterScore = touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
+                               touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2;
     }
     
     return false; // Prevent default
