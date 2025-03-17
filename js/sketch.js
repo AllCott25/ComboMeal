@@ -1,12 +1,13 @@
 /*
-* Culinary Logic Puzzle v0.0515.03
+* Culinary Logic Puzzle v0.0515.04
 * Created: March 6, 2025
 * Last Updated: May 15, 2025
 *
 * Fixed mobile touch interactions to properly handle vessel positioning, 
 * combinations, easter eggs, and hint vessel interactions.
 * Specifically fixed the ability to drag and drop single ingredients
-* onto the hint vessel.
+* onto the hint vessel and resolved vessel "sticking" issue by ensuring
+* all vessels properly snap back to grid positions.
 *
 * The following are intermediate combinations defined for testing.
 * These will be replaced with data from Supabase.
@@ -3548,8 +3549,14 @@ let intermediate_combinations = [
         overHintVessel = true;
       }
       
+      // Log for debugging
+      console.log("Touch ended. Over vessel:", overVessel ? "Yes" : "No", "Over hint:", overHintVessel ? "Yes" : "No");
+      
+      let combinationAttempted = false;
+      
       if (overVessel) {
         // Regular vessel combination
+        combinationAttempted = true;
         // Increment turn counter
         turnCounter++;
         
@@ -3680,14 +3687,35 @@ let intermediate_combinations = [
           }
         }
       } else if (overHintVessel) {
-        // Check if we can add this vessel to the hint
+        combinationAttempted = true;
+        // Trying to add to the hint vessel
+        turnCounter++;
+        
         let canAddToHint = false;
         
-        // Check if any ingredients from the dragged vessel match what the hint needs
-        if (hintVessel) {
+        // Check if it's a single ingredient
+        if (draggedVessel.ingredients.length === 1) {
+          let ingredientName = draggedVessel.ingredients[0];
+          canAddToHint = hintVessel.addIngredient(ingredientName);
+        } 
+        // Check if it's a partial combination that matches one of the required ingredients
+        else if (draggedVessel.name && hintVessel.required.includes(draggedVessel.name)) {
+          canAddToHint = hintVessel.addIngredient(draggedVessel.name);
+        }
+        // Check if it's a yellow vessel with multiple ingredients that are all part of the hint
+        else if (draggedVessel.ingredients.length > 0 && draggedVessel.ingredients.every(ing => hintVessel.required.includes(ing))) {
+          // Check if we can add all ingredients to the hint
+          canAddToHint = true;
           for (let ing of draggedVessel.ingredients) {
-            if (hintVessel.combo.ingredients.includes(ing) && !hintVessel.collected.includes(ing)) {
-              canAddToHint = true;
+            if (hintVessel.collected.includes(ing)) {
+              canAddToHint = false;
+              break;
+            }
+          }
+          
+          // If we can add all ingredients, do so
+          if (canAddToHint) {
+            for (let ing of draggedVessel.ingredients) {
               hintVessel.addIngredient(ing);
             }
           }
@@ -3719,7 +3747,9 @@ let intermediate_combinations = [
             }
           }
         } else {
+          // Reset position if we can't add to hint
           draggedVessel.snapBack();
+          
           // Add unsuccessful move to history (black)
           moveHistory.push('black');
           triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
@@ -3728,7 +3758,11 @@ let intermediate_combinations = [
           draggedVessel.shake();
           hintVessel.shake();
         }
-      } else {
+      }
+      
+      // If no combination was attempted at all, or if we're here for any other reason,
+      // make sure the vessel snaps back to its original position
+      if (!combinationAttempted) {
         // No vessel to combine with, snap back
         draggedVessel.snapBack();
         
@@ -3743,6 +3777,9 @@ let intermediate_combinations = [
           draggedVessel.shake();
         }
       }
+      
+      // Ensure vessel is back in position and arrange vessels as a safety measure
+      arrangeVessels();
       
       // Reset draggedVessel
       draggedVessel = null;
