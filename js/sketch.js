@@ -1,5 +1,5 @@
 /*
-* Culinary Logic Puzzle v0.0515.07
+* Culinary Logic Puzzle v0.0515.08
 * Created: March 6, 2025
 * Last Updated: May 15, 2025
 *
@@ -11,6 +11,7 @@
 * Added proper touch support for win screen interactions, including
 * View Recipe and Share Score buttons with an ultra-simplified approach.
 * Fixed persistent hover states on win screen CTAs after tapping them.
+* Limited tutorial text width to ensure instructions remain readable on all screen sizes.
 *
 * The following are intermediate combinations defined for testing.
 * These will be replaced with data from Supabase.
@@ -940,6 +941,9 @@ let intermediate_combinations = [
       descriptionSize = 10;
     }
     
+    // Calculate a maximum width for tutorial text that ensures it fits within the play area
+    const maxTutorialTextWidth = min(playAreaWidth * 0.85, 300);
+    
     // Draw "How to play:" header - position relative to play area
     textAlign(CENTER);
     textSize(headerSize);
@@ -949,8 +953,10 @@ let intermediate_combinations = [
     // New language with tutorial equations
     // First instruction
     textSize(descriptionSize);
+    textAlign(CENTER, CENTER);
+    textWrap(WORD);
     text("Drag & drop ingredients to combine them based on the steps of a recipe!", 
-         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.20);
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.20, maxTutorialTextWidth);
     
     // First equation
     drawTutorialEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
@@ -960,7 +966,7 @@ let intermediate_combinations = [
     // Second instruction
     textSize(descriptionSize);
     text("Completed combos turn green. Yellow combos need more ingredients.", 
-         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.40);
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.40, maxTutorialTextWidth);
     
     // Second equation
     drawTutorialEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
@@ -970,7 +976,7 @@ let intermediate_combinations = [
     // Third instruction
     textSize(descriptionSize);
     text("Complete the recipe with the fewest mistakes to make the grade.", 
-         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.60);
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.60, maxTutorialTextWidth);
     
     // Third equation
     drawTutorialEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
@@ -980,7 +986,7 @@ let intermediate_combinations = [
     // Final instruction
     textSize(descriptionSize);
     text("New recipe everyday!", 
-         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.80);
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.80, maxTutorialTextWidth);
     
     // Position start button relative to play area
     startButton.x = playAreaX + playAreaWidth/2;
@@ -992,7 +998,7 @@ let intermediate_combinations = [
     push();
     textSize(8);
     fill(100, 100, 100, 180); // Semi-transparent gray
-    text("v0.0515.02", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
+    text("v0.0515.07", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
     pop();
   }
   
