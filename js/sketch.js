@@ -746,7 +746,7 @@ let intermediate_combinations = [
     
     // Draw floral pattern border if there's space
     if (width > playAreaWidth + 80) {
-      drawBorder();
+      drawFloralBorder();
     }
     
     // No stroke for all text
