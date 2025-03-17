@@ -1,5 +1,5 @@
 /*
-* Culinary Logic Puzzle v0.0515.07
+* Culinary Logic Puzzle v0.0515.06
 * Created: March 6, 2025
 * Last Updated: May 15, 2025
 *
@@ -9,9 +9,7 @@
 * onto the hint vessel and resolved vessel "sticking" issue by ensuring
 * all vessels properly snap back to grid positions.
 * Added proper touch support for win screen interactions, including
-* View Recipe and Share Score buttons.
-* Fixed tutorial text sizing to ensure it fits correctly on all screens.
-* Improved touch handling in the win screen to ensure consistent behavior.
+* View Recipe and Share Score buttons with an ultra-simplified approach.
 *
 * The following are intermediate combinations defined for testing.
 * These will be replaced with data from Supabase.
@@ -54,10 +52,6 @@ let intermediate_combinations = [
   let recipeDescription = "A delicious recipe that's sure to please everyone at the table!"; // New variable to store recipe description
   let recipeAuthor = ""; // New variable to store recipe author
   let hintCount = 0; // Track number of hints used
-  let isMouseOverCard = false; // Track if mouse is over recipe card
-  let isMouseOverLetterScore = false; // Track if mouse is over letter score
-  let lastTouchOnCard = false; // Track if a touch on the card was processed
-  let lastTouchOnScore = false; // Track if a touch on the score was processed
   
   // Play area constraints
   let maxPlayWidth = 400; // Max width for the play area (phone-sized)
@@ -731,97 +725,60 @@ let intermediate_combinations = [
     // Set background color
     background(COLORS.background);
     
-    // Calculate playable area with padding
-    playAreaX = width/2 - playAreaWidth/2;
-    playAreaY = 0;
-    
-    // Draw play area frame
-    push();
-    noFill();
-    strokeWeight(2);
-    stroke(0, 0, 0, 40); // Semi-transparent black
-    rectMode(CORNER); // Use corner mode for the frame
-    rect(playAreaX, playAreaY, playAreaWidth, playAreaHeight, 5); // Rounded corners
-    pop();
-    
     // Draw floral pattern border if there's space
-    if (width > playAreaWidth + 80) {
-      drawFloralBorder();
-    }
+    drawFloralBorder();
     
-    // No stroke for all text
+    // Ensure no stroke for all text elements
     noStroke();
     
-    // Check for recipe data loading state
+    // Check if we're still loading recipe data
     if (isLoadingRecipe) {
+      // Draw loading screen
       textAlign(CENTER, CENTER);
-      fill(COLORS.text);
-      textSize(18);
-      text("Loading recipe data...", width/2, height/2);
+      textSize(24);
+      fill('#333');
+      text("Loading today's recipe...", width/2, height/2);
       
       // Show current EST time for debugging
-      let estOptions = { timeZone: 'America/New_York', hour12: false, hour: 'numeric', minute: 'numeric', second: 'numeric' };
-      let estTimeStr = new Date().toLocaleString('en-US', estOptions);
-      textSize(10);
-      text("Current EST Time: " + estTimeStr, width/2, height/2 + 30);
+      textSize(14);
+      const estTime = getCurrentESTTime();
+      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
+      
       return;
     }
     
-    // Display error message if loading failed
+    // Check if there was an error loading recipe data
     if (loadingError) {
       textAlign(CENTER, CENTER);
-      fill(COLORS.text);
-      textSize(18);
-      text("Sorry, could not load today's recipe. Please try again later.", width/2, height/2);
+      textSize(24);
+      fill(255, 0, 0);
+      text("Error loading recipe. Using default recipe.", width/2, height/2 - 30);
+      textSize(16);
+      text("Please check your internet connection and refresh the page.", width/2, height/2 + 10);
+      
+      // Display current time in EST for debugging
+      textSize(14);
+      const estTime = getCurrentESTTime();
+      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
+      
+      // After 3 seconds, continue with default recipe
+      if (frameCount % 180 === 0) {
+        loadingError = false;
+        // Initialize the game with default recipe data
+        initializeGame();
+      }
       return;
     }
     
-    // Initialize game if no vessels are present (only runs once)
+    // Check if we need to initialize the game after loading data
     if (vessels.length === 0) {
       initializeGame();
-    }
-    
-    // Enhanced touch interactions for win screen - this is the complete approach
-    if (gameWon && touches.length > 0) {
-      let touchX = touches[0].x;
-      let touchY = touches[0].y;
-      
-      // Check if the touch is inside the recipe card area
-      const isOnRecipeCard = touchX > cardX - cardWidth/2 && 
-                             touchX < cardX + cardWidth/2 && 
-                             touchY > cardY - cardHeight/2 && 
-                             touchY < cardY + cardHeight/2;
-      
-      // Check if the touch is inside the letter score area
-      const isOnLetterScore = touchX > scoreX - scoreWidth/2 && 
-                              touchX < scoreX + scoreWidth/2 && 
-                              touchY > scoreY - scoreHeight/2 && 
-                              touchY < scoreY + scoreHeight/2;
-      
-      // Update hover states for visual feedback
-      isMouseOverCard = isOnRecipeCard;
-      isMouseOverLetterScore = isOnLetterScore;
-      
-      // Handle touch on recipe card (only trigger once per touch)
-      if (isOnRecipeCard && !lastTouchOnCard) {
-        lastTouchOnCard = true;
-        viewRecipe();
-      }
-      
-      // Handle touch on letter score (only trigger once per touch)
-      if (isOnLetterScore && !lastTouchOnScore) {
-        lastTouchOnScore = true;
-        shareScore();
-      }
-    } else if (touches.length === 0) {
-      // Reset touch flags when no touches are detected
-      lastTouchOnCard = false;
-      lastTouchOnScore = false;
+      return;
     }
     
     // Only draw title when not in win state
     if (!gameWon) {
-      drawTitle();
+    drawTitle();
     }
     
     if (!gameStarted) {
@@ -968,7 +925,7 @@ let intermediate_combinations = [
   }
   
   function drawStartScreen() {
-    // Adjust header size based on available space - make even smaller for very narrow screens
+    // Adjust header size based on available space
     let headerSize = 28;
     let descriptionSize = 14;
     
@@ -981,107 +938,52 @@ let intermediate_combinations = [
       headerSize = 20;
       descriptionSize = 10;
     }
-    if (playAreaWidth < 300) {
-      headerSize = 18;
-      descriptionSize = 9;
-    }
     
     // Draw "How to play:" header - position relative to play area
     textAlign(CENTER);
     textSize(headerSize);
     fill('#333');
-    text("How to play:", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.10);
+    text("How to play:", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.12);
     
-    // Improved helper function to break text into multiple lines with better width calculation
-    const drawWrappedText = (message, x, y, maxWidth) => {
-      const words = message.split(' ');
-      let lines = [''];
-      let currentLine = 0;
-      
-      textSize(descriptionSize);
-      for (let word of words) {
-        // Add a space only if not at the beginning of a line
-        const testLine = lines[currentLine] + (lines[currentLine] ? ' ' : '') + word;
-        
-        // If the line with this word would exceed the maximum width, start a new line
-        if (textWidth(testLine) <= maxWidth) {
-          lines[currentLine] = testLine;
-        } else {
-          currentLine++;
-          lines[currentLine] = word;
-        }
-      }
-      
-      // Ensure proper padding and alignment
-      textAlign(CENTER, TOP);
-      
-      // Draw each line with proper spacing
-      for (let i = 0; i < lines.length; i++) {
-        text(lines[i], x, y + (i * (descriptionSize * 1.4)));
-      }
-      
-      // Return the height of all lines for positioning subsequent elements
-      return lines.length * (descriptionSize * 1.4);
-    };
+    // New language with tutorial equations
+    // First instruction
+    textSize(descriptionSize);
+    text("Drag & drop ingredients to combine them based on the steps of a recipe!", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.20);
     
-    // First instruction - with improved text wrapping and more compact spacing
-    let yOffset = playAreaY + playAreaHeight * 0.16;
-    const firstInstructionHeight = drawWrappedText(
-      "Drag & drop ingredients to combine them based on the steps of a recipe!", 
-      playAreaX + playAreaWidth/2, 
-      yOffset,
-      playAreaWidth * 0.9
-    );
-    
-    // First equation - adjust position based on wrapped text - reduce spacing
-    const equationSpacing = playAreaHeight * 0.06;
-    let equation1Y = yOffset + firstInstructionHeight + equationSpacing * 0.7;
+    // First equation
     drawTutorialEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
-                     "", 
-                     equation1Y, false, descriptionSize);
+                        "", // Empty description as we're using the text above
+                        playAreaY + playAreaHeight * 0.30, false, descriptionSize);
     
-    // Second instruction - with improved text wrapping
-    let secondInstructionY = equation1Y + equationSpacing;
-    const secondInstructionHeight = drawWrappedText(
-      "Completed combos turn green. Yellow combos need more ingredients.", 
-      playAreaX + playAreaWidth/2, 
-      secondInstructionY,
-      playAreaWidth * 0.9
-    );
+    // Second instruction
+    textSize(descriptionSize);
+    text("Completed combos turn green. Yellow combos need more ingredients.", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.40);
     
-    // Second equation - adjust position based on wrapped text
-    let equation2Y = secondInstructionY + secondInstructionHeight + equationSpacing * 0.7;
+    // Second equation
     drawTutorialEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
-                     "", 
-                     equation2Y, false, descriptionSize);
+                        "", // Empty description
+                        playAreaY + playAreaHeight * 0.50, false, descriptionSize);
     
-    // Third instruction - with improved text wrapping
-    let thirdInstructionY = equation2Y + equationSpacing;
-    const thirdInstructionHeight = drawWrappedText(
-      "Complete the recipe with the fewest mistakes to make the grade.", 
-      playAreaX + playAreaWidth/2, 
-      thirdInstructionY,
-      playAreaWidth * 0.9
-    );
+    // Third instruction
+    textSize(descriptionSize);
+    text("Complete the recipe with the fewest mistakes to make the grade.", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.60);
     
-    // Third equation - adjust position based on wrapped text
-    let equation3Y = thirdInstructionY + thirdInstructionHeight + equationSpacing * 0.7;
+    // Third equation
     drawTutorialEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
-                     "", 
-                     equation3Y, true, descriptionSize);
+                        "", // Empty description
+                        playAreaY + playAreaHeight * 0.70, true, descriptionSize);
     
-    // Final instruction - also use wrapped text for consistent handling
-    let finalY = equation3Y + equationSpacing;
-    const finalInstructionHeight = drawWrappedText(
-      "New recipe everyday!", 
-      playAreaX + playAreaWidth/2,
-      finalY,
-      playAreaWidth * 0.9
-    );
+    // Final instruction
+    textSize(descriptionSize);
+    text("New recipe everyday!", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.80);
     
-    // Position start button relative to play area - adjust based on the content above
+    // Position start button relative to play area
     startButton.x = playAreaX + playAreaWidth/2;
-    startButton.y = finalY + finalInstructionHeight + playAreaHeight * 0.08;
+    startButton.y = playAreaY + playAreaHeight * 0.88;
     startButton.draw();
     startButton.checkHover(mouseX, mouseY);
     
@@ -1089,7 +991,7 @@ let intermediate_combinations = [
     push();
     textSize(8);
     fill(100, 100, 100, 180); // Semi-transparent gray
-    text("v0.0515.07", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
+    text("v0.0515.02", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
     pop();
   }
   
@@ -3156,6 +3058,13 @@ let intermediate_combinations = [
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
+      // Debug logging to see touch position
+      if (gameWon) {
+        console.log("Touch position:", touchX, touchY);
+        console.log("Recipe card bounds:", cardX - cardWidth/2, cardX + cardWidth/2, cardY - cardHeight/2, cardY + cardHeight/2);
+        console.log("Score area bounds:", scoreX - scoreWidth/2, scoreX + scoreWidth/2, scoreY - scoreHeight/2, scoreY + scoreHeight/2);
+      }
+      
       // Check if any easter egg modal is active
       for (let i = eggModals.length - 1; i >= 0; i--) {
         if (eggModals[i].active) {
@@ -3172,9 +3081,20 @@ let intermediate_combinations = [
           return false;
         }
       } else if (gameWon) {
-        // Win screen interactions are now handled in the draw() function
-        // to ensure continuous detection during the entire touch duration
-        return false;
+        // DIRECT APPROACH: Check if recipe card was touched - with simplified bounds check
+        // Make the entire top half of the screen trigger the recipe view
+        if (touchY < height/2) {
+          console.log("View Recipe triggered");
+          viewRecipe();
+          return false;
+        }
+        
+        // Make the entire bottom half of the screen trigger the share score
+        if (touchY >= height/2) {
+          console.log("Share Score triggered");
+          shareScore();
+          return false;
+        }
       } else {
         // Check if hint button was touched
         if (!showingHint && hintButton.isInside(touchX, touchY)) {
@@ -3875,7 +3795,26 @@ let intermediate_combinations = [
       draggedVessel = null;
     }
     
-    // Win screen touch interactions are now handled entirely in the draw() function
+    // Handle win screen touch interactions
+    else if (gameWon && touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Using the same simplified approach as touchStarted
+      // Top half of screen = recipe view
+      if (touchY < height/2) {
+        console.log("View Recipe triggered from touchEnded");
+        viewRecipe();
+        return false;
+      }
+      
+      // Bottom half of screen = share score
+      if (touchY >= height/2) {
+        console.log("Share Score triggered from touchEnded");
+        shareScore();
+        return false;
+      }
+    }
     
     return false; // Prevent default
   }
@@ -3897,7 +3836,19 @@ let intermediate_combinations = [
         draggedVessel.y = constrain(draggedVessel.y, playAreaY + draggedVessel.h/2, playAreaY + playAreaHeight - draggedVessel.h/2);
       }
     }
-    // Win screen touch interactions are now handled entirely in the draw() function
+    // Update hover states for win screen elements - simplify to match touchStarted approach
+    else if (gameWon && touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Top half of the screen = recipe card
+      isMouseOverCard = (touchY < height/2);
+      
+      // Bottom half of the screen = letter score
+      isMouseOverLetterScore = (touchY >= height/2);
+      
+      console.log("Updated hover states - card:", isMouseOverCard, "score:", isMouseOverLetterScore);
+    }
     
     return false; // Prevent default
   }
@@ -3963,4 +3914,8 @@ let intermediate_combinations = [
     }
     endShape(CLOSE);
   }
+  
+  // Add isMouseOverCard variable at the top of the file with other global variables
+  let isMouseOverCard = false;
+  let isMouseOverLetterScore = false;
   
