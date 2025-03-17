@@ -114,6 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Easter Egg Form
     easterEggForm.addEventListener('submit', handleEasterEggSubmit);
+    
+    // Add this line to the existing DOMContentLoaded event listener
+    setTimeout(testSupabasePermissions, 2000); // Wait 2 seconds to ensure login is complete
 });
 
 // Handle Login
@@ -179,13 +182,14 @@ async function handleRecipeSubmit(e) {
     const name = document.getElementById('recipe-name').value;
     const date = document.getElementById('recipe-date').value;
     const description = document.getElementById('recipe-description').value;
+    const author = document.getElementById('recipe-author').value;
     const url = document.getElementById('recipe-url').value;
     
     try {
         const { data, error } = await supabase
             .from('recipes')
             .insert([
-                { name, date: date, description, recipe_url: url }
+                { name, date: date, description, author, recipe_url: url }
             ])
             .select();
         
@@ -515,7 +519,7 @@ function buildComboNode(combo) {
                 <div class="tree-node-actions">
                     <button class="edit-combo-btn edit-btn" data-combo="${combo.combo_id}">Edit</button>
                     <button class="add-child-btn" data-parent="${combo.combo_id}">Add Child</button>
-                    <button class="add-ingredient-btn" data-combo="${combo.combo_id}">Add Ingredient</button>
+                    <button class="add-ingredient-btn" data-combo="${combo.combo_id}">Add Ingredients</button>
                 </div>
             </div>
             <div class="node-details">
@@ -539,14 +543,14 @@ function buildComboNode(combo) {
         <div class="add-child-form" id="ing-form-${combo.combo_id}">
             <form class="ingredient-form" data-combo="${combo.combo_id}">
                 <div class="form-group">
-                    <label for="ing-name-${combo.combo_id}">Ingredient Name:</label>
-                    <input type="text" id="ing-name-${combo.combo_id}" required>
+                    <label for="ing-names-${combo.combo_id}">Ingredient Names (one per line):</label>
+                    <textarea id="ing-names-${combo.combo_id}" rows="5" required placeholder="Enter one ingredient name per line"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="ing-is-base-${combo.combo_id}">Is Base Ingredient:</label>
+                    <label for="ing-is-base-${combo.combo_id}">Are Base Ingredients:</label>
                     <input type="checkbox" id="ing-is-base-${combo.combo_id}" checked>
                 </div>
-                <button type="submit">Add Ingredient</button>
+                <button type="submit">Add Ingredients</button>
                 <button type="button" class="cancel-ing-btn" data-combo="${combo.combo_id}">Cancel</button>
             </form>
         </div>
@@ -672,53 +676,67 @@ async function handleIngredientSubmit(e) {
     e.preventDefault();
     
     const comboId = this.getAttribute('data-combo');
-    const name = document.getElementById(`ing-name-${comboId}`).value;
+    const namesText = document.getElementById(`ing-names-${comboId}`).value;
     const isBase = document.getElementById(`ing-is-base-${comboId}`).checked;
     
-    console.log('Adding ingredient:', { 
+    // Split the textarea content by newlines and filter out empty lines
+    const names = namesText.split('\n')
+        .map(name => name.trim())
+        .filter(name => name.length > 0);
+    
+    if (names.length === 0) {
+        showMessage('Please enter at least one ingredient name', 'error');
+        return;
+    }
+    
+    console.log('Adding ingredients:', { 
         combo_id: comboId, 
-        name, 
+        names, 
         is_base: isBase 
     });
     
     try {
-        // Check if this is a non-base ingredient with the same name as a combination
+        // Check for non-base ingredients with the same name as a combination
         if (!isBase) {
-            // Check if there's a combination with this name
-            const matchingCombo = currentCombinations.find(combo => combo.name === name);
-            
-            if (matchingCombo) {
-                // If this is a non-base ingredient representing a combination,
-                // make sure it's not assigned to its own combo_id
-                if (matchingCombo.combo_id.toString() === comboId.toString()) {
-                    showMessage('Error: A non-base ingredient representing a combination cannot be assigned to itself. Please assign it to a different combination.', 'error');
+            for (const name of names) {
+                // Check if there's a combination with this name
+                const matchingCombo = currentCombinations.find(combo => combo.name === name);
+                
+                if (matchingCombo && matchingCombo.combo_id.toString() === comboId.toString()) {
+                    showMessage(`Error: A non-base ingredient "${name}" representing a combination cannot be assigned to itself. Please assign it to a different combination.`, 'error');
                     return;
                 }
             }
         }
         
+        // Create an array of ingredient objects to insert
+        const ingredientsToInsert = names.map(name => ({
+            combo_id: comboId,
+            name,
+            is_base: isBase
+        }));
+        
         const { data, error } = await supabase
             .from('ingredients')
-            .insert([
-                { 
-                    combo_id: comboId, 
-                    name, 
-                    is_base: isBase
-                }
-            ])
+            .insert(ingredientsToInsert)
             .select();
         
         if (error) {
-            console.error('Error adding ingredient:', error);
+            console.error('Error adding ingredients:', error);
             throw error;
         }
         
-        console.log('Ingredient added successfully:', data);
-        showMessage('Ingredient added successfully!', 'success');
+        console.log('Ingredients added successfully:', data);
+        showMessage(`${names.length} ingredient(s) added successfully!`, 'success');
+        
+        // Clear the form
+        document.getElementById(`ing-names-${comboId}`).value = '';
+        
+        // Reload recipe data
         await loadRecipeData(currentRecipe.rec_id);
     } catch (error) {
         console.error('Error in handleIngredientSubmit:', error);
-        showMessage(`Error adding ingredient: ${error.message}`, 'error');
+        showMessage(`Error adding ingredients: ${error.message}`, 'error');
     }
 }
 
@@ -740,6 +758,7 @@ function showEditRecipeForm(recipe) {
     document.getElementById('edit-recipe-name').value = recipe.name;
     document.getElementById('edit-recipe-date').value = recipe.date;
     document.getElementById('edit-recipe-description').value = recipe.description || '';
+    document.getElementById('edit-recipe-author').value = recipe.author || '';
     document.getElementById('edit-recipe-url').value = recipe.recipe_url || '';
     
     editRecipeForm.style.display = 'block';
@@ -753,14 +772,19 @@ async function handleEditRecipeSubmit(e) {
     const name = document.getElementById('edit-recipe-name').value;
     const date = document.getElementById('edit-recipe-date').value;
     const description = document.getElementById('edit-recipe-description').value;
+    const author = document.getElementById('edit-recipe-author').value;
     const url = document.getElementById('edit-recipe-url').value;
+    
+    console.log("Attempting to update recipe:", { recId, name, date, description, author, url });
     
     try {
         const { data, error } = await supabase
             .from('recipes')
-            .update({ name, date, description, recipe_url: url })
+            .update({ name, date, description, author, recipe_url: url })
             .eq('rec_id', recId)
             .select();
+        
+        console.log("Update response:", { data, error });
         
         if (error) throw error;
         
@@ -771,6 +795,7 @@ async function handleEditRecipeSubmit(e) {
         await loadRecipes();
         await loadRecipeData(recId);
     } catch (error) {
+        console.error('Detailed error updating recipe:', error);
         showMessage(`Error updating recipe: ${error.message}`, 'error');
         console.error('Error updating recipe:', error);
     }
@@ -793,8 +818,11 @@ function showEasterEggsSection() {
     while (ing1Select.options.length > 1) ing1Select.remove(1);
     while (ing2Select.options.length > 1) ing2Select.remove(1);
     
+    // Filter to only show base ingredients from the current recipe
+    const recipeBaseIngredients = currentIngredients.filter(ing => ing.is_base === true);
+    
     // Add ingredients to dropdowns
-    allIngredients.forEach(ing => {
+    recipeBaseIngredients.forEach(ing => {
         const option1 = document.createElement('option');
         option1.value = ing.ing_id;
         option1.textContent = ing.name;
@@ -1075,8 +1103,11 @@ function showEditEasterEggForm(easterEgg) {
     while (ing1Select.options.length > 1) ing1Select.remove(1);
     while (ing2Select.options.length > 1) ing2Select.remove(1);
     
+    // Filter to only show base ingredients from the current recipe
+    const recipeBaseIngredients = currentIngredients.filter(ing => ing.is_base === true);
+    
     // Add ingredients to dropdowns
-    allIngredients.forEach(ing => {
+    recipeBaseIngredients.forEach(ing => {
         const option1 = document.createElement('option');
         option1.value = ing.ing_id;
         option1.textContent = ing.name;
@@ -1217,5 +1248,65 @@ async function checkForCircularReferences() {
     } catch (error) {
         console.error('Error checking for circular references:', error);
         return false;
+    }
+}
+
+// Add this function at the end of the file
+async function testSupabasePermissions() {
+    console.log("Testing Supabase permissions...");
+    
+    try {
+        // Test SELECT permission
+        console.log("Testing SELECT permission...");
+        const { data: selectData, error: selectError } = await supabase
+            .from('recipes')
+            .select('*')
+            .limit(1);
+        
+        console.log("SELECT result:", { data: selectData, error: selectError });
+        
+        // Test INSERT permission
+        console.log("Testing INSERT permission...");
+        const testRecipe = {
+            name: "Test Recipe " + Date.now(),
+            date: new Date().toISOString().split('T')[0],
+            description: "Test description",
+            author: "Test Author",
+            recipe_url: "https://example.com"
+        };
+        
+        const { data: insertData, error: insertError } = await supabase
+            .from('recipes')
+            .insert([testRecipe])
+            .select();
+        
+        console.log("INSERT result:", { data: insertData, error: insertError });
+        
+        if (insertData && insertData.length > 0) {
+            const insertedId = insertData[0].rec_id;
+            
+            // Test UPDATE permission
+            console.log("Testing UPDATE permission...");
+            const { data: updateData, error: updateError } = await supabase
+                .from('recipes')
+                .update({ description: "Updated test description" })
+                .eq('rec_id', insertedId)
+                .select();
+            
+            console.log("UPDATE result:", { data: updateData, error: updateError });
+            
+            // Test DELETE permission
+            console.log("Testing DELETE permission...");
+            const { data: deleteData, error: deleteError } = await supabase
+                .from('recipes')
+                .delete()
+                .eq('rec_id', insertedId);
+            
+            console.log("DELETE result:", { data: deleteData, error: deleteError });
+        }
+        
+        console.log("Permission tests completed.");
+    } catch (error) {
+        console.error("Error testing permissions:", error);
     }
 } 

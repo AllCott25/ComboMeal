@@ -1,7 +1,14 @@
-// Culinary Logic Puzzle v0.0313.11
-// Created: March 6, 2025
-// Last Updated: March 13, 2025
-
+/*
+* Culinary Logic Puzzle v0.0515.02
+* Created: March 6, 2025
+* Last Updated: May 15, 2025
+*
+* Fixed mobile touch interactions to properly handle vessel positioning, 
+* combinations, easter eggs, and hint vessel interactions.
+*
+* The following are intermediate combinations defined for testing.
+* These will be replaced with data from Supabase.
+*/
 // Define intermediate combinations (will be replaced with data from Supabase)
 let intermediate_combinations = [
     { name: "Fried Chicken Cutlet", required: ["Chicken Cutlet", "Flour", "Eggs", "Panko Bread Crumbs"] },
@@ -979,7 +986,7 @@ let intermediate_combinations = [
     push();
     textSize(8);
     fill(100, 100, 100, 180); // Semi-transparent gray
-    text("v0.0313.11", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
+    text("v0.0515.02", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
     pop();
   }
   
@@ -3090,6 +3097,7 @@ let intermediate_combinations = [
         for (let v of vessels) {
           if (v.isInside(touchX, touchY)) {
             draggedVessel = v;
+            // Store original position for proper snapback
             draggedVessel.originalX = v.x;
             draggedVessel.originalY = v.y;
             offsetX = touchX - v.x;
@@ -3517,20 +3525,36 @@ let intermediate_combinations = [
   function touchEnded() {
     // If we have a dragged vessel, handle the release
     if (draggedVessel) {
+      draggedVessel.targetScale = 1; // Reset scale
+      
       // Find the vessel under the touch point
       let touchX = touches.length > 0 ? touches[0].x : mouseX;
       let touchY = touches.length > 0 ? touches[0].y : mouseY;
       
       let overVessel = null;
-      for (let v of vessels) {
+      let overVesselIndex = -1;
+      let overHintVessel = false;
+      
+      // Check if dragged over another vessel
+      for (let i = 0; i < vessels.length; i++) {
+        let v = vessels[i];
         if (v !== draggedVessel && v.isInside(touchX, touchY)) {
           overVessel = v;
+          overVesselIndex = i;
           break;
+        }
       }
-    }
       
-      // If we found a vessel to combine with
+      // Check if dragged over hint vessel
+      if (showingHint && hintVessel && hintVessel.isInside(touchX, touchY)) {
+        overHintVessel = true;
+      }
+      
       if (overVessel) {
+        // Regular vessel combination
+        // Increment turn counter
+        turnCounter++;
+        
         // Check for easter eggs before combining
         const easterEgg = checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])]);
         if (easterEgg) {
@@ -3538,11 +3562,11 @@ let intermediate_combinations = [
           // Add a special move to history with a marker to indicate it's an Easter Egg
           moveHistory.push({ type: 'egg', color: 'yellow' });
           
-          // Update the turn counter
-          updateTurnCounter();
+          // Trigger haptic feedback
+          triggerHapticFeedback('completion');
           
-          // Play sound
-          playSound('easterEgg');
+          // Immediately snap vessels back to their original positions
+          draggedVessel.snapBack();
           
           // Display the easter egg modal
           displayEasterEgg(easterEgg, draggedVessel, overVessel);
@@ -3553,50 +3577,176 @@ let intermediate_combinations = [
         }
         
         // If not an easter egg, proceed with normal combination
-        let newVessel = combineVessels(draggedVessel, overVessel);
-        
-        if (newVessel) {
-          // Remove the original vessels
+        let new_v = combineVessels(draggedVessel, overVessel);
+        if (new_v) {
+          // Create animation particles
+          createCombineAnimation(draggedVessel.x, draggedVessel.y, draggedVessel.color, new_v.x, new_v.y);
+          createCombineAnimation(overVessel.x, overVessel.y, overVessel.color, new_v.x, new_v.y);
+          
+          // Get the index of the dragged vessel
+          let draggedIndex = vessels.indexOf(draggedVessel);
+          
+          // Remove old vessels
           vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
           
-          // Add the new vessel
-          vessels.push(newVessel);
+          // Insert the new vessel at the position of the target vessel
+          // This ensures the new vessel appears close to where the user dropped it
+          vessels.splice(overVesselIndex, 0, new_v);
           
-          // Add a move to history
-          moveHistory.push(1);
+          // Re-arrange vessels with the new vessel in place
+          arrangeVessels();
           
-          // Update the turn counter
-          updateTurnCounter();
+          // Pulse the new vessel
+          new_v.pulse();
           
-          // Play sound
-          playSound('combine');
+          // Store the current move history length to detect if checkForMatchingVessels adds moves
+          let originalMoveHistoryLength = moveHistory.length;
           
-          // Check if we've won
-          if (newVessel.isFinalDish) {
-            gameWon = true;
-            playSound('win');
+          // Check if the new vessel matches the current hint
+          if (showingHint && hintVessel) {
+            // Check if this vessel matches the hint
+            checkForMatchingVessels();
           }
           
-          // Rearrange vessels
-          arrangeVessels();
-        } else {
-          // Snap back to original position
-          draggedVessel.x = draggedVessel.originalX;
-          draggedVessel.y = draggedVessel.originalY;
+          // Only add to move history if it wasn't already added by checkForMatchingVessels
+          if (moveHistory.length === originalMoveHistoryLength) {
+            // Add successful move to history with the color of the new vessel
+            // Ensure we're using the COLORS object for consistency
+            if (new_v.color === 'yellow') {
+              moveHistory.push(COLORS.vesselYellow);
+            } else if (new_v.color === 'green') {
+              moveHistory.push(COLORS.vesselGreen);
+            } else if (new_v.color === 'white') {
+              moveHistory.push(COLORS.vesselBase);
+            } else if (new_v.color === '#FF5252') {
+              // Red counters have been removed
+              // moveHistory.push(COLORS.vesselHint);
+            } else {
+              moveHistory.push(new_v.color); // Fallback to the actual color
+            }
+          }
           
-          // Play error sound
-          playSound('error');
+          // Check if the game is won
+          if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+            gameWon = true;
+            triggerHapticFeedback('completion'); // Haptic feedback on game completion
+          } else {
+            // Trigger haptic feedback for successful combination
+            triggerHapticFeedback('medium');
+          }
+        } else {
+          // If new_v is null, it could mean one of two things:
+          // 1. The combination failed
+          // 2. The ingredients were added directly to the hint vessel
+          
+          // Check if the hint vessel has changed (ingredients were added)
+          if (showingHint && hintVessel && hintVessel.collected.some(ing => 
+              draggedVessel.ingredients.includes(ing) || overVessel.ingredients.includes(ing))) {
+            // Ingredients were added to the hint vessel
+            
+            // Remove the vessels that were combined
+            vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
+            arrangeVessels();
+            
+            // Check if the hint is now complete
+            if (hintVessel.isComplete()) {
+              // Convert hint to regular vessel
+              let newVessel = hintVessel.toVessel();
+              vessels.push(newVessel);
+              arrangeVessels();
+              
+              // Reset hint
+              hintVessel = null;
+              showingHint = false;
+              
+              // Check win condition
+              if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+                gameWon = true;
+                triggerHapticFeedback('completion'); // Haptic feedback on game completion
+              }
+            }
+            
+            // Trigger haptic feedback for successful combination
+            triggerHapticFeedback('medium');
+          } else {
+            // Combination failed, snap back
+            draggedVessel.snapBack();
+            
+            // Add unsuccessful move to history (black)
+            moveHistory.push('black');
+            triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+            
+            // Trigger shake animation on both vessels
+            draggedVessel.shake();
+            overVessel.shake();
+          }
+        }
+      } else if (overHintVessel) {
+        // Check if we can add this vessel to the hint
+        let canAddToHint = false;
+        
+        // Check if any ingredients from the dragged vessel match what the hint needs
+        if (hintVessel) {
+          for (let ing of draggedVessel.ingredients) {
+            if (hintVessel.combo.ingredients.includes(ing) && !hintVessel.collected.includes(ing)) {
+              canAddToHint = true;
+              hintVessel.addIngredient(ing);
+            }
+          }
+        }
+        
+        if (canAddToHint) {
+          // Create animation
+          createCombineAnimation(draggedVessel.x, draggedVessel.y, draggedVessel.color, hintVessel.x, hintVessel.y);
+          
+          // Remove the vessel
+          vessels = vessels.filter(v => v !== draggedVessel);
+          arrangeVessels();
+          
+          // Check if hint is complete
+          if (hintVessel.isComplete()) {
+            // Convert hint to regular vessel
+            let newVessel = hintVessel.toVessel();
+            vessels.push(newVessel);
+            arrangeVessels();
+            
+            // Reset hint
+            hintVessel = null;
+            showingHint = false;
+            
+            // Check win condition
+            if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+              gameWon = true;
+              triggerHapticFeedback('completion'); // Haptic feedback on game completion
+            }
+          }
+        } else {
+          draggedVessel.snapBack();
+          // Add unsuccessful move to history (black)
+          moveHistory.push('black');
+          triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+          
+          // Trigger shake animation on both vessels
+          draggedVessel.shake();
+          hintVessel.shake();
         }
       } else {
-        // Snap back to original position
-        draggedVessel.x = draggedVessel.originalX;
-        draggedVessel.y = draggedVessel.originalY;
+        // No vessel to combine with, snap back
+        draggedVessel.snapBack();
+        
+        // Only add black counter and shake if the vessel was actually dragged
+        // (not just clicked and released in the same spot)
+        if (dist(draggedVessel.x, draggedVessel.y, draggedVessel.originalX, draggedVessel.originalY) > 10) {
+          // Add unsuccessful move to history (black)
+          moveHistory.push('black');
+          triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+          
+          // Trigger shake animation on the dragged vessel
+          draggedVessel.shake();
+        }
       }
       
-      // Reset scale
-      draggedVessel.targetScale = 1.0;
-      
-      // Clear dragged vessel
+      // Reset draggedVessel
       draggedVessel = null;
     }
     
