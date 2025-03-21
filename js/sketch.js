@@ -1,5 +1,5 @@
 /*
-* Culinary Logic Puzzle v0.0326.05
+* Culinary Logic Puzzle v0.0326.06
 * Created by Ben Alpert
 * Last Updated: March 26, 2025
 *
@@ -3485,6 +3485,8 @@ let intermediate_combinations = [
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
+      console.log("Touch started at:", touchX, touchY);
+      
       // Check if any easter egg modal is active
       for (let i = eggModals.length - 1; i >= 0; i--) {
         if (eggModals[i].active) {
@@ -3501,14 +3503,14 @@ let intermediate_combinations = [
           return false;
         }
       } else if (gameWon) {
-        // Check if recipe card was touched (direct coordinate calculation)
+        // Check if recipe card was touched
         if (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
             touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2) {
           viewRecipe();
           return false;
         }
         
-        // Check if letter score area was touched (direct coordinate calculation)
+        // Check if letter score area was touched
         if (touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
             touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2) {
           shareScore();
@@ -3524,6 +3526,7 @@ let intermediate_combinations = [
         // Check if a vessel was touched
         for (let v of vessels) {
           if (v.isInside(touchX, touchY)) {
+            console.log("Selected vessel:", v.getDisplayText());
             draggedVessel = v;
             // Store original position for proper snapback
             draggedVessel.originalX = v.x;
@@ -3537,7 +3540,8 @@ let intermediate_combinations = [
         }
       }
     }
-    return false; // Always prevent default for touch events
+    
+    return false; // Prevent default
   }
   
   // New function to initialize the game after data is loaded
@@ -4017,172 +4021,156 @@ let intermediate_combinations = [
     if (draggedVessel) {
       draggedVessel.targetScale = 1; // Reset scale
       
-      // Find the vessel under the touch point
+      // Find the touch coordinates with fallback
       let touchX = touches.length > 0 ? touches[0].x : mouseX;
       let touchY = touches.length > 0 ? touches[0].y : mouseY;
       
+      console.log("Touch ended at:", touchX, touchY);
+      
+      // Variables to track vessel detection
       let overVessel = null;
       let overVesselIndex = -1;
       let overHintVessel = false;
       
-      // Check if dragged over another vessel
-      for (let i = 0; i < vessels.length; i++) {
-        let v = vessels[i];
-        if (v !== draggedVessel && v.isInside(touchX, touchY)) {
-          overVessel = v;
-          overVesselIndex = i;
-          break;
-        }
-      }
-      
-      // Check if dragged over hint vessel
+      // Check if dragged over hint vessel first
       if (showingHint && hintVessel && hintVessel.isInside(touchX, touchY)) {
         overHintVessel = true;
-      }
-      
-      let combinationAttempted = false;
-      
-      // Handle dragging over hint vessel
-      if (overHintVessel) {
-        // If hint vessel is showing and we're dragging a single ingredient
-        if (draggedVessel.ingredients.length === 1) {
+        console.log("Released over hint vessel");
+        
+        // Handle hint vessel interaction
+        if (hintVessel.ingredients.length > 0 && draggedVessel.ingredients.length === 1) {
           // Add the ingredient to the hint vessel
           hintVessel.addIngredient(draggedVessel.ingredients[0]);
           moveHistory.push('#FF5252'); // Add hint move to history (red)
-          triggerHapticFeedback('success'); // Haptic feedback on successful hint
+          triggerHapticFeedback('success');
           
-          // If hint is now complete, convert to a vessel
+          // If hint is now complete, convert to vessel
           if (hintVessel.isComplete()) {
             const newVessel = hintVessel.toVessel();
             vessels.push(newVessel);
-            showingHint = false;
             
-            // Position the new vessel
+            // Assign preferred row based on hint vessel position
             assignPreferredRow(newVessel, hintVessel.y);
+            
+            showingHint = false;
             
             // Check if we've won
             if (newVessel.name === final_combination.name) {
               gameWon = true;
-              triggerHapticFeedback('heavy'); // Strong haptic feedback on win
+              triggerHapticFeedback('heavy');
             }
           }
           
-          // Explicitly rearrange vessels
-          arrangeVessels();
-          
-          // Snap vessel back and clear dragged reference
+          // Snap back and reset dragged vessel
           draggedVessel.snapBack();
           draggedVessel = null;
+          
+          // Arrange vessels to ensure proper layout
+          arrangeVessels();
           return false;
         }
       }
-      // Handle dragging over another vessel
-      else if (overVessel) {
-        combinationAttempted = true;
-        
-        // Check for easter eggs before combining
-        const easterEgg = checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])]);
-        if (easterEgg) {
-          // Easter egg was found
-          moveHistory.push({ type: 'egg', color: 'yellow' });
-          
-          // Trigger haptic feedback
-          triggerHapticFeedback('completion');
-          
-          // Snap vessel back
-          draggedVessel.snapBack();
-          
-          // Display the easter egg modal
-          displayEasterEgg(easterEgg, draggedVessel, overVessel);
-          
-          // Clear dragged reference
-          draggedVessel = null;
-          return false;
+      
+      // Check if dragged over another vessel (the old implementation approach)
+      for (let i = 0; i < vessels.length; i++) {
+        const v = vessels[i];
+        if (v !== draggedVessel && v.isInside(touchX, touchY)) {
+          overVessel = v;
+          overVesselIndex = i;
+          console.log("Released over vessel:", v.getDisplayText());
+          break;
         }
+      }
+      
+      // Handle vessel combination if we found an overlapping vessel
+      if (overVessel) {
+        console.log("Attempting to combine with:", overVessel.getDisplayText());
         
-        // Try to combine vessels
-        const combinationResult = combineVessels(draggedVessel, overVessel);
+        // Try to combine the vessels
+        const newVessel = combineVessels(draggedVessel, overVessel);
         
-        if (combinationResult.success) {
-          // Remove the two combined vessels
+        // Check if the combination was successful
+        if (newVessel) {
+          console.log("Combination successful:", newVessel.getDisplayText());
+          
+          // Remove the original vessels
           vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
           
           // Add the new vessel
-          vessels.push(combinationResult.vessel);
+          vessels.push(newVessel);
           
-          // Position the new vessel
-          assignPreferredRow(combinationResult.vessel, touchY, touchX);
+          // Assign preferred position
+          assignPreferredRow(newVessel, touchY, touchX);
           
-          // Add successful move to history
+          // Add to move history
           moveHistory.push('blue');
           
-          // Add animation
+          // Add animation effect
           createCombineAnimation(
             draggedVessel.x, 
             draggedVessel.y, 
             COLORS.primary,
-            combinationResult.vessel.x, 
-            combinationResult.vessel.y
+            newVessel.x, 
+            newVessel.y
           );
           
-          // Provide feedback
+          // Do haptic feedback
           triggerHapticFeedback('medium');
           
-          // Check win condition
-          if (combinationResult.vessel.name === final_combination.name) {
+          // Check if we've won
+          if (newVessel.name === final_combination.name) {
             gameWon = true;
             triggerHapticFeedback('heavy');
+          } else {
+            // Check for easter eggs
+            checkForEasterEgg(newVessel.ingredients, draggedVessel, overVessel);
           }
-          
-          // Rearrange vessels
-          arrangeVessels();
         } else {
-          // Combination failed
+          console.log("Combination failed");
+          
+          // Add unsuccessful move to history
           moveHistory.push('black');
+          
+          // Do haptic feedback for error
           triggerHapticFeedback('error');
           
-          // Shake vessels to indicate failure
+          // Trigger shake animation
           draggedVessel.shake();
           overVessel.shake();
           
-          // Snap back to grid
+          // Return vessel to original position
           draggedVessel.snapBack();
-          
-          // Make sure vessels are properly arranged
-          arrangeVessels();
         }
-      } else {
-        // Not dropped on any vessel, just snap back
+      } else if (!overHintVessel) {
+        // If not over any other vessel or hint vessel, just snap back
+        console.log("Not over any vessel, snapping back");
         draggedVessel.snapBack();
         
-        // Only count as a failed move if actually dragged (not just tapped)
+        // Only count as a move if the vessel was dragged a significant distance
         if (dist(draggedVessel.x, draggedVessel.y, draggedVessel.originalX, draggedVessel.originalY) > 10) {
           moveHistory.push('black');
           triggerHapticFeedback('error');
           draggedVessel.shake();
         }
-        
-        // Always ensure vessels are arranged properly
-        arrangeVessels();
       }
       
-      // Clear dragged vessel reference
+      // Reset dragged vessel and ensure proper grid arrangement
       draggedVessel = null;
-    }
-    
-    // Handle win screen touch interactions
+      arrangeVessels();
+    } 
+    // Handle win screen touch events
     else if (gameWon && touches.length > 0) {
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
-      // Check if recipe card was touched (direct coordinate calculation)
+      // Check if recipe card was touched
       if (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
           touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2) {
         viewRecipe();
         return false;
       }
       
-      // Check if letter score area was touched (direct coordinate calculation)
+      // Check if letter score area was touched
       if (touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
           touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2) {
         shareScore();
@@ -4200,6 +4188,8 @@ let intermediate_combinations = [
       if (touches.length > 0) {
         let touchX = touches[0].x;
         let touchY = touches[0].y;
+        
+        console.log("Touch moved to:", touchX, touchY);
         
         // Update vessel position
         draggedVessel.x = touchX - offsetX;
@@ -4279,6 +4269,5 @@ let intermediate_combinations = [
   // Add isMouseOverCard variable at the top of the file with other global variables
   let isMouseOverCard = false;
   let isMouseOverLetterScore = false;
-  
   
   
