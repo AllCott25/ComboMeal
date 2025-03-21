@@ -1,21 +1,10 @@
 /*
-* Culinary Logic Puzzle v0.0317.02
-* Created: March 6, 2025
-* Last Updated: March 17, 2025
+* Culinary Logic Puzzle v0.0326.02
+* Created by Ben Alpert
+* Last Updated: March 26, 2025
 *
-* Fixed mobile touch interactions to properly handle vessel positioning, 
-* combinations, easter eggs, and hint vessel interactions.
-* Specifically fixed the ability to drag and drop single ingredients
-* onto the hint vessel and resolved vessel "sticking" issue by ensuring
-* all vessels properly snap back to grid positions.
-* Added proper touch support for win screen interactions, including
-* View Recipe and Share Score buttons with an ultra-simplified approach.
-* Fixed persistent hover states on win screen CTAs after tapping them.
-* Limited tutorial text width to ensure instructions remain readable on all screen sizes.
-* Added decorative flowers at the top and bottom of the screen for narrow mobile displays.
-*
-* The following are intermediate combinations defined for testing.
-* These will be replaced with data from Supabase.
+* A daily culinary logic puzzle game where players combine ingredients
+* according to recipe logic to create a final dish.
 */
 // Define intermediate combinations (will be replaced with data from Supabase)
 let intermediate_combinations = [
@@ -155,6 +144,10 @@ let intermediate_combinations = [
     }
     
     draw() {
+      // Calculate relative values for visual elements
+      const cornerRadius = Math.max(this.w * 0.06, 4); // Border radius as 6% of width, min 4px
+      const strokeW = Math.max(this.w * 0.025, 2); // Stroke weight as 2.5% of width, min 2px
+      
       // Draw button
       rectMode(CENTER);
       if (this.disabled) {
@@ -168,8 +161,12 @@ let intermediate_combinations = [
         fill(this.color);
       }
       stroke(0, 50);
-      strokeWeight(3); // Increased line width for cartoony look
-      rect(this.x, this.y, this.w, this.h, 8);
+      strokeWeight(strokeW); // Relative stroke weight
+      rect(this.x, this.y, this.w, this.h, cornerRadius);
+      
+      // Calculate font size relative to button height (smaller proportion)
+      const fontSize = Math.max(this.h * 0.3, 14); // 30% of button height, minimum 14px
+      textSize(fontSize);
       
       // Draw label
       if (this.disabled) {
@@ -183,7 +180,7 @@ let intermediate_combinations = [
       noStroke();
       textAlign(CENTER, CENTER);
       textFont(buttonFont);
-      textSize(16);
+      
       text(this.label, this.x, this.y);
     }
     
@@ -289,7 +286,11 @@ let intermediate_combinations = [
     
     // Convert to a regular vessel when complete but keep it red
     toVessel() {
-      let v = new Vessel([], [], this.name, COLORS.vesselHint, this.x, this.y, 200, 100);
+      // Calculate appropriate vessel dimensions based on play area size
+      const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
+      const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
+      
+      let v = new Vessel([], [], this.name, COLORS.vesselHint, this.x, this.y, vesselWidth, vesselHeight);
       v.isAdvanced = true; // Mark as advanced for proper rendering
       v.pulse();
       return v;
@@ -390,6 +391,9 @@ let intermediate_combinations = [
         vesselColor = 'white'; // Use pure white instead of cream for base vessels
       }
       
+      // Calculate stroke weight relative to vessel size, with minimum value
+      const strokeW = Math.max(this.w * 0.015, 2); // 1.5% of width, minimum 2px
+      
       if (this.isAdvanced) {
         // Advanced vessel (pot or pan based on color)
         
@@ -398,69 +402,86 @@ let intermediate_combinations = [
           // Draw handles BEHIND the main shape
           fill('#888888');
           stroke('black');
-          strokeWeight(3);
+          strokeWeight(strokeW);
           // Position handles slightly lower and half-overlapping with the main shape
           // Move handles a bit past the edge of the pot
-          circle(-this.w * 0.4, -this.h * 0.15, this.h * 0.2);
-          circle(this.w * 0.4, -this.h * 0.15, this.h * 0.2);
+          const handleSize = this.h * 0.2;
+          circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
+          circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
         } else if (this.color === 'green' || this.color === COLORS.vesselGreen || this.color === COLORS.primary) {
           // Green vessel (pan with long handle) - standardized for all green vessels
           // Draw handle BEHIND the main shape
           fill('#888888');
           stroke('black');
-          strokeWeight(3);
+          strokeWeight(strokeW);
           rectMode(CENTER);
           // Draw handle as thin horizontal rectangle
-          rect(this.w * 0.6, 0, this.w * 0.5, this.h * 0.15, 5);
+          const handleCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px
+          rect(this.w * 0.6, -this.h * 0.1, this.w * 0.5, this.h * 0.15, handleCornerRadius);
         } else if (this.color === 'yellow') {
           // Yellow vessel (pot with two handles like the red vessel)
           // Draw handles BEHIND the main shape
           fill('#888888');
           stroke('black');
-          strokeWeight(3);
+          strokeWeight(strokeW);
           // Position handles slightly lower and half-overlapping with the main shape
           // Move handles a bit past the edge of the pot
-          circle(-this.w * 0.4, -this.h * 0.15, this.h * 0.2);
-          circle(this.w * 0.4, -this.h * 0.15, this.h * 0.2);
+          const handleSize = this.h * 0.2;
+          circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
+          circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
         }
         
         // Draw vessel body
         fill(vesselColor);
         stroke('black');
-        strokeWeight(3);
+        strokeWeight(strokeW);
         
-        // Draw vessel body (3:2 rectangle with rounded corners ONLY at the bottom)
+        // Calculate border radius to match basic vessels
+        const topCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px for top corners
+        const bottomCornerRadius = Math.max(this.h * 0.3, 15); // 30% of height, min 15px for bottom corners
+        
+        // Draw vessel body with rounded corners matching basic vessel style
         rectMode(CENTER);
-        rect(0, 0, this.w * 0.8, this.h * 0.6, 0, 0, 10, 10);
+        rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
         
       } else {
         // Basic ingredient vessel (rectangle with extremely rounded bottom corners)
         fill(vesselColor);
         stroke('black');
-        strokeWeight(3);
+        strokeWeight(strokeW);
+        
+        // Calculate border radius relative to vessel height
+        const topCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px
+        const bottomCornerRadius = Math.max(this.h * 0.3, 15); // 30% of height, min 15px
         
         // Draw rounded rectangle
         rectMode(CENTER);
-        rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, 5, 5, 30, 30);
+        rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
       }
       
       // Draw text inside the vessel
       fill('black');
       noStroke();
       textAlign(CENTER, CENTER);
-      textSize(12);
+      // Calculate text size relative to vessel height
+      const fontSize = Math.max(this.h * 0.12, 10); // 12% of height, min 10px (reduced from 20%)
+      textSize(fontSize);
+      textStyle(BOLD); // Make text bold
       
-      // Set text style to bold
-      textStyle(BOLD);
-      
-      // Calculate text position to be inside the vessel
-      let displayText = this.getDisplayText();
-      let lines = splitTextIntoLines(displayText, this.w * 0.7);
+      // Split text into lines if needed
+      let lines = splitTextIntoLines(this.getDisplayText(), this.w * 0.7);
       
       for (let i = 0; i < lines.length; i++) {
-        let yOffset = (i - (lines.length - 1) / 2) * 15;
-        // Position text slightly higher in the vessel
-        text(lines[i], 0, yOffset - this.h * 0.1);
+        let yOffset = (i - (lines.length - 1) / 2) * (fontSize * 1.2); // Dynamic line spacing based on font size
+        
+        // Position text based on vessel type
+        if (!this.isAdvanced) {
+          // Basic ingredient vessel - position text slightly higher
+          text(lines[i], 0, yOffset - this.h * 0.1);
+        } else {
+          // Advanced vessel (pots/pans) - center text properly in the shifted vessel body
+          text(lines[i], 0, yOffset - this.h * 0.1);
+        }
       }
       
       // Reset text style
@@ -485,7 +506,8 @@ let intermediate_combinations = [
         
         // Set text properties
         textAlign(CENTER);
-        textSize(18);
+        const verbFontSize = Math.max(this.h * 0.14, 12); // 14% of height, min 12px (reduced from 18%)
+        textSize(verbFontSize);
         
         // Position the verb directly above the vessel
         // Use a smaller offset to keep it closer to the vessel
@@ -496,11 +518,14 @@ let intermediate_combinations = [
         noStroke();
         rectMode(CENTER);
         let verbWidth = textWidth(this.verb);
-        rect(this.x, yPosition, verbWidth + 20, 25, 5);
+        const verbPadding = Math.max(this.w * 0.05, 10); // 5% of width, min 10px
+        const verbHeight = Math.max(this.h * 0.25, 20); // 25% of height, min 20px
+        const verbCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px
+        rect(this.x, yPosition, verbWidth + verbPadding, verbHeight, verbCornerRadius);
         
         // Draw the verb text
         fill('black');
-        text(this.verb, this.x, yPosition + 6);
+        text(this.verb, this.x, yPosition + verbFontSize * 0.3); // Adjust vertical centering
         
         // Decrement the display time
         this.verbDisplayTime--;
@@ -618,11 +643,107 @@ let intermediate_combinations = [
     return array;
   }
   
+  // Enhanced function to assign both preferred row and column based on drop position
+  function assignPreferredRow(newVessel, dropY, dropX = mouseX) {
+    // Calculate vessel sizes - must match the same calculations in arrangeVessels
+    // Use relative margins exactly like in arrangeVessels
+    const margin = Math.max(playAreaWidth * 0.0125, 3); // 1.25% of play area width, min 3px
+    const vertical_margin = Math.max(playAreaHeight * 0.008, 2); // 0.8% of play area height, min 2px
+    
+    // Calculate basic vessel width and height using the exact same formula from arrangeVessels
+    const basic_w = (playAreaWidth - (4 * margin)) / 3;
+    const basic_h = basic_w * 0.8;
+    
+    // Calculate the row height using the same values as the actual arrangement
+    const rowHeight = basic_h + vertical_margin;
+    
+    // Calculate the starting Y position - exactly matching arrangeVessels
+    const startY = playAreaY + playAreaHeight * 0.2;
+    
+    // Calculate which row index the drop position corresponds to
+    // Using Math.max to ensure we don't get negative values
+    const relativeDropY = Math.max(0, dropY - startY);
+    const dropRowIndex = Math.floor(relativeDropY / rowHeight);
+    
+    // Set preferred row, clamping to a reasonable range
+    // We estimate the maximum number of rows based on vessel count
+    const maxRows = Math.ceil(vessels.length / 3); // At most 3 basic vessels per row
+    newVessel.preferredRow = Math.min(dropRowIndex, maxRows);
+    
+    // Determine preferred column based on drop X position
+    // First calculate the potential column positions in a typical 3-column row
+    const totalRowWidth = playAreaWidth - (2 * margin); // Width available for all vessels in a row
+    const columnWidth = totalRowWidth / 3; // Width of each column
+    
+    // Calculate the starting X position for a standard row
+    const startX = playAreaX + margin;
+    
+    // Calculate the relative drop X position
+    const relativeDropX = dropX - startX;
+    
+    // Determine the column (0 = left, 1 = center, 2 = right)
+    let preferredColumn = 0; // Default to left column
+    
+    if (relativeDropX >= 0 && relativeDropX <= totalRowWidth) {
+      // Within the grid area
+      preferredColumn = Math.floor(relativeDropX / columnWidth);
+    } else if (relativeDropX > totalRowWidth) {
+      // Beyond the right edge
+      preferredColumn = 2; // Right column
+    }
+    
+    // For advanced vessels, prevent them from being assigned to the center column (column 1)
+    // This ensures they will span columns 0-1 or 1-2 instead of staying centered
+    if (newVessel.isAdvanced && preferredColumn === 1) {
+      // Calculate the center of the play area
+      const centerX = playAreaX + playAreaWidth / 2;
+      
+      // Shift the vessel left or right based on which side of center it was dropped
+      if (dropX < centerX) {
+        // If dropped left of center, assign to column 0 (will span 0-1)
+        newVessel.preferredColumn = 0;
+        console.log("Advanced vessel shifted from center to left column (will span 0-1)");
+      } else {
+        // If dropped right of center, assign to column 2 (will span 1-2)
+        newVessel.preferredColumn = 2;
+        console.log("Advanced vessel shifted from center to right column (will span 1-2)");
+      }
+    } else {
+      // For basic vessels or advanced vessels already in columns 0 or 2, keep the original column
+      newVessel.preferredColumn = preferredColumn;
+    }
+    
+    // Add column boundary information for better visualization
+    const colBoundaries = [
+      startX,                          // Left edge of left column
+      startX + columnWidth,            // Left edge of center column
+      startX + 2 * columnWidth,        // Left edge of right column
+      startX + 3 * columnWidth         // Right edge of right column
+    ];
+    
+    // Enhanced logging to verify function execution
+    console.log("=== PREFERRED POSITION ASSIGNMENT ===");
+    console.log(`Drop position: X=${dropX}, Y=${dropY}`);
+    console.log(`Play area start: X=${startX}, Y=${startY}`);
+    console.log(`Column width: ${columnWidth}, Row height: ${rowHeight}`);
+    console.log(`Relative drop position: X=${relativeDropX}, Y=${relativeDropY}`);
+    console.log(`Column boundaries: [${colBoundaries.join(', ')}]`);
+    console.log(`Calculated position: Row=${dropRowIndex}, Column=${preferredColumn}`);
+    console.log(`Assigned position: Row=${newVessel.preferredRow}, Column=${newVessel.preferredColumn}`);
+    console.log(`New vessel properties:`, newVessel.name || "unnamed", newVessel.ingredients);
+    console.log("====================================");
+  }
+  
   function arrangeVessels() {
     // Calculate vessel sizes based on play area width to ensure 3 base vessels per row
     // We need to fit 3 vessels plus margins in the play area width
-    let margin = 10;
-    let vertical_margin = 5; // Minimal vertical spacing between rows
+    // Convert fixed margins to relative values based on play area dimensions
+    let margin = playAreaWidth * 0.0125; // 1.25% of play area width (was 10px)
+    let vertical_margin = playAreaHeight * 0.008; // 0.8% of play area height (was 5px)
+    
+    // Ensure minimum values for very small screens
+    margin = Math.max(margin, 3); // Minimum 3px margin
+    vertical_margin = Math.max(vertical_margin, 2); // Minimum 2px vertical margin
     
     // Calculate basic vessel width to fit exactly 3 per row with margins
     let basic_w = (playAreaWidth - (4 * margin)) / 3; // 3 vessels with margin on both sides
@@ -632,25 +753,164 @@ let intermediate_combinations = [
     let advanced_w = basic_w * 2 + margin;
     let advanced_h = basic_h * 1.2;
     
-    // Adjust margins for very small screens
-    if (playAreaWidth < 300) {
-      margin = 5;
-      vertical_margin = 2; // Even smaller vertical margin for small screens
-      // Recalculate with smaller margins
-      basic_w = (playAreaWidth - (4 * margin)) / 3;
-      basic_h = basic_w * 0.8;
-      advanced_w = basic_w * 2 + margin;
-      advanced_h = basic_h * 1.2;
+    // Calculate column widths and positions for precise column preferences
+    const columnWidth = (playAreaWidth - (4 * margin)) / 3;
+    const columnPositions = [
+      playAreaX + margin + columnWidth/2,                // Left column center
+      playAreaX + margin + columnWidth + margin + columnWidth/2,  // Middle column center
+      playAreaX + margin + 2 * (columnWidth + margin) + columnWidth/2 // Right column center
+    ];
+
+    // Calculate the starting Y position
+    let startY = playAreaY + playAreaHeight * 0.2;
+    
+    // Find vessel with preferredRow (if any)
+    const preferredVessel = vessels.find(v => v.hasOwnProperty('preferredRow'));
+    
+    // Log debugging information about the preferred vessel
+    if (preferredVessel) {
+      console.log("=== ARRANGE VESSELS ===");
+      console.log("Found vessel with preferred position:", 
+                  { row: preferredVessel.preferredRow, column: preferredVessel.preferredColumn || 'not set' });
+      console.log("Vessel properties:", preferredVessel.name || "unnamed", preferredVessel.ingredients);
+      console.log("======================");
     }
-
-    // First, separate vessels into advanced and basic
-    let advancedVessels = vessels.filter(v => v.isAdvanced);
-    let basicVessels = vessels.filter(v => !v.isAdvanced);
-
+    
+    // ENHANCEMENT 1: Sort vessels by priority - colored vessels should move less than base vessels
+    // Sort order: 1) Advanced (colored) vessels first, 2) Basic (white) vessels
+    // This ensures we position colored vessels first and move basic vessels around them
+    let advancedVessels = vessels
+      .filter(v => v.isAdvanced && v !== preferredVessel)
+      .sort((a, b) => {
+        // Sort by complexity (number of ingredients) in descending order
+        return b.ingredients.length - a.ingredients.length;
+      });
+      
+    let basicVessels = vessels
+      .filter(v => !v.isAdvanced && v !== preferredVessel)
+      .sort((a, b) => {
+        // Sort by complexity (number of ingredients) in descending order
+        return b.ingredients.length - a.ingredients.length;
+      });
+    
     // Create an array to hold our row arrangements
     let rowArrangements = [];
-
-    // Create rows with optimal arrangements
+    
+    // Handle preferred vessel placement logic
+    if (preferredVessel) {
+      const preferredRow = preferredVessel.preferredRow;
+      
+      // Helper function to create a standard row
+      const createStandardRow = () => {
+        let row = [];
+        if (advancedVessels.length > 0 && basicVessels.length > 0) {
+          row.push(advancedVessels.shift());
+          row.push(basicVessels.shift());
+        } else if (advancedVessels.length > 0) {
+          row.push(advancedVessels.shift());
+        } else if (basicVessels.length > 0) {
+          for (let i = 0; i < 3 && basicVessels.length > 0; i++) {
+            row.push(basicVessels.shift());
+          }
+        }
+        return row;
+      };
+      
+      // Fill rows until we reach the preferred row
+      while (rowArrangements.length < preferredRow && 
+            (advancedVessels.length > 0 || basicVessels.length > 0)) {
+        rowArrangements.push(createStandardRow());
+      }
+      
+      // Create the preferred row with the preferred vessel
+      let preferredRowArr = [];
+      
+      // ENHANCEMENT 2: Honor column preference when placing the vessel
+      if (preferredVessel.hasOwnProperty('preferredColumn')) {
+        // We need to create a row that places the vessel in the correct column
+        const preferredColumn = preferredVessel.preferredColumn;
+        
+        // For a vessel in column 0, it should be the first vessel in the row
+        // For a vessel in column 1, it should be the second vessel (or first if it's advanced)
+        // For a vessel in column 2, it should be the third vessel (or second if there's an advanced first)
+        
+        console.log(`Creating row with vessel in preferred column ${preferredColumn}`);
+        
+        // Initialize the row with null placeholders
+        preferredRowArr = [null, null, null];
+        
+        // Place the preferred vessel at its column position
+        preferredRowArr[preferredColumn] = preferredVessel;
+        
+        // Now fill the remaining positions with the most appropriate vessels
+        if (preferredVessel.isAdvanced) {
+          // Advanced vessel takes 2 slots, so we can only add one more basic vessel
+          // If it's in column 0, we can add a basic vessel in column 2
+          // If it's in column 1, we can't add any more vessels
+          // If it's in column 2, we can add a basic vessel in column 0
+          if (preferredColumn === 0 && basicVessels.length > 0) {
+            preferredRowArr[2] = basicVessels.shift();
+          } else if (preferredColumn === 2 && basicVessels.length > 0) {
+            preferredRowArr[0] = basicVessels.shift();
+          }
+        } else {
+          // Basic vessel takes 1 slot, so we can add more vessels
+          if (preferredColumn === 0) {
+            // We can add an advanced vessel in column 1 or two basic vessels in column 1 and 2
+            if (advancedVessels.length > 0) {
+              preferredRowArr[1] = advancedVessels.shift();
+            } else {
+              if (basicVessels.length > 0) preferredRowArr[1] = basicVessels.shift();
+              if (basicVessels.length > 0) preferredRowArr[2] = basicVessels.shift();
+            }
+          } else if (preferredColumn === 1) {
+            // We can add one basic vessel in column 0 and one in column 2
+            if (basicVessels.length > 0) preferredRowArr[0] = basicVessels.shift();
+            if (basicVessels.length > 0) preferredRowArr[2] = basicVessels.shift();
+          } else if (preferredColumn === 2) {
+            // We can add an advanced vessel in column 0 or two basic vessels in column 0 and 1
+            if (advancedVessels.length > 0) {
+              preferredRowArr[0] = advancedVessels.shift();
+            } else {
+              if (basicVessels.length > 0) preferredRowArr[0] = basicVessels.shift();
+              if (basicVessels.length > 0) preferredRowArr[1] = basicVessels.shift();
+            }
+          }
+        }
+        
+        // Filter out null placeholders
+        preferredRowArr = preferredRowArr.filter(v => v !== null);
+      } else {
+        // No column preference, just place the vessel at the start of the row
+        preferredRowArr = [preferredVessel];
+        
+        // Determine how many more slots we can fill in this row
+        let slotsAvailable = preferredVessel.isAdvanced ? 1 : 2; // Advanced takes 2 slots, basic takes 1
+        
+        // Fill remaining slots in the preferred row
+        if (slotsAvailable > 0) {
+          if (slotsAvailable === 1) {
+            // We can fit one basic vessel
+            if (basicVessels.length > 0) {
+              preferredRowArr.push(basicVessels.shift());
+            }
+          } else if (slotsAvailable === 2) {
+            // We can fit either one advanced or up to two basic vessels
+            if (advancedVessels.length > 0) {
+              preferredRowArr.push(advancedVessels.shift());
+            } else {
+              for (let i = 0; i < 2 && basicVessels.length > 0; i++) {
+                preferredRowArr.push(basicVessels.shift());
+              }
+            }
+          }
+        }
+      }
+      
+      rowArrangements.push(preferredRowArr);
+    }
+    
+    // Continue with regular arrangement for remaining vessels
     while (advancedVessels.length > 0 || basicVessels.length > 0) {
       let currentRow = [];
       
@@ -658,57 +918,111 @@ let intermediate_combinations = [
       if (advancedVessels.length > 0 && basicVessels.length > 0) {
         currentRow.push(advancedVessels.shift()); // Add 1 advanced vessel (takes 2 slots)
         currentRow.push(basicVessels.shift()); // Add 1 basic vessel (takes 1 slot)
-            rowArrangements.push(currentRow);
+        rowArrangements.push(currentRow);
       }
       // If we only have advanced vessels left, add 1 per row
       else if (advancedVessels.length > 0) {
-                currentRow.push(advancedVessels.shift());
+        currentRow.push(advancedVessels.shift());
         rowArrangements.push(currentRow);
       }
       // If we only have basic vessels left, add 3 per row (or fewer if that's all we have)
       else if (basicVessels.length > 0) {
         // Add up to 3 basic vessels
         for (let i = 0; i < 3 && basicVessels.length > 0; i++) {
-                    currentRow.push(basicVessels.shift());
+          currentRow.push(basicVessels.shift());
         }
-            rowArrangements.push(currentRow);
+        rowArrangements.push(currentRow);
       }
     }
 
-    // Calculate the starting Y position
-    let startY = playAreaY + playAreaHeight * 0.2; // Position relative to play area
-
     // Position all vessels based on row arrangements
     rowArrangements.forEach((row, rowIndex) => {
-        // Calculate total width of this row
-        let rowWidth = row.reduce((width, v) => {
-            return width + (v.isAdvanced ? advanced_w : basic_w);
-        }, 0) + (row.length - 1) * margin;
+      // Calculate total width of this row
+      let rowWidth = row.reduce((width, v) => {
+        return width + (v.isAdvanced ? advanced_w : basic_w);
+      }, 0) + (row.length - 1) * margin;
 
       // Calculate starting x position to center the row within the play area
       let startX = playAreaX + (playAreaWidth - rowWidth) / 2;
-        let currentX = startX;
+      let currentX = startX;
 
-        // Position each vessel in the row
-        row.forEach((v) => {
-            // Update vessel dimensions
-            if (v.isAdvanced) {
-                v.w = advanced_w;
-                v.h = advanced_h;
+      // Position each vessel in the row
+      row.forEach((v, columnIndex) => {
+        // Update vessel dimensions
+        if (v.isAdvanced) {
+          v.w = advanced_w;
+          v.h = advanced_h;
+        } else {
+          v.w = basic_w;
+          v.h = basic_h;
+        }
+
+        // ENHANCEMENT 3: For vessels with preferred column, try to honor that position
+        if (v.hasOwnProperty('preferredColumn') && v === preferredVessel) {
+          // Calculate the x-coordinate based on the column preference
+          const preferredColumn = v.preferredColumn;
+          
+          // Determine the position for the vessel based on its type and preferred column
+          let preferredX;
+          
+          if (v.isAdvanced) {
+            // Check if this vessel is the only one in its row - if so, center it
+            if (row.length === 1) {
+              // For a single advanced vessel in a row, center it in the middle of the play area
+              preferredX = playAreaX + playAreaWidth / 2;
+              console.log("Single advanced vessel in row - centering in play area");
             } else {
-                v.w = basic_w;
-                v.h = basic_h;
+              // Advanced vessels should span two columns
+              if (preferredColumn === 0) {
+                // Left column drop: position between columns 0 and 1
+                preferredX = playAreaX + margin + columnWidth + margin/2;
+              } else if (preferredColumn === 2) {
+                // Right column drop: position between columns 1 and 2
+                preferredX = playAreaX + margin + columnWidth + margin + columnWidth + margin/2;
+              } else if (preferredColumn === 1) {
+                // Center column drop: deterministically choose column based on position in row
+                // Use columnIndex to alternate between spanning 0-1 and 1-2
+                // This ensures a more balanced and predictable grid layout
+                if (columnIndex % 2 === 0) {
+                  // For first vessel in row or even indexed vessels, span columns 0-1
+                  preferredX = playAreaX + margin + columnWidth + margin/2;
+                  console.log("Center vessel positioned to span columns 0-1");
+                } else {
+                  // For odd indexed vessels, span columns 1-2
+                  preferredX = playAreaX + margin + columnWidth + margin + columnWidth + margin/2;
+                  console.log("Center vessel positioned to span columns 1-2");
+                }
+              }
             }
-
-            // Set vessel position
-            v.x = currentX + v.w / 2;
-        v.y = startY + rowIndex * (basic_h + vertical_margin); // Use basic_h for consistent spacing
-            v.originalX = v.x;
-            v.originalY = v.y;
-
-            // Move x position for next vessel
-            currentX += v.w + margin;
-        });
+          } else {
+            // Basic vessels still use the column centers
+            preferredX = columnPositions[preferredColumn];
+          }
+          
+          // Log that we're positioning at the preferred column
+          console.log(`Positioning vessel at preferred column ${preferredColumn} (x=${preferredX})`);
+          console.log(`Vessel is ${v.isAdvanced ? 'advanced' : 'basic'} and spans ${v.isAdvanced ? '2 columns' : '1 column'}`);
+          
+          // Set vessel position
+          v.x = preferredX;
+          v.y = startY + rowIndex * (basic_h + vertical_margin);
+          v.originalX = v.x;
+          v.originalY = v.y;
+          
+          // Adjust currentX to account for this vessel's placement
+          currentX = v.x + v.w/2 + margin;
+        } else {
+          // For vessels without a specific column preference, just place them sequentially
+          // Set vessel position
+          v.x = currentX + v.w / 2;
+          v.y = startY + rowIndex * (basic_h + vertical_margin); // Use basic_h for consistent spacing
+          v.originalX = v.x;
+          v.originalY = v.y;
+          
+          // Move x position for next vessel
+          currentX += v.w + margin;
+        }
+      });
     });
     
     // Calculate the lowest vessel position for hint button placement
@@ -717,11 +1031,52 @@ let intermediate_combinations = [
       lowestY = Math.max(lowestY, v.y + v.h/2);
     });
     
-    // Set hint button position 40 pixels below the lowest vessel (increased from 20)
-    hintButtonY = lowestY + 40;
+    // Set hint button position using a relative offset instead of fixed 40px
+    let hintButtonOffset = playAreaHeight * 0.06; // 6% of play area height (was 40px)
+    hintButtonOffset = Math.max(hintButtonOffset, 20); // Minimum 20px
+    hintButtonY = lowestY + hintButtonOffset;
     
-    // Ensure the hint button stays within the play area
-    hintButtonY = Math.min(hintButtonY, playAreaY + playAreaHeight - 60);
+    // Ensure the hint button stays within the play area with a relative margin
+    let bottomMargin = playAreaHeight * 0.09; // 9% of play area height (was 60px)
+    bottomMargin = Math.max(bottomMargin, 30); // Minimum 30px
+    hintButtonY = Math.min(hintButtonY, playAreaY + playAreaHeight - bottomMargin);
+    
+    // After arrangement, log the final position of the preferred vessel
+    if (preferredVessel) {
+      // Calculate the grid column based on position
+      const minX = playAreaX;
+      const maxX = playAreaX + playAreaWidth;
+      const columnWidth = (maxX - minX) / 3;
+      
+      // Determine which grid column the vessel ended up in
+      let vesselColumn;
+      if (preferredVessel.x < minX + columnWidth) {
+        vesselColumn = 0; // Left column
+      } else if (preferredVessel.x < minX + 2 * columnWidth) {
+        vesselColumn = 1; // Center column
+      } else {
+        vesselColumn = 2; // Right column
+      }
+      
+      // Check if we successfully honored the vessel's preferred position
+      const preferredColumnHonored = !preferredVessel.hasOwnProperty('preferredColumn') || 
+                                   vesselColumn === preferredVessel.preferredColumn;
+      const preferredRowHonored = Math.floor((preferredVessel.y - startY) / (basic_h + vertical_margin)) === preferredVessel.preferredRow;
+      
+      console.log("=== VESSEL POSITIONED ===");
+      console.log("Final position of vessel with preferred position:", {x: preferredVessel.x, y: preferredVessel.y});
+      console.log("Grid position:", 
+                  {row: Math.floor((preferredVessel.y - startY) / (basic_h + vertical_margin)), 
+                   column: vesselColumn});
+      console.log("Preferred position was:", 
+                  {row: preferredVessel.preferredRow, column: preferredVessel.preferredColumn || 'not set'});
+      console.log("Position honored:", {row: preferredRowHonored, column: preferredColumnHonored});
+      console.log("========================");
+      
+      // Clear the preferences after using them
+      delete preferredVessel.preferredRow;
+      delete preferredVessel.preferredColumn;
+    }
   }
   
   function draw() {
@@ -850,7 +1205,10 @@ let intermediate_combinations = [
   function drawTitle() {
     // Set text properties
     textAlign(CENTER, CENTER);
-    textSize(36);
+    
+    // Calculate title size relative to play area width
+    const titleSize = Math.max(playAreaWidth * 0.055, 30); // 5.5% of play area width, min 30px
+    textSize(titleSize);
     
     // Use a bold sans-serif font
     textStyle(BOLD);
@@ -931,19 +1289,9 @@ let intermediate_combinations = [
   }
   
   function drawStartScreen() {
-    // Adjust header size based on available space
-    let headerSize = 28;
-    let descriptionSize = 14;
-    
-    // Scale down based on play area width
-    if (playAreaWidth < 380) {
-      headerSize = 24;
-      descriptionSize = 12;
-    }
-    if (playAreaWidth < 340) {
-      headerSize = 20;
-      descriptionSize = 10;
-    }
+    // Calculate header and description sizes based on play area dimensions
+    const headerSize = Math.max(playAreaWidth * 0.055, 16); // 5.5% of width, min 16px
+    const descriptionSize = Math.max(playAreaWidth * 0.028, 10); // 2.8% of width, min 10px
     
     // Calculate a maximum width for tutorial text that ensures it fits within the play area
     const maxTutorialTextWidth = min(playAreaWidth * 0.85, 300);
@@ -992,6 +1340,14 @@ let intermediate_combinations = [
     text("New recipe everyday!", 
          playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.80, maxTutorialTextWidth);
     
+    // Calculate button sizes relative to play area
+    const buttonWidth = Math.max(playAreaWidth * 0.3, 120);
+    const buttonHeight = Math.max(playAreaHeight * 0.08, 40);
+    
+    // Update start button dimensions
+    startButton.w = buttonWidth;
+    startButton.h = buttonHeight;
+    
     // Position start button relative to play area
     startButton.x = playAreaX + playAreaWidth/2;
     startButton.y = playAreaY + playAreaHeight * 0.88;
@@ -1000,21 +1356,25 @@ let intermediate_combinations = [
     
     // Draw version number at the very bottom
     push();
-    textSize(8);
+    textSize(Math.max(playAreaWidth * 0.016, 8)); // 1.6% of width, min 8px
     fill(100, 100, 100, 180); // Semi-transparent gray
-    text("v0.0317.02", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
+    text("v0.0323.10", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
     pop();
   }
   
   // Function to draw tutorial equations
   function drawTutorialEquation(equationNum, leftName, leftColor, rightName, rightColor, resultName, resultColor, description, yPosition, showStarburst = false, descriptionSize = 16) {
-    // Adjust vessel sizes based on play area width
-    let vesselWidth = min(70, playAreaWidth * 0.15) * 1.15; // Increased by 15%
-    let vesselHeight = vesselWidth * 0.6;
-    let operatorSize = min(24, playAreaWidth * 0.06);
+    // Calculate vessel sizes based on play area dimensions with minimum sizes
+    const vesselWidth = Math.max(playAreaWidth * 0.17, 60); // 17% of play area width, min 60px
+    const vesselHeight = vesselWidth * 0.6; // Maintain aspect ratio
+    
+    // Calculate operator size relative to play area with minimum size
+    const operatorSize = Math.max(playAreaWidth * 0.04, 16); // 4% of play area width, min 16px
+    
+    // Dynamic description text size based on play area width
+    const descriptionFontSize = Math.max(playAreaWidth * 0.022, 14); // 2.2% of play area width, min 14px
     
     // Calculate positions relative to play area
-    const spacing = playAreaWidth * 0.2;
     const leftX = playAreaX + playAreaWidth * 0.25;
     const rightX = playAreaX + playAreaWidth * 0.5;
     const resultX = playAreaX + playAreaWidth * 0.75;
@@ -1023,10 +1383,10 @@ let intermediate_combinations = [
     const operatorX1 = (leftX + rightX) / 2;
     const operatorX2 = (rightX + resultX) / 2;
     
-    // Adjust y position for green vessels (raise them 12px higher)
+    // Adjust y position for green vessels (raise them slightly)
     let adjustedY = yPosition;
     if (leftColor === "green" || rightColor === "green" || resultColor === "green") {
-        adjustedY = yPosition - 12;
+        adjustedY = yPosition - vesselHeight * 0.15; // 15% of vessel height instead of fixed 12px
     }
     
     // Draw left vessel
@@ -1049,17 +1409,18 @@ let intermediate_combinations = [
     noStroke();
     text("=", operatorX2, yPosition);
     
-    // Draw result vessel with optional starburst
+    // Draw result vessel
+    drawTutorialVessel(resultX, adjustedY, resultName, resultColor, vesselWidth, vesselHeight);
+    
+    // Draw starburst behind the result vessel if requested
     if (showStarburst) {
       drawStarburst(resultX, adjustedY);
     }
-    drawTutorialVessel(resultX, adjustedY, resultName, resultColor, vesselWidth, vesselHeight);
     
-    // Draw description with improved spacing
-    textAlign(CENTER); // Center align all descriptions for better fit
-    textSize(descriptionSize);
+    // Draw description text below the equation
     fill('#333');
-    
+    textAlign(CENTER);
+    textSize(descriptionFontSize); // Use the calculated description font size
     // Position description below the equation
     text(description, playAreaX + playAreaWidth/2, yPosition + vesselHeight * 0.9);
   }
@@ -1069,63 +1430,100 @@ let intermediate_combinations = [
     push();
     translate(x, y);
     
+    // Calculate relative stroke weight based on vessel size
+    const strokeW = Math.max(vesselWidth * 0.03, 1.5); // 3% of vessel width, min 1.5px
+    
     // Draw vessel
     if (color === "white") {
       // Basic ingredient vessel (white)
       fill('white'); // Pure white for base vessels
-        stroke('black');
-      strokeWeight(2);
+      stroke('black');
+      strokeWeight(strokeW);
+      
+      // Calculate border radius relative to vessel dimensions
+      const topRadius = Math.max(vesselHeight * 0.08, 3); // 8% of height, min 3px
+      const bottomRadius = Math.max(vesselHeight * 0.5, 15); // 50% of height, min 15px
       
       // Draw rounded rectangle
       rectMode(CENTER);
-      rect(0, 0, vesselWidth, vesselHeight, 5, 5, 30, 30);
+      rect(0, 0, vesselWidth, vesselHeight, topRadius, topRadius, bottomRadius, bottomRadius);
     } else if (color === "yellow") {
+      // Calculate handle sizes based on vessel dimensions
+      const handleSize = Math.max(vesselHeight * 0.25, 12); // 25% of vessel height, min 12px
+      
       // Draw handles behind the vessel
-        fill('#888888');
-        stroke('black');
-      strokeWeight(2);
-      circle(-vesselWidth * 0.4, -5, 15);
-      circle(vesselWidth * 0.4, -5, 15);
+      fill('#888888');
+      stroke('black');
+      strokeWeight(strokeW);
+      circle(-vesselWidth * 0.4, -vesselHeight * 0.08 - vesselHeight * 0.1, handleSize);
+      circle(vesselWidth * 0.4, -vesselHeight * 0.08 - vesselHeight * 0.1, handleSize);
       
       // Yellow vessel (partial combination)
       fill(COLORS.vesselYellow); // Use the exact vessel color
-        stroke('black');
-      strokeWeight(2);
-        
+      stroke('black');
+      strokeWeight(strokeW);
+      
+      // Calculate border radius to match white vessels
+      const topRadius = Math.max(vesselHeight * 0.08, 3); // 8% of height, min 3px
+      const bottomRadius = Math.max(vesselHeight * 0.5, 15); // 50% of height, min 15px
+      
       // Draw rectangle with rounded corners
-        rectMode(CENTER);
-      rect(0, 0, vesselWidth, vesselHeight, 0, 0, 10, 10);
-    } else if (color === "green") {
-      // Draw handle behind the vessel
-        fill('#888888');
-        stroke('black');
-      strokeWeight(2);
       rectMode(CENTER);
-      rect(vesselWidth * 0.6, 0, vesselWidth * 0.5, vesselHeight * 0.15, 5);
+      rect(0, -vesselHeight * 0.1, vesselWidth, vesselHeight, topRadius, topRadius, bottomRadius, bottomRadius);
+    } else if (color === "green") {
+      // Calculate handle size based on vessel dimensions
+      const handleWidth = vesselWidth * 0.5;
+      const handleHeight = vesselHeight * 0.15;
+      const handleRadius = Math.max(handleHeight * 0.3, 3); // 30% of handle height, min 3px
+      
+      // Draw handle behind the vessel
+      fill('#888888');
+      stroke('black');
+      strokeWeight(strokeW);
+      rectMode(CENTER);
+      rect(vesselWidth * 0.6, -vesselHeight * 0.1, handleWidth, handleHeight, handleRadius);
       
       // Green vessel (complete combination)
       fill(COLORS.primary); // Changed from COLORS.vesselGreen to COLORS.primary for consistency
-        stroke('black');
-      strokeWeight(2);
-        
-      // Draw rectangle with rounded corners
-        rectMode(CENTER);
-      rect(0, 0, vesselWidth, vesselHeight, 0, 0, 10, 10);
-      }
+      stroke('black');
+      strokeWeight(strokeW);
       
-      // Draw text
-      fill('black');
-      noStroke();
-      textAlign(CENTER, CENTER);
-    textSize(12);
+      // Calculate border radius to match white vessels
+      const topRadius = Math.max(vesselHeight * 0.08, 3); // 8% of height, min 3px
+      const bottomRadius = Math.max(vesselHeight * 0.5, 15); // 50% of height, min 15px
+      
+      // Draw rectangle with rounded corners
+      rectMode(CENTER);
+      rect(0, -vesselHeight * 0.1, vesselWidth, vesselHeight, topRadius, topRadius, bottomRadius, bottomRadius);
+    }
+    
+    // Draw text
+    fill('black');
+    noStroke();
+    textAlign(CENTER, CENTER);
+    // Calculate text size relative to vessel height
+    const fontSize = Math.max(vesselHeight * 0.12, 10); // 12% of vessel height, min 10px
+    textSize(fontSize);
     textStyle(BOLD); // Make text bold
     
     // Split text into lines if needed
     let lines = splitTextIntoLines(name, vesselWidth * 0.8);
     
+    // Calculate line spacing based on text size
+    const lineSpacing = fontSize * 1.2; // 120% of text size for line spacing
+    
     for (let i = 0; i < lines.length; i++) {
-      let yOffset = (i - (lines.length - 1) / 2) * 15;
-      text(lines[i], 0, yOffset);
+      let lineOffset = (i - (lines.length - 1) / 2) * lineSpacing;
+      
+      // Position text based on vessel type
+      if (color === "white") {
+        // Basic white vessel - position text slightly higher
+        let lineY = -vesselHeight * 0.1 + lineOffset; // 10% of vessel height up from center
+        text(lines[i], 0, lineY);
+      } else {
+        // Yellow or green vessels - center text properly
+        text(lines[i], 0, lineOffset);
+      }
     }
     
     // Reset text style
@@ -1143,10 +1541,14 @@ let intermediate_combinations = [
     fill(COLORS.tertiary + '80'); // Mustard yellow with 50% opacity
     noStroke();
     
+    // Calculate star size based on play area dimensions
+    const outerRadius = Math.max(playAreaWidth * 0.09, 55); // 9% of play area width, min 55px
+    const innerRadius = outerRadius * 0.7; // Inner radius 70% of outer radius
+    
     // Draw an 8-point star
     beginShape();
     for (let i = 0; i < 16; i++) {
-      let radius = i % 2 === 0 ? 70 : 50;
+      let radius = i % 2 === 0 ? outerRadius : innerRadius;
       let angle = TWO_PI * i / 16 - PI/16;
       let px = cos(angle) * radius;
       let py = sin(angle) * radius;
@@ -1158,26 +1560,32 @@ let intermediate_combinations = [
   }
   
   function drawWinScreen() {
-    // Don't draw title on win screen
-    // drawTitle();
-    
     // Center all content within the play area
     textAlign(CENTER, CENTER);
     
-    // ===== TOP HALF: RECIPE SECTION =====
+    // Calculate responsive dimensions based on screen size
+    const isMobile = width < 768;
     
-    // Calculate positions for the Recipe Card
-    const cardWidth = playAreaWidth * 0.8 + 70; // Increased by 70px total
-    const cardHeight = playAreaHeight * 0.35 + 20; // Increased by 20px
-    // Adjust cardX and cardY to account for rectMode(CENTER)
-    // Instead of representing the top-left corner, these now represent the center
-    const cardX = playAreaX + playAreaWidth/2;
-    // Move everything up to fill the void left by removing the header
-    const cardY = playAreaY + playAreaHeight * 0.10 + cardHeight/2; // Moved up from 0.15 to 0.10
+    // Determine layout approach based on screen size
+    const useVerticalLayout = isMobile;
+    
+    // Calculate the available space for content
+    const contentWidth = playAreaWidth * 0.9;
+    
+    // ===== RECIPE CARD SECTION =====
+    
+    // Calculate recipe card size based on viewport dimensions
+    const cardWidth = min(playAreaWidth, 600);  // Changed to 100% of play area width, max 600px
+    const cardHeight = playAreaHeight * 0.38; // Increased to 38% of screen height
+    
+    // Position card based on adjusted spacing - header at 6%, recipe card at 10%
+    const cardX = playAreaX + playAreaWidth / 2;
+    let cardY = playAreaY + playAreaHeight * 0.10 + cardHeight / 2;
     
     // Draw reward message with multicolor treatment (like COMBO MEAL)
     const rewardMessage = "YOU MADE IT!";
-    textSize(32);
+    const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36); // Changed from width to playAreaWidth with adjusted coefficient
+    textSize(rewardMessageSize);
     textStyle(BOLD);
     
     // Calculate the total width of the title to center each letter
@@ -1219,16 +1627,16 @@ let intermediate_combinations = [
           break;
       }
       
-      // Calculate letter position
+      // Calculate letter position - 6% of screen height from the top (adjusted)
       let letterX = x + letterWidths[i]/2;
-      let letterY = cardY - cardHeight/2 - 40;
+      let letterY = playAreaY + playAreaHeight * 0.06;
       
       // Draw black outline by drawing the letter multiple times with slight offsets
       fill('black');
       noStroke();
       
       // Draw the letter 8 times in different directions to create the outline
-      const outlineWeight = 3;
+      const outlineWeight = useVerticalLayout ? 2 : 3;
       text(rewardMessage[i], letterX - outlineWeight, letterY); // Left
       text(rewardMessage[i], letterX + outlineWeight, letterY); // Right
       text(rewardMessage[i], letterX, letterY - outlineWeight); // Top
@@ -1252,7 +1660,7 @@ let intermediate_combinations = [
     // Shadow
     fill(0, 0, 0, 30);
     noStroke();
-    rect(cardX + 5, cardY + 5, cardWidth, cardHeight, 8);
+    rect(cardX + 5, cardY + 5, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px
     
     // Card - make it look slightly interactive with a subtle hover effect
     if (isMouseOverCard) {
@@ -1265,11 +1673,11 @@ let intermediate_combinations = [
       stroke(220);
       strokeWeight(1);
     }
-    rect(cardX, cardY, cardWidth, cardHeight, 8);
+    rect(cardX, cardY, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px
     
-    // Draw flowers in the corners of the recipe card (in front of white rectangle, behind content)
-    const flowerSize = 8; // Size of flower petals
-    const cornerOffset = 25; // Increased from 15 to 25 to move flowers more towards center
+    // Draw flowers in the corners of the recipe card - reduced to 1.5% of card width
+    const flowerSize = max(cardWidth * 0.015, 4); // 1.5% of card width, min 4px
+    const cornerOffset = cardWidth * 0.07; // 7% of card width
     
     // Draw flowers in each corner
     drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
@@ -1277,26 +1685,28 @@ let intermediate_combinations = [
     drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
     drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
     
-    // Draw recipe name (now bold and raised up by 5px)
-    textSize(24);
+    // Draw recipe name
+    const recipeNameSize = min(max(playAreaWidth * 0.06, 18), 28); // Changed from width to playAreaWidth with adjusted coefficient
+    textSize(recipeNameSize);
     fill(COLORS.secondary);
-    textStyle(BOLD); // Make recipe name bold
-    text(final_combination.name, playAreaX + playAreaWidth/2, cardY - cardHeight/2 + 25); // Raised from 30 to 25
+    textStyle(BOLD);
+    text(final_combination.name, cardX, cardY - cardHeight/2 + cardHeight * 0.09); // Adjusted to 9% of card height from top
     textStyle(NORMAL);
     
-    // Add author information if it exists (also raised up by 5px)
+    // Add author information if it exists
     if (recipeAuthor && recipeAuthor.trim() !== "") {
-      textSize(10);
+      textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
       fill('#333333');
-      text(`By ${recipeAuthor}`, playAreaX + playAreaWidth/2, cardY - cardHeight/2 + 45); // Raised from 50 to 45
+      text(`By ${recipeAuthor}`, cardX, cardY - cardHeight/2 + cardHeight * 0.16); // Adjusted to 16% of card height from top
     }
     
-    // Calculate positions for the recipe image placeholder and description
-    const imageWidth = 175; // Fixed 175px square
-    const imageHeight = 175; // Fixed 175px square
-    // Adjust imageX to be relative to the card's center
-    const imageX = cardX - cardWidth/2 + cardWidth * 0.2 + imageWidth/2 - 60; // Moved 60px left
-    const imageY = cardY - cardHeight/2 + 60 + imageHeight/2;
+    // Resize image dimensions for responsive layout
+    const imageWidth = min(cardWidth * 0.45, 220);  // 45% of card width, max 220px
+    const imageHeight = imageWidth; // Keep square
+    
+    // Update image position based on new metrics
+    let imageX = cardX - cardWidth/2 + cardWidth * 0.28; // 28% of card width from left edge
+    let imageY = cardY - cardHeight/2 + cardHeight * 0.53; // 53% of card height from top (updated from 50%)
     
     // Draw recipe image placeholder (square)
     fill(240);
@@ -1306,142 +1716,98 @@ let intermediate_combinations = [
     
     // Draw placeholder text
     fill(180);
-    textSize(14);
+    textSize(min(max(playAreaWidth * 0.025, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
     text("Recipe Image", imageX, imageY);
     
-    // Draw recipe description (smaller text size)
-    // Since we're using textAlign(LEFT, TOP), we need to adjust the position
-    const descriptionX = imageX + imageWidth/2 + 40 + 45; // Moved right by 45px more
-    const descriptionWidth = cardWidth * 0.35;
+    // Only draw the image if it exists and has been loaded
+    if (typeof recipeImage !== 'undefined' && recipeImage) {
+      image(recipeImage, imageX, imageY, imageWidth, imageHeight);
+    }
+
+    // Draw recipe description - increased to 45% of card width
+    const descriptionX = cardX - cardWidth/2 + cardWidth * 0.75; // 75% of card width from left edge (changed from 55%)
+    const descriptionWidth = cardWidth * 0.45; // 45% of card width
     
+    // Update description Y position to 38% of card height from top (changed from 35%)
+    const descriptionY = cardY - cardHeight/2 + cardHeight * 0.38; // 38% of card height from top
+    
+    fill(0);
     textAlign(LEFT, TOP);
-    textSize(10); // Reduced from 12 to 10 (2pts smaller)
+    textSize(min(max(playAreaWidth * 0.02, 8), 12)); // Changed from width to playAreaWidth with adjusted coefficient
     fill('#666');
     
-    // Calculate the height of the description text
-    const descriptionY = imageY - imageHeight/2 + 110 - 15; // Moved up by 15px
-    const descriptionText = recipeDescription;
+    text(recipeDescription, descriptionX, descriptionY, descriptionWidth, cardHeight * 0.35); // 35% of card height max
     
-    // Draw the description with a limited height container
-    text(descriptionText, descriptionX, descriptionY, descriptionWidth, 100); // Limit height to 100px
-    
-    // Position ingredients at a fixed distance from description start
-    const ingredientsY = descriptionY + 80; // Fixed 80px from description start
-    const ingredientsX = descriptionX - 70; // Moved left 70px
+    // Position ingredients - align with description's left edge and adjust spacing
+    const ingredientsY = descriptionY + cardHeight * 0.05; // 5% of card height below description
+    const ingredientsX = descriptionX; // Match description's left alignment
     
     // Draw "Ingredients:" header
-    textSize(10);
+    textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
     textStyle(BOLD);
     fill('#444');
-    text("Ingredients:", ingredientsX, ingredientsY);
+    textAlign(LEFT, TOP);
+    text("Ingredients:", ingredientsX, ingredientsY, descriptionWidth); // Added width parameter to match description width
     textStyle(NORMAL);
     
     // Calculate columns for ingredients
     const numIngredients = ingredients.length;
-    const numColumns = 2; // Always use 2 columns regardless of ingredient count
+    const numColumns = 2; // Always use 2 columns
     const itemsPerColumn = Math.ceil(numIngredients / numColumns);
     const columnWidth = descriptionWidth / numColumns;
     
     // Draw ingredients in columns
-    textSize(9);
+    textSize(min(max(playAreaWidth * 0.018, 7), 9)); // Changed from width to playAreaWidth with adjusted coefficient
     fill('#666');
-    // Recalculate the layout for ingredients to avoid overlaps and gaps
-    const lineHeight = 12; // Height of a single line of text
-    const ingredientSpacing = 2; // Space between ingredients
     
-    // First pass: calculate ingredient lengths and store original indices
-    let ingredientData = [];
-    for (let i = 0; i < numIngredients; i++) {
-      ingredientData.push({
-        index: i,
-        text: ingredients[i],
-        totalLength: ingredients[i].length
-      });
-    }
-    
-    // Sort ingredients by length (longest first)
-    ingredientData.sort((a, b) => b.totalLength - a.totalLength);
-    
-    // Assign first half of sorted ingredients to right column, second half to left
-    let rightColumnIngredients = [];
-    let leftColumnIngredients = [];
-    
-    // Distribute ingredients to columns (longer ones to the right)
-    for (let i = 0; i < ingredientData.length; i++) {
-      if (i < Math.ceil(ingredientData.length / 2)) {
-        rightColumnIngredients.push(ingredients[ingredientData[i].index]);
-      } else {
-        leftColumnIngredients.push(ingredients[ingredientData[i].index]);
-      }
-    }
-    
-    // Character limits for each column
-    const leftCharLimit = 12;
-    const rightCharLimit = 18;
-    
-    // Function to process ingredients for a column with a specific character limit
+    // Function to process ingredients for display
     function processIngredientsForColumn(ingredientsList, charLimit) {
-      let processedIngredients = [];
-      
-      for (let i = 0; i < ingredientsList.length; i++) {
-        let ingredient = ingredientsList[i];
-        let words = ingredient.split(' ');
+      return ingredientsList.map(ingredient => {
         let lines = [];
-        let currentLine = '';
+        let words = ingredient.split(' ');
+        let currentLine = "";
         
-        for (let j = 0; j < words.length; j++) {
-          let word = words[j];
-          
-          // If adding this word would exceed the character limit
-          if (currentLine.length + word.length + (currentLine.length > 0 ? 1 : 0) > charLimit) {
-            // Push the current line and start a new one
+        for (let word of words) {
+          if (currentLine === "") {
+            currentLine = word;
+          } else if ((currentLine + " " + word).length <= charLimit) {
+            currentLine += " " + word;
+          } else {
             lines.push(currentLine);
             currentLine = word;
-          } else {
-            // Add the word to the current line
-            if (currentLine.length > 0) {
-              currentLine += ' ' + word;
-            } else {
-              currentLine = word;
-            }
           }
         }
         
-        // Push the last line
-        if (currentLine.length > 0) {
+        if (currentLine !== "") {
           lines.push(currentLine);
         }
         
-        processedIngredients.push({
+        return {
           original: ingredient,
           lines: lines
-        });
-      }
-      
-      return processedIngredients;
+        };
+      });
     }
+    
+    // Character limit for ingredients, adjust for screen size
+    const charLimit = useVerticalLayout ? 15 : 20;
     
     // Process ingredients for both columns
-    const leftColumnProcessed = processIngredientsForColumn(leftColumnIngredients, leftCharLimit);
-    const rightColumnProcessed = processIngredientsForColumn(rightColumnIngredients, rightCharLimit);
+    const leftColumnIngredients = ingredients.slice(0, itemsPerColumn);
+    const rightColumnIngredients = ingredients.slice(itemsPerColumn);
     
-    // Calculate total height needed for ingredients
-    let leftColumnHeight = 0;
-    for (let i = 0; i < leftColumnProcessed.length; i++) {
-      leftColumnHeight += leftColumnProcessed[i].lines.length * lineHeight + ingredientSpacing;
-    }
+    const leftColumnProcessed = processIngredientsForColumn(leftColumnIngredients, charLimit);
+    const rightColumnProcessed = processIngredientsForColumn(rightColumnIngredients, charLimit);
     
-    let rightColumnHeight = 0;
-    for (let i = 0; i < rightColumnProcessed.length; i++) {
-      rightColumnHeight += rightColumnProcessed[i].lines.length * lineHeight + ingredientSpacing;
-    }
+    // Calculate if all ingredients can fit in the available space
+    const lineHeight = useVerticalLayout ? 8 : 10;
+    const ingredientSpacing = useVerticalLayout ? 2 : 3;
     
-    // Check if ingredients list would overflow the card
-    const maxAvailableHeight = cardY + cardHeight/2 - 30 - ingredientsY;
-    const totalIngredientsHeight = Math.max(leftColumnHeight, rightColumnHeight);
+    // Max available height for ingredients
+    const maxAvailableHeight = cardY + cardHeight/2 - ingredientsY - 20;
     
-    // If ingredients would overflow, only show what fits
-    const showAllIngredients = totalIngredientsHeight <= maxAvailableHeight;
+    // Flag to track if we should show all ingredients or only a subset
+    let showAllIngredients = true;
     
     // Draw left column
     let leftYOffset = ingredientsY + 15;
@@ -1452,16 +1818,16 @@ let intermediate_combinations = [
       }
       
       const lines = leftColumnProcessed[i].lines;
-      const x = ingredientsX;
+      const x = ingredientsX - (cardWidth * 0.03); // Apply -3% of card width as offset for responsive alignment (changed from 18%)
       
       // Draw each line of this ingredient
       for (let j = 0; j < lines.length; j++) {
         if (j === 0) {
           // Only add bullet to the first line of each ingredient
-          text("• " + lines[j], x, leftYOffset);
+          text("• " + lines[j], x, leftYOffset, columnWidth); // Added width parameter for consistent alignment
         } else {
           // Indent subsequent lines to align with text after bullet
-          text("  " + lines[j], x, leftYOffset);
+          text("  " + lines[j], x, leftYOffset, columnWidth); // Added width parameter for consistent alignment
         }
         leftYOffset += lineHeight;
       }
@@ -1479,16 +1845,16 @@ let intermediate_combinations = [
       }
       
       const lines = rightColumnProcessed[i].lines;
-      const x = ingredientsX + columnWidth;
+      const x = ingredientsX - (cardWidth * 0.03) + columnWidth; // Apply same 3% offset to right column and add columnWidth
       
       // Draw each line of this ingredient
       for (let j = 0; j < lines.length; j++) {
         if (j === 0) {
           // Only add bullet to the first line of each ingredient
-          text("• " + lines[j], x, rightYOffset);
+          text("• " + lines[j], x, rightYOffset, columnWidth); // Added width parameter for consistent alignment
         } else {
           // Indent subsequent lines to align with text after bullet
-          text("  " + lines[j], x, rightYOffset);
+          text("  " + lines[j], x, rightYOffset, columnWidth); // Added width parameter for consistent alignment
         }
         rightYOffset += lineHeight;
       }
@@ -1499,42 +1865,41 @@ let intermediate_combinations = [
     
     // Add "View Full Recipe" text at the bottom of the card
     textAlign(CENTER, CENTER);
-    textSize(12);
+    textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
     if (isMouseOverCard) {
       fill(COLORS.primary); // Green text when hovered
     } else {
       fill('#666'); // Gray text normally
     }
-    text("View Full Recipe →", cardX, cardY + cardHeight/2 - 15);
+    text("View Full Recipe →", cardX, cardY + cardHeight/2 - cardHeight * 0.07); // 7% of card height from bottom
     
     // Reset text alignment
     textAlign(LEFT, TOP);
     
-    // ===== BOTTOM HALF: SCORE SECTION =====
+    // ===== SCORE SECTION =====
     
-    // Move the bottom section up by removing the divider and adjusting the position
-    const dividerY = playAreaY + playAreaHeight * 0.55; // Moved up from 0.60 to 0.55
+    // Calculate responsive position for score section - 52% of screen height (adjusted)
+    const scoreCardPositionY = playAreaY + playAreaHeight * 0.52;
     
-    // Decrease padding between View Recipe button and Letter Score by 5px
-    // Calculate positions for the letter score (vertical printer paper)
-    // Increase the letter score by another 10% from its current size
-    const scoreWidth = playAreaWidth * 0.25 * 1.25 * 1.25 * 0.75 * 1.5 * 1.25 * 1.1; // Increased by another 10%
-    const scoreHeight = scoreWidth * 1.414;
-    // Adjust scoreX and scoreY to account for rectMode(CENTER)
+    // Calculate score card size based on play area width - increased to 45% of play area width
+    const scoreWidth = min(max(playAreaWidth * 0.45, 180), 300);
+    const scoreHeight = scoreWidth * 1.414; // A4 paper ratio
+    
+    // Position score card
     const scoreX = playAreaX + playAreaWidth/2; // Centered in the play area
-    const scoreY = dividerY + 25 + scoreHeight/2 - 15 - 10; // Raised by 10px
+    const scoreY = scoreCardPositionY + scoreHeight/2; // Adjusted for vertical centering
     
     // Draw letter score with drop shadow
     // Shadow
     fill(0, 0, 0, 30);
     noStroke();
-    rect(scoreX + 5, scoreY + 5, scoreWidth, scoreHeight, 5);
+    rect(scoreX + 5, scoreY + 5, scoreWidth, scoreHeight, max(scoreWidth * 0.01, 4)); // Reduced to 1% of score width, min 4px
     
     // Paper
     fill(255);
     stroke(220);
     strokeWeight(1);
-    rect(scoreX, scoreY, scoreWidth, scoreHeight, 5);
+    rect(scoreX, scoreY, scoreWidth, scoreHeight, max(scoreWidth * 0.01, 4)); // Reduced to 1% of score width, min 4px
     
     // Check if mouse is over the letter score area
     isMouseOverLetterScore = mouseX > scoreX - scoreWidth/2 && mouseX < scoreX + scoreWidth/2 && 
@@ -1546,7 +1911,7 @@ let intermediate_combinations = [
       noFill();
       stroke(COLORS.primary); // Green highlight
       strokeWeight(3);
-      rect(scoreX, scoreY, scoreWidth, scoreHeight, 5);
+      rect(scoreX, scoreY, scoreWidth, scoreHeight, max(scoreWidth * 0.01, 4)); // Reduced to 1% of score width, min 4px
     }
     
     // Count black moves (incorrect attempts)
@@ -1593,8 +1958,8 @@ let intermediate_combinations = [
       letterColor = COLORS.secondary; // Red from vessels
     }
     
-    // Draw circle with the same color as the letter but with 30% opacity
-    const circleSize = 140 * 0.75 * 1.5 * 1.25 * 1.1; // Increased by another 10% to match the paper size
+    // Draw circle with the same color as the letter but with 30% opacity - increased to 90% of score width
+    const circleSize = scoreWidth * 0.9; // 90% of score width
     noStroke();
     
     // Create a copy of the letter color with 30% opacity
@@ -1602,9 +1967,10 @@ let intermediate_combinations = [
     fill(circleBgColor);
     circle(scoreX, scoreY, circleSize);
     
-    // Add "COMBO MEAL" header above the letter grade (30px above the circle)
+    // Add "COMBO MEAL" header above the letter grade - positioned at 8% of score height from top
     textAlign(CENTER, CENTER);
-    textSize(16);
+    // Use relative font sizing based on play area width with min/max constraints
+    textSize(min(max(playAreaWidth * 0.04, 14), 18)); 
     fill(0); // Black text
     textStyle(BOLD);
     
@@ -1632,25 +1998,26 @@ let intermediate_combinations = [
     // Starting x position (centered with kerning)
     let comboMealX = scoreX - (comboMealWidth + comboMealTotalKerning)/2;
     
+    // Position at 8% of score height from top (adjusted)
+    const comboMealY = scoreY - scoreHeight/2 + scoreHeight * 0.08;
+    
     // Draw each letter with increased spacing
     for (let i = 0; i < comboMealText.length; i++) {
       // Calculate letter position
       let letterX = comboMealX + comboMealLetterWidths[i]/2;
-      let letterY = scoreY - circleSize/2 - 30; // 30px above the circle
       
       // Draw letter
-      text(comboMealText[i], letterX, letterY);
+      text(comboMealText[i], letterX, comboMealY);
       
       // Move to the next letter position with kerning
       comboMealX += comboMealLetterWidths[i] * (1 + comboMealKerningFactor);
     }
     
-    // Draw letter grade
+    // Draw letter grade - with relative font size based on circle size
     textAlign(CENTER, CENTER);
-    // Increase letter size by 20% and use regular weight instead of bold
-    textSize(((letterGrade === ":" ? scoreWidth * 0.3 * 2 : scoreWidth * 0.4 * 1.5 * 2) * 0.75) * 1.3 * 1.2); // Increased by 20%
+    textSize(circleSize * 0.65); // 65% of circle size for better proportion
     fill(letterColor);
-    textStyle(NORMAL); // Changed from BOLD to NORMAL
+    textStyle(NORMAL);
     text(letterGrade, scoreX, scoreY);
     
     // Check if Easter Egg was found
@@ -1662,9 +2029,9 @@ let intermediate_combinations = [
     if (eggFound) {
       push();
       // Position the egg in the top left corner of the letter grade
-      // Move up 14px and left 30px, increase size by 25%
-      const eggX = scoreX - circleSize * 0.3 - 50 + 65 - 30;
-      const eggY = scoreY - circleSize * 0.3 - 100 + 40 - 14;
+      const eggSize = circleSize * 0.25; // 25% of circle size
+      const eggX = scoreX - circleSize * 0.3;
+      const eggY = scoreY - circleSize * 0.3;
       const sizeMultiplier = 1.25; // Increase size by 25%
       
       // Draw drop shadow for the entire egg
@@ -1744,11 +2111,12 @@ let intermediate_combinations = [
       pop();
     }
     
-    // Remove the old diamond drawing code and replace with the star stickers
     // Draw star stickers for A+ grade
     if (isAPlus) {
       // Star parameters
-      const outerRadius = circleSize * 0.15;
+      const starLargeSize = circleSize * 0.3; // 30% of circle size for larger stars
+      const starSmallSize = circleSize * 0.24; // 24% of circle size for smaller stars
+      const outerRadius = starLargeSize * 0.5;
       const innerRadius = outerRadius * 0.5; // Increased inner radius for rounder appearance
       const roundness = outerRadius * 0.25; // Increased roundness for more cartoonish look
       
@@ -1757,35 +2125,40 @@ let intermediate_combinations = [
         push();
         translate(x, y);
         
+        // Calculate radius based on size (large or small)
+        const currentOuterRadius = size === 'large' ? outerRadius : outerRadius * 0.8;
+        const currentInnerRadius = size === 'large' ? innerRadius : innerRadius * 0.8;
+        const currentRoundness = size === 'large' ? roundness : roundness * 0.8;
+        
         // Draw drop shadow
         fill(0, 0, 0, 40);
         noStroke();
         translate(2, 2);
-        starWithRoundedPoints(0, 0, innerRadius * size, outerRadius * size, 5, roundness * size);
+        starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
         
         // Draw white outline
         translate(-2, -2);
         fill(255);
         strokeWeight(3);
         stroke(255);
-        starWithRoundedPoints(0, 0, innerRadius * size, outerRadius * size, 5, roundness * size);
+        starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
         
         // Draw yellow star with yolk color (255, 204, 0) instead of COLORS.tertiary
         fill(255, 204, 0);
         strokeWeight(1);
         stroke(255, 255, 255, 200);
-        starWithRoundedPoints(0, 0, innerRadius * size, outerRadius * size, 5, roundness * size);
+        starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
         
         pop();
       };
       
       // Top right corner - two stars
-      drawStarSticker(scoreX + circleSize * 0.35, scoreY - circleSize * 0.35, 1);
-      drawStarSticker(scoreX + circleSize * 0.5, scoreY - circleSize * 0.2, 0.8);
+      drawStarSticker(scoreX + circleSize * 0.35, scoreY - circleSize * 0.35, 'large');
+      drawStarSticker(scoreX + circleSize * 0.5, scoreY - circleSize * 0.2, 'small');
       
       // Bottom left corner - two stars
-      drawStarSticker(scoreX - circleSize * 0.35, scoreY + circleSize * 0.35, 1);
-      drawStarSticker(scoreX - circleSize * 0.5, scoreY + circleSize * 0.2, 0.8);
+      drawStarSticker(scoreX - circleSize * 0.35, scoreY + circleSize * 0.35, 'large');
+      drawStarSticker(scoreX - circleSize * 0.5, scoreY + circleSize * 0.2, 'small');
     }
     
     // Draw hint indicators if hints were used
@@ -1795,87 +2168,81 @@ let intermediate_combinations = [
         push();
         translate(x, y);
         
-        // Draw drop shadow (doubled in size)
+        // Calculate hint indicator size - 25% of circle size
+        const hintSize = circleSize * 0.25 * size;
+        
+        // Draw drop shadow
         fill(0, 0, 0, 40);
         noStroke();
-        translate(4, 4); // Increased shadow offset for larger stickers
-        ellipse(0, 0, 60 * size, 60 * size); // Doubled from 30 to 60
+        translate(4, 4);
+        ellipse(0, 0, hintSize, hintSize);
         
         // Draw white outline
         translate(-4, -4);
         fill(255);
-        strokeWeight(4); // Increased from 3 to 4 for larger stickers
+        strokeWeight(4);
         stroke(255);
-        ellipse(0, 0, 60 * size, 60 * size); // Doubled from 30 to 60
+        ellipse(0, 0, hintSize, hintSize);
         
         // Draw white background
         fill(255);
         strokeWeight(1);
         stroke(255, 255, 255, 200);
-        ellipse(0, 0, 60 * size, 60 * size); // Doubled from 30 to 60
+        ellipse(0, 0, hintSize, hintSize);
         
         // Draw red circle outline (closer to the edge)
         noFill();
-        strokeWeight(3); // Increased from 2 to 3 for larger stickers
+        strokeWeight(3);
         stroke('#FF5252');
-        ellipse(0, 0, 48 * size, 48 * size); // Increased from 20 to 48 (80% of sticker size)
+        ellipse(0, 0, hintSize * 0.8, hintSize * 0.8);
         
         // Draw red question mark using Helvetica font
         fill('#FF5252');
         noStroke();
-        textSize(36 * size); // Larger font size for better visibility
-        textFont('Helvetica, Arial, sans-serif'); // Using Helvetica for a classic look
-        textStyle(NORMAL); // Normal weight instead of bold for a cleaner look
+        textSize(hintSize * 0.6);
+        textFont('Helvetica, Arial, sans-serif');
+        textStyle(NORMAL);
         textAlign(CENTER, CENTER);
-        text("?", 0, 0); // Perfectly centered question mark (removed vertical offset)
+        text("?", 0, 0);
         
         pop();
       };
       
       // Draw hint indicators based on hint count
       if (hintCount >= 1) {
-        // First hint indicator - bottom right (adjusted position for larger size)
+        // First hint indicator - bottom right
         drawHintIndicator(scoreX + circleSize * 0.4, scoreY + circleSize * 0.4, 1);
       }
       
       if (hintCount >= 2) {
-        // Second hint indicator - top right (adjusted position for larger size)
+        // Second hint indicator - top right
         drawHintIndicator(scoreX + circleSize * 0.4, scoreY - circleSize * 0.4, 1);
       }
       
       if (hintCount >= 3) {
-        // Third hint indicator - with minimal overlap (reduced from 25% to about 10%)
+        // Third hint indicator - with minimal overlap
         drawHintIndicator(scoreX + circleSize * 0.4 + 25, scoreY + circleSize * 0.4 - 25, 1);
       }
     }
     
     textStyle(NORMAL);
     
-    // Move the Letter Score to the right to fill the void
-    // We'll adjust the position of the Share button directly without drawing the move history
-    
-    // Position the Share Score button so its bottom aligns with the Letter Score bottom
-    const letterScoreBottom = scoreY + scoreHeight/2;
-    
-    // Remove the "Egg found!" text
-    // (Removed the if(eggFound) block that displayed this text)
-    
-    // Add "Share Score" text at the bottom of the letter score area, similar to "View Full Recipe"
+    // Add "Share Score" text at the bottom of the letter score area
     textAlign(CENTER, CENTER);
-    textSize(12);
+    textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
     if (isMouseOverLetterScore) {
       fill(COLORS.primary); // Green text when hovered
     } else {
       fill('#666'); // Gray text normally
     }
-    text("Share Score →", scoreX, scoreY + scoreHeight/2 - 15);
+    text("Share Score →", scoreX, scoreY + scoreHeight/2 - scoreHeight * 0.07); // 7% of score height from bottom
     
-    // Add "New Recipe Everyday!" text at the bottom
+    // Add "New Recipe Everyday!" text at the bottom - 5% from bottom of screen
     textAlign(CENTER, CENTER);
-    textSize(16);
+    textSize(min(max(playAreaWidth * 0.04, 14), 18)); // Changed from width to playAreaWidth with adjusted coefficient
     fill('#333');
     textStyle(BOLD);
-    text("New Recipe Everyday!", playAreaX + playAreaWidth/2, scoreY + scoreHeight/2 + 80);
+    text("New Recipe Everyday!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.95);
     textStyle(NORMAL);
     
     // Check if mouse is over the recipe card
@@ -2127,6 +2494,13 @@ let intermediate_combinations = [
           // Insert the new vessel at the position of the target vessel
           // This ensures the new vessel appears close to where the user dropped it
           vessels.splice(overVesselIndex, 0, new_v);
+          
+          // Debug log to verify flow before assigning preferred row
+          console.log("MOUSE RELEASED: About to assign preferred row to new vessel");
+          
+          // Assign preferred row based on the target vessel's position (where the dragged vessel was dropped)
+          // This ensures the new vessel appears at the position of the vessel it was combined with
+          assignPreferredRow(new_v, overVessel.y, overVessel.x);
           
           // Re-arrange vessels with the new vessel in place
           arrangeVessels();
@@ -2393,8 +2767,12 @@ let intermediate_combinations = [
       
       // Only create a new vessel if we have valid recipe candidates
       if (C_candidates.length > 0) {
-        // Create a new vessel (yellow or green)
-        let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+        // Calculate appropriate vessel dimensions based on play area size
+        const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
+        const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
+        
+        // Create a new vessel (yellow or green) with relative dimensions
+        let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
         
         let C = C_candidates[0];
         
@@ -2476,8 +2854,12 @@ let intermediate_combinations = [
         if (parentCombo) {
           console.log("Found parent combination:", parentCombo.name);
           
-          // Create a new vessel for the parent combination
-          let new_v = new Vessel([], U, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+          // Calculate appropriate vessel dimensions based on play area size
+          const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
+          const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
+          
+          // Create a new vessel for the parent combination with relative dimensions
+          let new_v = new Vessel([], U, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
           
           // Check if we have all required components for the parent combination
           // Get all combinations that have this parent
@@ -2522,8 +2904,12 @@ let intermediate_combinations = [
       if (v1ContainsFinalComponent && v2ContainsFinalComponent) {
         console.log("Both vessels contain components of the final recipe");
         
-        // Create a new vessel for the combined components
-        let new_v = new Vessel([], U, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+        // Calculate appropriate vessel dimensions based on play area size
+        const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
+        const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
+        
+        // Create a new vessel for the combined components with relative dimensions
+        let new_v = new Vessel([], U, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
         
         // Check if we have all required components for the final combination
         if (finalRecipeComponents.every(name => U.includes(name))) {
@@ -2636,11 +3022,19 @@ let intermediate_combinations = [
         let new_v;
         
         if (targetRecipe === final_combination) {
-          // For final recipe, store combination names
-          new_v = new Vessel([], allComponents, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+          // Calculate appropriate vessel dimensions based on play area size
+          const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
+          const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
+          
+          // For final recipe, store combination names with relative dimensions
+          new_v = new Vessel([], allComponents, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
         } else {
-          // For intermediate recipes, store ingredients
-          new_v = new Vessel(allComponents, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, 200, 100);
+          // Calculate appropriate vessel dimensions based on play area size
+          const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
+          const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
+          
+          // For intermediate recipes, store ingredients with relative dimensions
+          new_v = new Vessel(allComponents, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
         }
         
         // Check if we have all required components for the target recipe
@@ -2962,6 +3356,13 @@ let intermediate_combinations = [
           // Convert hint to regular vessel
           let newVessel = hintVessel.toVessel();
           vessels.push(newVessel);
+          
+          // Debug log to verify flow before assigning preferred row
+          console.log("SHOW HINT: About to assign preferred row to new vessel");
+          
+          // Assign the same row as the hint vessel was in
+          assignPreferredRow(newVessel, hintVessel.y);
+          
           arrangeVessels();
           
           // Reset hint
@@ -3045,6 +3446,13 @@ let intermediate_combinations = [
       // Convert hint to regular vessel
       let newVessel = hintVessel.toVessel();
       vessels.push(newVessel);
+      
+      // Debug log to verify flow before assigning preferred row
+      console.log("CHECK MATCHING VESSELS: About to assign preferred row to new vessel");
+      
+      // Assign the same row as the hint vessel was in
+      assignPreferredRow(newVessel, hintVessel.y);
+      
       arrangeVessels();
       
       // Reset hint
@@ -3073,52 +3481,58 @@ let intermediate_combinations = [
   // Add touch support for mobile devices
   function touchStarted() {
     // Prevent default touch behavior to avoid scrolling
+    // Only do this if we're actually handling the touch
+    let touchHandled = false;
+    
+    // Get the touch coordinates
     if (touches.length > 0) {
       let touchX = touches[0].x;
       let touchY = touches[0].y;
-      
-      // Debug logging to see touch position
-      if (gameWon) {
-        console.log("Touch position:", touchX, touchY);
-        console.log("Recipe card bounds:", cardX - cardWidth/2, cardX + cardWidth/2, cardY - cardHeight/2, cardY + cardHeight/2);
-        console.log("Score area bounds:", scoreX - scoreWidth/2, scoreX + scoreWidth/2, scoreY - scoreHeight/2, scoreY + scoreHeight/2);
-      }
-      
-      // Check if any easter egg modal is active
-      for (let i = eggModals.length - 1; i >= 0; i--) {
-        if (eggModals[i].active) {
-          eggModals[i].checkClick(touchX, touchY);
-          return false;
-        }
-      }
       
       // Handle the same logic as mousePressed but with touch coordinates
       if (!gameStarted) {
         // Check if start button was touched
         if (startButton.isInside(touchX, touchY)) {
           startGame();
-          return false;
+          touchHandled = true;
         }
       } else if (gameWon) {
-        // DIRECT APPROACH: Check if recipe card was touched - with simplified bounds check
-        // Make the entire top half of the screen trigger the recipe view
-        if (touchY < height/2) {
+        // For responsive win screen, check if recipe card was touched
+        if (isMouseOverCard) {
           console.log("View Recipe triggered");
           viewRecipe();
-          return false;
+          touchHandled = true;
         }
         
-        // Make the entire bottom half of the screen trigger the share score
-        if (touchY >= height/2) {
+        // Check if letter score was touched
+        if (isMouseOverLetterScore) {
           console.log("Share Score triggered");
           shareScore();
-          return false;
+          touchHandled = true;
+        }
+        
+        // Fallback for mobile touch (simplified approach):
+        // If not touching specific elements, use top/bottom half of screen
+        if (!touchHandled) {
+          // Top half = view recipe
+          if (touchY < height/2) {
+            console.log("View Recipe triggered (fallback)");
+            viewRecipe();
+            touchHandled = true;
+          }
+          
+          // Bottom half = share score
+          if (touchY >= height/2) {
+            console.log("Share Score triggered (fallback)");
+            shareScore();
+            touchHandled = true;
+          }
         }
       } else {
         // Check if hint button was touched
         if (!showingHint && hintButton.isInside(touchX, touchY)) {
           showHint();
-          return false;
+          touchHandled = true;
         }
         
         // Check if a vessel was touched
@@ -3132,12 +3546,20 @@ let intermediate_combinations = [
             offsetY = touchY - v.y;
             v.targetScale = 1.1; // Slight scale up when dragging
             triggerHapticFeedback('success'); // Haptic feedback on successful drag
-            return false;
+            touchHandled = true;
+            break;
           }
         }
       }
     }
-    return false; // Prevent default
+    
+    // Only prevent default if we actually handled the touch
+    if (touchHandled) {
+      return false;
+    }
+    
+    // Let other touch events pass through if we didn't handle this one
+    return true;
   }
   
   // New function to initialize the game after data is loaded
@@ -3160,18 +3582,29 @@ let intermediate_combinations = [
       lowestY = Math.max(lowestY, v.y + v.h/2);
     });
     
-    // Set hint button position 40 pixels below the lowest vessel (increased from 20)
-    hintButtonY = lowestY + 40;
+    // Set hint button position using a relative offset instead of fixed 40px
+    let hintButtonOffset = playAreaHeight * 0.06; // 6% of play area height (was 40px)
+    hintButtonOffset = Math.max(hintButtonOffset, 20); // Minimum 20px
+    hintButtonY = lowestY + hintButtonOffset;
     
-    // Adjust button sizes based on play area width
-    let buttonWidth = min(120, playAreaWidth * 0.25);
-    let buttonHeight = min(40, buttonWidth * 0.4);
-    let startButtonWidth = min(180, playAreaWidth * 0.4);
-    let startButtonHeight = min(60, startButtonWidth * 0.33);
+    // Calculate button dimensions using relative values
+    // Hint button - smaller action button
+    let buttonWidth = playAreaWidth * 0.15; // 15% of play area width (was 120px)
+    let buttonHeight = buttonWidth * 0.333; // Maintain aspect ratio
+    // Ensure minimum sizes for usability
+    buttonWidth = Math.max(buttonWidth, 80);
+    buttonHeight = Math.max(buttonHeight, 30);
+    
+    // Start button - larger call to action
+    let startButtonWidth = playAreaWidth * 0.3; // 30% of play area width (was 180px)
+    let startButtonHeight = startButtonWidth * 0.333; // Maintain aspect ratio
+    // Ensure minimum sizes for usability
+    startButtonWidth = Math.max(startButtonWidth, 120);
+    startButtonHeight = Math.max(startButtonHeight, 40);
     
     // Create hint button with white background and grey outline
     hintButton = new Button(
-      playAreaX + playAreaWidth * 0.5, 
+      playAreaX + playAreaWidth * 0.5, // Center horizontally
       hintButtonY, 
       buttonWidth, 
       buttonHeight, 
@@ -3183,8 +3616,8 @@ let intermediate_combinations = [
     
     // Create start button
     startButton = new Button(
-      playAreaX + playAreaWidth * 0.5, 
-      playAreaY + playAreaHeight * 0.85, 
+      playAreaX + playAreaWidth * 0.5, // Center horizontally
+      playAreaY + playAreaHeight * 0.85, // Position at 85% down the play area
       startButtonWidth, 
       startButtonHeight, 
       "Let's Get Cooking!", 
@@ -3283,31 +3716,44 @@ let intermediate_combinations = [
     const flowerSpacing = 40;
     const smallerPetalSize = 5; // Slightly smaller flowers for the mobile version
     
+    // Calculate positions that are truly symmetrical around the play area
+    const topMargin = playAreaY;
+    const bottomMargin = windowHeight - (playAreaY + playAreaHeight);
+    
+    // Use the same distance from the play area for both top and bottom
+    const flowerDistance = min(topMargin, bottomMargin) * 0.5;
+    
     // Draw on the top (outside the play area, above the game)
     for (let x = flowerSpacing/2; x < width - flowerSpacing/2; x += flowerSpacing) {
-      // Top row - position flowers in the top margin but not too close to the edge
-      const y = max(10, playAreaY / 2); // Ensure at least 10px from the top edge
-      const colorIndex = Math.floor(x/flowerSpacing) % 3;
-      if (colorIndex === 0) {
-        drawFlower(x, y, smallerPetalSize, COLORS.primary); // Green
-      } else if (colorIndex === 1) {
-        drawFlower(x, y, smallerPetalSize, COLORS.secondary); // Red/Orange
-      } else {
-        drawFlower(x, y, smallerPetalSize, COLORS.tertiary); // Yellow
+      // Position flowers at a consistent distance from the play area
+      const y = playAreaY - flowerDistance;
+      // Only draw if there's enough room
+      if (y >= smallerPetalSize * 2) {
+        const colorIndex = Math.floor(x/flowerSpacing) % 3;
+        if (colorIndex === 0) {
+          drawFlower(x, y, smallerPetalSize, COLORS.primary); // Green
+        } else if (colorIndex === 1) {
+          drawFlower(x, y, smallerPetalSize, COLORS.secondary); // Red/Orange
+        } else {
+          drawFlower(x, y, smallerPetalSize, COLORS.tertiary); // Yellow
+        }
       }
     }
     
     // Draw on the bottom (outside the play area, below the game)
     for (let x = flowerSpacing/2; x < width - flowerSpacing/2; x += flowerSpacing) {
-      // Bottom row - position flowers in the bottom margin but not too close to the edge
-      const y = min(windowHeight - 10, playAreaY + playAreaHeight + (windowHeight - (playAreaY + playAreaHeight)) / 2);
-      const colorIndex = Math.floor(x/flowerSpacing) % 3;
-      if (colorIndex === 0) {
-        drawFlower(x, y, smallerPetalSize, COLORS.tertiary); // Yellow (different order from top)
-      } else if (colorIndex === 1) {
-        drawFlower(x, y, smallerPetalSize, COLORS.primary); // Green
-      } else {
-        drawFlower(x, y, smallerPetalSize, COLORS.secondary); // Red/Orange
+      // Position flowers at a consistent distance from the play area
+      const y = playAreaY + playAreaHeight + flowerDistance;
+      // Only draw if there's enough room
+      if (y <= windowHeight - smallerPetalSize * 2) {
+        const colorIndex = Math.floor(x/flowerSpacing) % 3;
+        if (colorIndex === 0) {
+          drawFlower(x, y, smallerPetalSize, COLORS.tertiary); // Yellow (different order from top)
+        } else if (colorIndex === 1) {
+          drawFlower(x, y, smallerPetalSize, COLORS.primary); // Green
+        } else {
+          drawFlower(x, y, smallerPetalSize, COLORS.secondary); // Red/Orange
+        }
       }
     }
   }
@@ -3591,239 +4037,126 @@ let intermediate_combinations = [
   function touchEnded() {
     // If we have a dragged vessel, handle the release
     if (draggedVessel) {
-      draggedVessel.targetScale = 1; // Reset scale
+      // Reset scale
+      draggedVessel.targetScale = 1.0;
       
-      // Find the vessel under the touch point
-      let touchX = touches.length > 0 ? touches[0].x : mouseX;
-      let touchY = touches.length > 0 ? touches[0].y : mouseY;
-      
-      let overVessel = null;
-      let overVesselIndex = -1;
-      let overHintVessel = false;
-      
-      // Check if dragged over another vessel
-      for (let i = 0; i < vessels.length; i++) {
-        let v = vessels[i];
-        if (v !== draggedVessel && v.isInside(touchX, touchY)) {
-          overVessel = v;
-          overVesselIndex = i;
-          break;
-        }
-      }
-      
-      // Check if dragged over hint vessel
-      if (showingHint && hintVessel && hintVessel.isInside(touchX, touchY)) {
-        overHintVessel = true;
-      }
-      
-      // Log for debugging
-      console.log("Touch ended. Over vessel:", overVessel ? "Yes" : "No", "Over hint:", overHintVessel ? "Yes" : "No");
-      
+      // Flag to track if a combination was attempted/made
       let combinationAttempted = false;
       
-      if (overVessel) {
-        // Regular vessel combination
-        combinationAttempted = true;
-        // Increment turn counter
-        turnCounter++;
-        
-        // Check for easter eggs before combining
-        const easterEgg = checkForEasterEgg([...new Set([...draggedVessel.ingredients, ...overVessel.ingredients])]);
-        if (easterEgg) {
-          // Easter egg was found
-          // Add a special move to history with a marker to indicate it's an Easter Egg
-          moveHistory.push({ type: 'egg', color: 'yellow' });
-          
-          // Trigger haptic feedback
-          triggerHapticFeedback('completion');
-          
-          // Immediately snap vessels back to their original positions
-          draggedVessel.snapBack();
-          
-          // Display the easter egg modal
-          displayEasterEgg(easterEgg, draggedVessel, overVessel);
-          
-          // Set draggedVessel to null to prevent further interaction until modal is closed
-          draggedVessel = null;
-          return false;
-        }
-        
-        // If not an easter egg, proceed with normal combination
-        let new_v = combineVessels(draggedVessel, overVessel);
-        if (new_v) {
-          // Create animation particles
-          createCombineAnimation(draggedVessel.x, draggedVessel.y, draggedVessel.color, new_v.x, new_v.y);
-          createCombineAnimation(overVessel.x, overVessel.y, overVessel.color, new_v.x, new_v.y);
-          
-          // Get the index of the dragged vessel
-          let draggedIndex = vessels.indexOf(draggedVessel);
-          
-          // Remove old vessels
-          vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
-          
-          // Insert the new vessel at the position of the target vessel
-          // This ensures the new vessel appears close to where the user dropped it
-          vessels.splice(overVesselIndex, 0, new_v);
-          
-          // Re-arrange vessels with the new vessel in place
-          arrangeVessels();
-          
-          // Pulse the new vessel
-          new_v.pulse();
-          
-          // Store the current move history length to detect if checkForMatchingVessels adds moves
-          let originalMoveHistoryLength = moveHistory.length;
-          
-          // Check if the new vessel matches the current hint
-          if (showingHint && hintVessel) {
-            // Check if this vessel matches the hint
-            checkForMatchingVessels();
-          }
-          
-          // Only add to move history if it wasn't already added by checkForMatchingVessels
-          if (moveHistory.length === originalMoveHistoryLength) {
-            // Add successful move to history with the color of the new vessel
-            // Ensure we're using the COLORS object for consistency
-            if (new_v.color === 'yellow') {
-              moveHistory.push(COLORS.vesselYellow);
-            } else if (new_v.color === 'green') {
-              moveHistory.push(COLORS.vesselGreen);
-            } else if (new_v.color === 'white') {
-              moveHistory.push(COLORS.vesselBase);
-            } else if (new_v.color === '#FF5252') {
-              // Red counters have been removed
-              // moveHistory.push(COLORS.vesselHint);
-            } else {
-              moveHistory.push(new_v.color); // Fallback to the actual color
-            }
-          }
-          
-          // Check if the game is won
-          if (vessels.length === 1 && vessels[0].name === final_combination.name) {
-            gameWon = true;
-            triggerHapticFeedback('completion'); // Haptic feedback on game completion
-          } else {
-            // Trigger haptic feedback for successful combination
-            triggerHapticFeedback('medium');
-          }
-        } else {
-          // If new_v is null, it could mean one of two things:
-          // 1. The combination failed
-          // 2. The ingredients were added directly to the hint vessel
-          
-          // Check if the hint vessel has changed (ingredients were added)
-          if (showingHint && hintVessel && hintVessel.collected.some(ing => 
-              draggedVessel.ingredients.includes(ing) || overVessel.ingredients.includes(ing))) {
-            // Ingredients were added to the hint vessel
+      // Check if dragged vessel is over the hint vessel
+      if (showingHint && hintVessel && hintVessel.isInside(draggedVessel.x, draggedVessel.y)) {
+        // If the hint vessel is showing ingredients
+        if (hintVessel.ingredients.length > 0) {
+          // Add the dragged vessel ingredient to the hint vessel
+          if (draggedVessel.ingredients.length === 1) {
+            // We only allow adding single ingredients to the hint vessel
+            hintVessel.addIngredient(draggedVessel.ingredients[0]);
+            moveHistory.push('#FF5252'); // Add hint move to history (red)
+            triggerHapticFeedback('success'); // Haptic feedback on successful move
             
-            // Remove the vessels that were combined
-            vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
-            arrangeVessels();
-            
-            // Check if the hint is now complete
+            // If hint is now complete, convert to a vessel and add to game
             if (hintVessel.isComplete()) {
-              // Convert hint to regular vessel
-              let newVessel = hintVessel.toVessel();
+              const newVessel = hintVessel.toVessel();
               vessels.push(newVessel);
-              arrangeVessels();
               
-              // Reset hint
-              hintVessel = null;
+              // Debug log to verify flow before assigning preferred row
+              console.log("TOUCH ENDED (HINT VESSEL): About to assign preferred row to new vessel");
+              
+              // Assign the same row as the hint vessel was in
+              assignPreferredRow(newVessel, hintVessel.y);
+              
               showingHint = false;
               
-              // Check win condition
-              if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+              // Check if we've won
+              if (newVessel.name === final_combination.name) {
                 gameWon = true;
-                triggerHapticFeedback('completion'); // Haptic feedback on game completion
+                triggerHapticFeedback('heavy'); // Strong haptic feedback on win
+              } else {
+                // Attempt to arrange vessels to accommodate the new one
+                arrangeVessels();
               }
             }
             
-            // Trigger haptic feedback for successful combination
-            triggerHapticFeedback('medium');
-          } else {
-            // Combination failed, snap back
+            // Snapback after successful hint vessel interaction
             draggedVessel.snapBack();
+            draggedVessel = null;
+            return false;
+          }
+        }
+      }
+      
+      // Regular vessel combination logic (unchanged)
+      for (let targetVessel of vessels) {
+        // Skip self or if we've already attempted a combination
+        if (targetVessel === draggedVessel || combinationAttempted) {
+          continue;
+        }
+        
+        // Check if dragged vessel is overlapping target vessel
+        if (targetVessel.isInside(draggedVessel.x, draggedVessel.y)) {
+          combinationAttempted = true;
+          
+          // Attempt to combine vessels
+          const combinationResult = combineVessels(draggedVessel, targetVessel);
+          
+          if (combinationResult.success) {
+            // Remove the two vessels that were combined
+            vessels = vessels.filter(v => v !== draggedVessel && v !== targetVessel);
             
+            // Add the new vessel
+            vessels.push(combinationResult.vessel);
+            
+            // Debug log to verify flow before assigning preferred row
+            console.log("TOUCH ENDED (COMBINE): About to assign preferred row to new vessel");
+            
+            // Assign preferred row based on touch position
+            if (touches.length > 0) {
+              assignPreferredRow(combinationResult.vessel, touches[0].y, touches[0].x);
+            } else {
+              // Fallback to the vessel's current position if no touch data
+              assignPreferredRow(combinationResult.vessel, targetVessel.y, targetVessel.x);
+            }
+            
+            // Add successful move to history (blue)
+            moveHistory.push('blue');
+            
+            // Add animation for successful combine
+            createCombineAnimation(
+              draggedVessel.x, 
+              draggedVessel.y, 
+              COLORS.primary,
+              combinationResult.vessel.x, 
+              combinationResult.vessel.y
+            );
+            
+            // Do haptic feedback
+            triggerHapticFeedback('medium');
+            
+            // Check if we've won
+            if (combinationResult.vessel.name === final_combination.name) {
+              gameWon = true;
+              triggerHapticFeedback('heavy'); // Strong haptic feedback on win
+            } else {
+              // Check if this combination triggered an easter egg
+              checkForEasterEgg(combinationResult.vessel.ingredients, draggedVessel, targetVessel);
+            }
+          } else {
+            // Combination failed
             // Add unsuccessful move to history (black)
             moveHistory.push('black');
-            triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
+            
+            // Do haptic feedback for error
+            triggerHapticFeedback('error');
             
             // Trigger shake animation on both vessels
             draggedVessel.shake();
-            overVessel.shake();
-          }
-        }
-      } else if (overHintVessel) {
-        combinationAttempted = true;
-        // Trying to add to the hint vessel
-        turnCounter++;
-        
-        let canAddToHint = false;
-        
-        // Check if it's a single ingredient
-        if (draggedVessel.ingredients.length === 1) {
-          let ingredientName = draggedVessel.ingredients[0];
-          canAddToHint = hintVessel.addIngredient(ingredientName);
-        } 
-        // Check if it's a partial combination that matches one of the required ingredients
-        else if (draggedVessel.name && hintVessel.required.includes(draggedVessel.name)) {
-          canAddToHint = hintVessel.addIngredient(draggedVessel.name);
-        }
-        // Check if it's a yellow vessel with multiple ingredients that are all part of the hint
-        else if (draggedVessel.ingredients.length > 0 && draggedVessel.ingredients.every(ing => hintVessel.required.includes(ing))) {
-          // Check if we can add all ingredients to the hint
-          canAddToHint = true;
-          for (let ing of draggedVessel.ingredients) {
-            if (hintVessel.collected.includes(ing)) {
-              canAddToHint = false;
-              break;
-            }
-          }
-          
-          // If we can add all ingredients, do so
-          if (canAddToHint) {
-            for (let ing of draggedVessel.ingredients) {
-              hintVessel.addIngredient(ing);
-            }
-          }
-        }
-        
-        if (canAddToHint) {
-          // Create animation
-          createCombineAnimation(draggedVessel.x, draggedVessel.y, draggedVessel.color, hintVessel.x, hintVessel.y);
-          
-          // Remove the vessel
-          vessels = vessels.filter(v => v !== draggedVessel);
-          arrangeVessels();
-          
-          // Check if hint is complete
-          if (hintVessel.isComplete()) {
-            // Convert hint to regular vessel
-            let newVessel = hintVessel.toVessel();
-            vessels.push(newVessel);
-            arrangeVessels();
+            targetVessel.shake();
             
-            // Reset hint
-            hintVessel = null;
-            showingHint = false;
-            
-            // Check win condition
-            if (vessels.length === 1 && vessels[0].name === final_combination.name) {
-              gameWon = true;
-              triggerHapticFeedback('completion'); // Haptic feedback on game completion
-            }
+            // Snap the dragged vessel back to its grid position
+            draggedVessel.snapBack();
           }
-        } else {
-          // Reset position if we can't add to hint
-          draggedVessel.snapBack();
           
-          // Add unsuccessful move to history (black)
-          moveHistory.push('black');
-          triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
-          
-          // Trigger shake animation on both vessels
-          draggedVessel.shake();
-          hintVessel.shake();
+          break;
         }
       }
       
@@ -3852,22 +4185,35 @@ let intermediate_combinations = [
       draggedVessel = null;
     }
     
-    // Handle win screen touch interactions
+    // Handle win screen touch interactions with better detection
     else if (gameWon && touches.length > 0) {
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
-      // Using the same simplified approach as touchStarted
+      // First check if specific UI elements were touched
+      if (isMouseOverCard) {
+        console.log("View Recipe triggered from touchEnded");
+        viewRecipe();
+        return false;
+      }
+      
+      if (isMouseOverLetterScore) {
+        console.log("Share Score triggered from touchEnded");
+        shareScore();
+        return false;
+      }
+      
+      // Fallback to simpler top/bottom detection if no specific element was touched
       // Top half of screen = recipe view
       if (touchY < height/2) {
-        console.log("View Recipe triggered from touchEnded");
+        console.log("View Recipe triggered from touchEnded (fallback)");
         viewRecipe();
         return false;
       }
       
       // Bottom half of screen = share score
       if (touchY >= height/2) {
-        console.log("Share Score triggered from touchEnded");
+        console.log("Share Score triggered from touchEnded (fallback)");
         shareScore();
         return false;
       }
@@ -3975,4 +4321,5 @@ let intermediate_combinations = [
   // Add isMouseOverCard variable at the top of the file with other global variables
   let isMouseOverCard = false;
   let isMouseOverLetterScore = false;
+  
   
