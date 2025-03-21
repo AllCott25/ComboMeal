@@ -1,5 +1,5 @@
 /*
-* Culinary Logic Puzzle v0.0326.02
+* Culinary Logic Puzzle v0.0326.04
 * Created by Ben Alpert
 * Last Updated: March 26, 2025
 *
@@ -1358,7 +1358,7 @@ let intermediate_combinations = [
     push();
     textSize(Math.max(playAreaWidth * 0.016, 8)); // 1.6% of width, min 8px
     fill(100, 100, 100, 180); // Semi-transparent gray
-    text("v0.0323.10", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
+    text("v0.0326.02", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
     pop();
   }
   
@@ -3489,6 +3489,8 @@ let intermediate_combinations = [
       let touchX = touches[0].x;
       let touchY = touches[0].y;
       
+      console.log("Touch started at:", touchX, touchY);
+      
       // Handle the same logic as mousePressed but with touch coordinates
       if (!gameStarted) {
         // Check if start button was touched
@@ -3538,6 +3540,7 @@ let intermediate_combinations = [
         // Check if a vessel was touched
         for (let v of vessels) {
           if (v.isInside(touchX, touchY)) {
+            console.log("Selected vessel:", v.getDisplayText());
             draggedVessel = v;
             // Store original position for proper snapback
             draggedVessel.originalX = v.x;
@@ -3551,6 +3554,8 @@ let intermediate_combinations = [
           }
         }
       }
+    } else {
+      console.log("Touch started but no coordinates available");
     }
     
     // Only prevent default if we actually handled the touch
@@ -4043,6 +4048,22 @@ let intermediate_combinations = [
       // Flag to track if a combination was attempted/made
       let combinationAttempted = false;
       
+      // Ensure we have valid touch coordinates
+      let touchX = 0;
+      let touchY = 0;
+      
+      // Get touch coordinates if available
+      if (touches.length > 0) {
+        touchX = touches[0].x;
+        touchY = touches[0].y;
+        console.log("Touch ended with coordinates:", touchX, touchY);
+      } else {
+        // Fallback to the vessel's current position
+        touchX = draggedVessel.x;
+        touchY = draggedVessel.y;
+        console.log("No touch data available, using vessel position:", touchX, touchY);
+      }
+      
       // Check if dragged vessel is over the hint vessel
       if (showingHint && hintVessel && hintVessel.isInside(draggedVessel.x, draggedVessel.y)) {
         // If the hint vessel is showing ingredients
@@ -4080,6 +4101,9 @@ let intermediate_combinations = [
             // Snapback after successful hint vessel interaction
             draggedVessel.snapBack();
             draggedVessel = null;
+            
+            // Always ensure vessels are arranged properly
+            arrangeVessels();
             return false;
           }
         }
@@ -4095,11 +4119,13 @@ let intermediate_combinations = [
         // Check if dragged vessel is overlapping target vessel
         if (targetVessel.isInside(draggedVessel.x, draggedVessel.y)) {
           combinationAttempted = true;
+          console.log("Attempting combination with target vessel:", targetVessel.getDisplayText());
           
           // Attempt to combine vessels
           const combinationResult = combineVessels(draggedVessel, targetVessel);
           
           if (combinationResult.success) {
+            console.log("Combination was successful");
             // Remove the two vessels that were combined
             vessels = vessels.filter(v => v !== draggedVessel && v !== targetVessel);
             
@@ -4111,10 +4137,13 @@ let intermediate_combinations = [
             
             // Assign preferred row based on touch position
             if (touches.length > 0) {
+              // Apply the same preferred row/column logic consistently for touch interactions
               assignPreferredRow(combinationResult.vessel, touches[0].y, touches[0].x);
+              console.log("Touch combine: Assigned preferred position via touch coordinates");
             } else {
               // Fallback to the vessel's current position if no touch data
               assignPreferredRow(combinationResult.vessel, targetVessel.y, targetVessel.x);
+              console.log("Touch combine: Used fallback positioning (no touch data)");
             }
             
             // Add successful move to history (blue)
@@ -4141,6 +4170,7 @@ let intermediate_combinations = [
               checkForEasterEgg(combinationResult.vessel.ingredients, draggedVessel, targetVessel);
             }
           } else {
+            console.log("Combination failed");
             // Combination failed
             // Add unsuccessful move to history (black)
             moveHistory.push('black');
@@ -4163,6 +4193,7 @@ let intermediate_combinations = [
       // If no combination was attempted at all, or if we're here for any other reason,
       // make sure the vessel snaps back to its original position
       if (!combinationAttempted) {
+        console.log("No combination attempted, snapping back to grid");
         // No vessel to combine with, snap back
         draggedVessel.snapBack();
         
@@ -4178,7 +4209,8 @@ let intermediate_combinations = [
         }
       }
       
-      // Ensure vessel is back in position and arrange vessels as a safety measure
+      // ALWAYS ensure vessels are rearranged at the end of a touch interaction
+      console.log("Ensuring vessels are arranged properly after touch interaction");
       arrangeVessels();
       
       // Reset draggedVessel
@@ -4230,6 +4262,9 @@ let intermediate_combinations = [
         let touchX = touches[0].x;
         let touchY = touches[0].y;
         
+        // Log touch position for debugging
+        console.log("Touch moved to:", touchX, touchY);
+        
         // Update vessel position
         draggedVessel.x = touchX - offsetX;
         draggedVessel.y = touchY - offsetY;
@@ -4237,6 +4272,9 @@ let intermediate_combinations = [
         // Keep vessel within play area bounds
         draggedVessel.x = constrain(draggedVessel.x, playAreaX + draggedVessel.w/2, playAreaX + playAreaWidth - draggedVessel.w/2);
         draggedVessel.y = constrain(draggedVessel.y, playAreaY + draggedVessel.h/2, playAreaY + playAreaHeight - draggedVessel.h/2);
+      } else {
+        // If no touch data is available, log the issue
+        console.log("Touch moved but no coordinates available");
       }
     }
     // Update hover states for win screen elements - simplify to match touchStarted approach
