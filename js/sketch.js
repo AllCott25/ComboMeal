@@ -1,5 +1,5 @@
 /*
-* Culinary Logic Puzzle v0.0326.07
+* Culinary Logic Puzzle v0.0326.08
 * Created by Ben Alpert
 * Last Updated: March 26, 2025
 *
@@ -2708,51 +2708,51 @@ let intermediate_combinations = [
       let U = [...new Set([...v1.ingredients, ...v2.ingredients])];
       
       // Special handling for hint: If all ingredients are part of the hint
-        if (hintActive) {
-          // Check if all ingredients are required for the hint
-          let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
-          
-          // Check if any of these ingredients are already collected in the hint
-          let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
-          
-          // If all ingredients are part of the hint and none are already collected,
+      if (hintActive) {
+        // Check if all ingredients are required for the hint
+        let allIngredientsInHint = U.every(ing => hintVessel.required.includes(ing));
+        
+        // Check if any of these ingredients are already collected in the hint
+        let anyAlreadyCollected = U.some(ing => hintVessel.collected.includes(ing));
+        
+        // If all ingredients are part of the hint and none are already collected,
         // we should add them directly to the hint vessel instead of creating a new vessel
-          if (allIngredientsInHint && !anyAlreadyCollected) {
+        if (allIngredientsInHint && !anyAlreadyCollected) {
           console.log(`Adding ingredients directly to hint: ${U.join(', ')}`);
           
           // Add all ingredients to the hint vessel
+          let ingredientsAdded = false;
           for (let ing of U) {
-            hintVessel.addIngredient(ing);
+            // Only add ingredients that aren't already collected
+            if (!hintVessel.collected.includes(ing)) {
+              let added = hintVessel.addIngredient(ing);
+              if (added) ingredientsAdded = true;
+            }
           }
           
-          // Create animations directly from each original vessel to the hint vessel
-          createCombineAnimation(v1.x, v1.y, v1.color, hintVessel.x, hintVessel.y);
-          createCombineAnimation(v2.x, v2.y, v2.color, hintVessel.x, hintVessel.y);
-          
-          // Add red moves to history - one for each ingredient (or at least one if it was a combination)
-          // This ensures we count the proper number of turns when adding multiple ingredients at once
-          let numIngredientsAdded = Math.max(1, U.length);
-          // Red counters have been removed
-          // for (let j = 0; j < numIngredientsAdded; j++) {
-          //   moveHistory.push('#FF5252');
-          // }
-          
-          // Check if hint is complete
-          if (hintVessel.isComplete()) {
-            // Convert hint to regular vessel
-            let newVessel = hintVessel.toVessel();
+          // Only proceed if at least one ingredient was added
+          if (ingredientsAdded) {
+            // Create animations directly from each original vessel to the hint vessel
+            createCombineAnimation(v1.x, v1.y, v1.color, hintVessel.x, hintVessel.y);
+            createCombineAnimation(v2.x, v2.y, v2.color, hintVessel.x, hintVessel.y);
             
-            // Reset hint
-            hintVessel = null;
-            showingHint = false;
+            // Check if hint is complete
+            if (hintVessel.isComplete()) {
+              // Convert hint to regular vessel
+              let newVessel = hintVessel.toVessel();
+              
+              // Reset hint
+              hintVessel = null;
+              showingHint = false;
+              
+              // Return the new vessel to replace the two combined vessels
+              return newVessel;
+            }
             
-            // Return the new vessel
-            return newVessel;
+            // Return success flag to indicate vessels should be removed
+            // even though no new vessel was created
+            return { success: true, removeOriginals: true };
           }
-          
-          // Return null to indicate no new vessel should be created
-          // The ingredients were added directly to the hint vessel
-          return null;
         }
       }
       
@@ -4042,43 +4042,60 @@ let intermediate_combinations = [
         overHintVessel = true;
         console.log("Released over hint vessel");
         
-        // Handle hint vessel interaction - only add single ingredients
-        if (hintVessel.ingredients.length > 0 && draggedVessel.ingredients.length === 1) {
-          // Add the ingredient to the hint vessel
-          hintVessel.addIngredient(draggedVessel.ingredients[0]);
-          moveHistory.push('#FF5252'); // Add hint move to history (red)
-          triggerHapticFeedback('success');
+        // Better hint vessel interaction - more forgiving with multiple checks
+        let wasSuccessful = false;
+        
+        // Check 1: Direct single ingredient addition to hint vessel
+        if (draggedVessel.ingredients.length === 1 && hintVessel.required.includes(draggedVessel.ingredients[0])) {
+          console.log("Adding single ingredient to hint vessel:", draggedVessel.ingredients[0]);
           
-          // If hint is now complete, convert to vessel
-          if (hintVessel.isComplete()) {
-            const newVessel = hintVessel.toVessel();
-            vessels.push(newVessel);
+          // Check if ingredient is already in hint vessel
+          if (!hintVessel.collected.includes(draggedVessel.ingredients[0])) {
+            hintVessel.addIngredient(draggedVessel.ingredients[0]);
+            moveHistory.push('#FF5252'); // Add hint move to history (red)
+            triggerHapticFeedback('success');
+            wasSuccessful = true;
             
-            // Assign preferred row based on hint vessel position
-            assignPreferredRow(newVessel, hintVessel.y);
-            
-            showingHint = false;
-            
-            // Check if we've won
-            if (newVessel.name === final_combination.name) {
-              gameWon = true;
-              triggerHapticFeedback('heavy');
-            }
+            // Remove the vessel that provided the ingredient
+            vessels = vessels.filter(v => v !== draggedVessel);
+            draggedVessel = null;
+          } else {
+            console.log("Ingredient already collected in hint vessel");
           }
+        }
+        
+        // If hint is now complete, convert to vessel
+        if (wasSuccessful && hintVessel.isComplete()) {
+          const newVessel = hintVessel.toVessel();
+          vessels.push(newVessel);
           
-          // Snap back and reset dragged vessel
-          draggedVessel.snapBack();
-          draggedVessel = null;
+          // Assign preferred row based on hint vessel position
+          assignPreferredRow(newVessel, hintVessel.y);
           
-          // Arrange vessels to ensure proper layout
-          arrangeVessels();
+          showingHint = false;
+          
+          // Check if we've won
+          if (newVessel.name === final_combination.name) {
+            gameWon = true;
+            triggerHapticFeedback('heavy');
+          }
+        }
+        
+        // Always arrange vessels after hint interaction (successful or not)
+        arrangeVessels();
+        
+        // If interaction was successful, stop processing
+        if (wasSuccessful) {
           return false;
         } else {
-          // Wrong type of vessel for hint - shake it
+          // Wrong type of vessel for hint - shake it and continue with regular processing
           console.log("Incompatible vessel for hint");
-          draggedVessel.shake();
-          moveHistory.push('black');
-          triggerHapticFeedback('error');
+          if (draggedVessel) {
+            draggedVessel.shake();
+            moveHistory.push('black');
+            triggerHapticFeedback('error');
+            draggedVessel.snapBack();
+          }
         }
       }
       
@@ -4099,43 +4116,61 @@ let intermediate_combinations = [
         
         try {
           // Try to combine the vessels
-          const newVessel = combineVessels(draggedVessel, overVessel);
+          const result = combineVessels(draggedVessel, overVessel);
           
           // Check if the combination was successful
-          if (newVessel) {
-            console.log("Combination successful:", newVessel.getDisplayText());
-            
-            // Remove the original vessels
-            vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
-            
-            // Add the new vessel
-            vessels.push(newVessel);
-            
-            // Assign preferred position
-            assignPreferredRow(newVessel, touchY, touchX);
-            
-            // Add to move history
-            moveHistory.push('blue');
-            
-            // Add animation effect
-            createCombineAnimation(
-              draggedVessel.x, 
-              draggedVessel.y, 
-              COLORS.primary,
-              newVessel.x, 
-              newVessel.y
-            );
-            
-            // Do haptic feedback
-            triggerHapticFeedback('medium');
-            
-            // Check if we've won
-            if (newVessel.name === final_combination.name) {
-              gameWon = true;
-              triggerHapticFeedback('heavy');
+          if (result) {
+            // Handle different result formats from combineVessels
+            if (result.success === true && result.removeOriginals === true) {
+              // This is a special hint vessel case - ingredients were added but no new vessel created
+              console.log("Ingredients added to hint vessel");
+              
+              // Remove the original vessels
+              vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
+              
+              // Add to move history
+              moveHistory.push('#FF5252'); // Red for hint move
+              
+              // Do haptic feedback
+              triggerHapticFeedback('medium');
+            } else if (typeof result === 'object' && result.name) {
+              // This is a regular vessel object returned from successful combination
+              console.log("Combination successful:", result.getDisplayText());
+              
+              // Remove the original vessels
+              vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
+              
+              // Add the new vessel
+              vessels.push(result);
+              
+              // Assign preferred position
+              assignPreferredRow(result, touchY, touchX);
+              
+              // Add to move history
+              moveHistory.push('blue');
+              
+              // Add animation effect
+              createCombineAnimation(
+                draggedVessel.x, 
+                draggedVessel.y, 
+                COLORS.primary,
+                result.x, 
+                result.y
+              );
+              
+              // Do haptic feedback
+              triggerHapticFeedback('medium');
+              
+              // Check if we've won
+              if (result.name === final_combination.name) {
+                gameWon = true;
+                triggerHapticFeedback('heavy');
+              } else {
+                // Check for easter eggs
+                checkForEasterEgg(result.ingredients, draggedVessel, overVessel);
+              }
             } else {
-              // Check for easter eggs
-              checkForEasterEgg(newVessel.ingredients, draggedVessel, overVessel);
+              console.log("Unexpected result from combineVessels:", result);
             }
           } else {
             console.log("Combination failed - vessels can't be combined");
