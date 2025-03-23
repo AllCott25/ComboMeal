@@ -1,0 +1,163 @@
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Reset hover states after handling the win screen touch
+      isMouseOverCard = false;
+      isMouseOverLetterScore = false;
+      
+      // Check if recipe card was touched
+      if (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
+          touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2) {
+        console.log("Win screen: View Recipe triggered");
+        viewRecipe();
+        return false;
+      }
+      
+      // Check if letter score area was touched
+      if (touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
+          touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2) {
+        console.log("Win screen: Share Score triggered");
+        shareScore();
+        return false;
+      }
+    }
+    
+    return false; // Prevent default
+  } // Add this closing bracket for the touchEnded function
+  
+  // Add touch move support for mobile devices
+  function touchMoved() {
+    // If we have a dragged vessel, update its position
+    if (draggedVessel) {
+      if (touches.length > 0) {
+        let touchX = touches[0].x;
+        let touchY = touches[0].y;
+        
+        // Log touch position occasionally to avoid console spam
+        if (frameCount % 10 === 0) {
+          console.log("Touch moved to:", touchX, touchY);
+        }
+        
+        // Update vessel position
+        draggedVessel.x = touchX - offsetX;
+        draggedVessel.y = touchY - offsetY;
+        
+        // Keep vessel within play area bounds
+        draggedVessel.x = constrain(draggedVessel.x, playAreaX + draggedVessel.w/2, playAreaX + playAreaWidth - draggedVessel.w/2);
+        draggedVessel.y = constrain(draggedVessel.y, playAreaY + draggedVessel.h/2, playAreaY + playAreaHeight - draggedVessel.h/2);
+      }
+    }
+    // Handle win screen hover effects for better visual feedback
+    else if (gameWon && touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      
+      // Update visual hover states for recipe card
+      isMouseOverCard = (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
+                        touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2);
+      
+      // Update visual hover states for letter score
+      isMouseOverLetterScore = (touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
+                               touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2);
+    }
+    
+    return false; // Prevent default
+  }
+  
+  function isOnlyFinalComboRemaining() {
+    // Case 1: Only the final dish remains
+    if (vessels.length === 1 && vessels[0].name === final_combination.name) {
+      return true;
+    }
+    
+    // Case 2: All the required combinations for the final dish are present
+    // Get all completed combinations
+    let completedCombos = vessels
+      .filter(v => v.name !== null)
+      .map(v => v.name);
+    
+    // Also check for combinations that are part of partial combinations
+    // These are combinations that are in the complete_combinations array of any vessel
+    let partialCompletedCombos = [];
+    vessels.forEach(v => {
+      if (v.complete_combinations && v.complete_combinations.length > 0) {
+        partialCompletedCombos.push(...v.complete_combinations);
+      }
+    });
+    
+    // Combine both lists to get all completed combinations
+    let allCompletedCombos = [...new Set([...completedCombos, ...partialCompletedCombos])];
+    
+    // Check if all required combinations for the final dish are present
+    // either as standalone vessels or as part of partial combinations
+    let allFinalIngredientsPresent = final_combination.required.every(req => 
+      allCompletedCombos.includes(req));
+    
+    // Check if only the required combinations for the final dish are present
+    // (plus possibly some base ingredients that can't be used)
+    let onlyFinalIngredientsRemain = true;
+    for (let combo of completedCombos) {
+      // If this is not a required ingredient for the final dish
+      if (!final_combination.required.includes(combo)) {
+        // And it's not a base ingredient (it's an intermediate combination)
+        if (intermediate_combinations.some(ic => ic.name === combo)) {
+          onlyFinalIngredientsRemain = false;
+          break;
+        }
+      }
+    }
+    
+    return allFinalIngredientsPresent && onlyFinalIngredientsRemain;
+  }
+  
+  // Helper function to draw a star
+  function star(x, y, radius1, radius2, npoints) {
+    let angle = TWO_PI / npoints;
+    let halfAngle = angle / 2.0;
+    beginShape();
+    for (let a = 0; a < TWO_PI; a += angle) {
+      let sx = x + cos(a) * radius2;
+      let sy = y + sin(a) * radius2;
+      vertex(sx, sy);
+      sx = x + cos(a + halfAngle) * radius1;
+      sy = y + sin(a + halfAngle) * radius1;
+      vertex(sx, sy);
+    }
+    endShape(CLOSE);
+  }
+  
+  // Add isMouseOverCard variable at the top of the file with other global variables
+  let isMouseOverCard = false;
+  let isMouseOverLetterScore = false;
+  
+  // Add this new function after the checkForMatchingVessels function
+  function completeHintVessel() {
+    if (!hintVessel || !hintVessel.isComplete()) return;
+    
+    console.log("Completing hint vessel:", hintVessel.name);
+    
+    // Convert hint to regular vessel
+    let newVessel = hintVessel.toVessel();
+    vessels.push(newVessel);
+    
+    // Assign the same row as the hint vessel was in
+    assignPreferredRow(newVessel, hintVessel.y);
+    
+    // Important: Reset the hint state completely
+    hintVessel = null;
+    showingHint = false;
+    
+    // Arrange vessels to update the UI
+    arrangeVessels();
+    
+    // Check if we've won
+    if (newVessel.name === final_combination.name) {
+      gameWon = true;
+      triggerHapticFeedback('heavy');
+    }
+    
+    console.log("Hint vessel completed. Hint state reset.");
+    return newVessel;
+  }
+  
+  }
