@@ -3343,33 +3343,132 @@ let intermediate_combinations = [
       }
       
       function useClipboardFallback() {
-        // Copy to clipboard
-        navigator.clipboard.writeText(shareText)
-          .then(() => {
-            // Create and show toast
-            const toast = document.createElement('div');
-            toast.className = 'share-toast';
-            toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
-            document.body.appendChild(toast);
-            
-            // Fade in with a small delay to ensure DOM update
-            setTimeout(() => {
-              toast.style.opacity = 1;
-            }, 50);
-            
-            // Fade out and remove after 3 seconds (longer display time)
-            setTimeout(() => {
-              toast.style.opacity = 0;
-              setTimeout(() => {
-                document.body.removeChild(toast);
-              }, 500);
-            }, 3000);
-          })
-          .catch(err => {
-            console.error('Error copying to clipboard:', err);
-            // Show custom in-game modal for copying
-            showShareModal(shareText);
+        // Check if this is iOS
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        
+        if (isIOS) {
+          // Create a simple selection of native iOS sharing options
+          const directShareDiv = document.createElement('div');
+          directShareDiv.style.position = 'fixed';
+          directShareDiv.style.top = '0';
+          directShareDiv.style.left = '0';
+          directShareDiv.style.width = '100%';
+          directShareDiv.style.height = '100%';
+          directShareDiv.style.backgroundColor = 'rgba(0,0,0,0.7)';
+          directShareDiv.style.display = 'flex';
+          directShareDiv.style.flexDirection = 'column';
+          directShareDiv.style.alignItems = 'center';
+          directShareDiv.style.justifyContent = 'center';
+          directShareDiv.style.zIndex = '1000';
+          
+          // Create content container
+          const contentDiv = document.createElement('div');
+          contentDiv.style.backgroundColor = '#FFFFFF';
+          contentDiv.style.padding = '20px';
+          contentDiv.style.borderRadius = '10px';
+          contentDiv.style.maxWidth = '90%';
+          contentDiv.style.textAlign = 'center';
+          
+          // Create header
+          const header = document.createElement('h3');
+          header.innerText = 'Share Your Score';
+          header.style.marginTop = '0';
+          header.style.color = '#778F5D'; // Avocado green
+          header.style.fontFamily = 'Arial, sans-serif';
+          
+          // SMS button
+          const smsButton = document.createElement('button');
+          smsButton.innerText = '📱 Send as Text Message';
+          smsButton.style.backgroundColor = '#778F5D'; // Avocado green
+          smsButton.style.color = 'white';
+          smsButton.style.border = 'none';
+          smsButton.style.padding = '12px 20px';
+          smsButton.style.borderRadius = '5px';
+          smsButton.style.margin = '10px 0';
+          smsButton.style.width = '100%';
+          smsButton.style.cursor = 'pointer';
+          smsButton.style.fontFamily = 'Arial, sans-serif';
+          smsButton.style.fontSize = '16px';
+          
+          // Email button
+          const emailButton = document.createElement('button');
+          emailButton.innerText = '✉️ Send as Email';
+          emailButton.style.backgroundColor = '#D96941'; // Burnt orange
+          emailButton.style.color = 'white';
+          emailButton.style.border = 'none';
+          emailButton.style.padding = '12px 20px';
+          emailButton.style.borderRadius = '5px';
+          emailButton.style.margin = '10px 0';
+          emailButton.style.width = '100%';
+          emailButton.style.cursor = 'pointer';
+          emailButton.style.fontFamily = 'Arial, sans-serif';
+          emailButton.style.fontSize = '16px';
+          
+          // Close button
+          const closeButton = document.createElement('button');
+          closeButton.innerText = 'Close';
+          closeButton.style.backgroundColor = '#999';
+          closeButton.style.color = 'white';
+          closeButton.style.border = 'none';
+          closeButton.style.padding = '12px 20px';
+          closeButton.style.borderRadius = '5px';
+          closeButton.style.margin = '10px 0';
+          closeButton.style.width = '100%';
+          closeButton.style.cursor = 'pointer';
+          closeButton.style.fontFamily = 'Arial, sans-serif';
+          closeButton.style.fontSize = '16px';
+          
+          // Add event listeners
+          smsButton.addEventListener('click', () => {
+            window.location.href = `sms:?&body=${encodeURIComponent(shareText)}`;
+            document.body.removeChild(directShareDiv);
           });
+          
+          emailButton.addEventListener('click', () => {
+            window.location.href = `mailto:?subject=${encodeURIComponent('My Combo Meal Score')}&body=${encodeURIComponent(shareText)}`;
+            document.body.removeChild(directShareDiv);
+          });
+          
+          closeButton.addEventListener('click', () => {
+            document.body.removeChild(directShareDiv);
+          });
+          
+          // Assemble and display
+          contentDiv.appendChild(header);
+          contentDiv.appendChild(smsButton);
+          contentDiv.appendChild(emailButton);
+          contentDiv.appendChild(closeButton);
+          directShareDiv.appendChild(contentDiv);
+          document.body.appendChild(directShareDiv);
+        } else {
+          // For non-iOS devices, still use clipboard
+          navigator.clipboard.writeText(shareText)
+            .then(() => {
+              // Create and show toast
+              const toast = document.createElement('div');
+              toast.className = 'share-toast';
+              toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
+              document.body.appendChild(toast);
+              
+              // Fade in with a small delay to ensure DOM update
+              setTimeout(() => {
+                toast.style.opacity = 1;
+              }, 50);
+              
+              // Fade out and remove after 3 seconds (longer display time)
+              setTimeout(() => {
+                toast.style.opacity = 0;
+                setTimeout(() => {
+                  document.body.removeChild(toast);
+                }, 500);
+              }, 3000);
+            })
+            .catch(err => {
+              console.error('Error copying to clipboard:', err);
+              // Fallback to modal only as last resort
+              showShareModal(shareText);
+            });
+        }
       }
       
       // Reset hover states to prevent persistent highlighting
