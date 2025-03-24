@@ -379,4 +379,49 @@ async function fetchRecipeByDate(dateString) {
     console.error("Error in fetchRecipeByDate:", error);
     return null;
   }
+}
+
+// Function to fetch a random recipe
+async function fetchRandomRecipe() {
+  try {
+    console.log("Fetching random recipe data...");
+    
+    // Get all recipes from the database
+    const { data: recipes, error } = await supabase
+      .from('recipes')
+      .select('*');
+    
+    if (error) {
+      console.error("Error fetching recipes:", error);
+      return null;
+    }
+    
+    if (!recipes || recipes.length === 0) {
+      console.error("No recipes found in database");
+      return null;
+    }
+    
+    // Get the current recipe date in EST
+    const currentDate = getCurrentDateEST();
+    
+    // Filter out the current recipe (the one for today)
+    const filteredRecipes = recipes.filter(recipe => recipe.date !== currentDate);
+    
+    if (filteredRecipes.length === 0) {
+      console.error("No other recipes available besides today's recipe");
+      return null;
+    }
+    
+    // Select a random recipe from the filtered list
+    const randomIndex = Math.floor(Math.random() * filteredRecipes.length);
+    const recipe = filteredRecipes[randomIndex];
+    
+    console.log("Found random recipe:", recipe);
+    
+    // Get full recipe details
+    return await fetchRecipeDetails(recipe);
+  } catch (error) {
+    console.error("Error in fetchRandomRecipe:", error);
+    return null;
+  }
 } 

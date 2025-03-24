@@ -91,7 +91,8 @@ let intermediate_combinations = [
     vesselBase: '#F9F5EB',    // Cream white for base ingredients
     vesselYellow: '#E2B33C',  // Mustard yellow for partial combinations
     vesselGreen: '#778F5D',   // Avocado green for complete combinations
-    vesselHint: '#D96941'     // Burnt orange for hint vessels
+    vesselHint: '#D96941',    // Burnt orange for hint vessels
+    green: '#778F5D'          // Explicit avocado green for all green elements
   };
   
   // Animation class for combining ingredients
@@ -342,7 +343,7 @@ let intermediate_combinations = [
       // Map color names to our new color palette
       if (color === 'white') this.color = COLORS.vesselBase;
       else if (color === 'yellow') this.color = COLORS.vesselYellow;
-      else if (color === 'green') this.color = COLORS.primary; // Changed from COLORS.vesselGreen to COLORS.primary
+      else if (color === 'green') this.color = COLORS.green; // Use our explicit green color
       else if (color === '#FF5252') this.color = COLORS.vesselHint; // Hint vessel color
       else this.color = color; // Use provided color if it doesn't match any of our mappings
       
@@ -443,7 +444,7 @@ let intermediate_combinations = [
           const handleSize = this.h * 0.2;
           circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
           circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
-        } else if (this.color === 'green' || this.color === COLORS.vesselGreen || this.color === COLORS.primary) {
+        } else if (this.color === COLORS.green || this.color === 'green' || this.color === COLORS.vesselGreen || this.color === COLORS.primary) {
           // Green vessel (pan with long handle) - standardized for all green vessels
           // Draw handle BEHIND the main shape
           fill('#888888');
@@ -1072,20 +1073,11 @@ let intermediate_combinations = [
     // If initial hint button position is not set (first time), calculate it
     // Otherwise, use the stored position
     if (!initialHintButtonY) {
-      // Set hint button position using a relative offset plus two full row heights
-      let hintButtonOffset = playAreaHeight * 0.06; // 6% of play area height (was 40px)
-      hintButtonOffset = Math.max(hintButtonOffset, 20); // Minimum 20px
+      // Set hint button at a fixed position 85% from top of play area
+      hintButtonY = playAreaY + playAreaHeight * 0.85;
       
-      // Use a relative calculation for row height rather than depending on basic_h
-      // This is approximately the same as basic_h (80% of vessel width) + vertical_margin
-      let rowHeight = playAreaHeight * 0.08; // About 8% of play area height
-      rowHeight = Math.max(rowHeight, 30); // Minimum 30px to ensure visibility
-      hintButtonY = lowestY + hintButtonOffset + (rowHeight * 2); // Add two row heights
-      
-      // Ensure the hint button stays within the play area with a relative margin
-      let bottomMargin = playAreaHeight * 0.09; // 9% of play area height
-      bottomMargin = Math.max(bottomMargin, 30); // Minimum 30px
-      hintButtonY = Math.min(hintButtonY, playAreaY + playAreaHeight - bottomMargin);
+      // Store the initial hint button position
+      initialHintButtonY = hintButtonY;
     } else {
       // Use the stored initial position
       hintButtonY = initialHintButtonY;
@@ -1383,37 +1375,42 @@ let intermediate_combinations = [
   
   function drawStartScreen() {
     // Calculate header and description sizes based on play area dimensions
-    const headerSize = Math.max(playAreaWidth * 0.055, 16); // 5.5% of width, min 16px
-    const descriptionSize = Math.max(playAreaWidth * 0.028, 10); // 2.8% of width, min 10px
+    const headerSize = Math.max(playAreaWidth * 0.07, 20); // Increased from 0.055 to 0.07, min 20px
+    const descriptionSize = Math.max(playAreaWidth * 0.035, 14); // Increased from 0.028 to 0.035, min 14px
     
     // Calculate a maximum width for tutorial text that ensures it fits within the play area
     const maxTutorialTextWidth = min(playAreaWidth * 0.85, 300);
+    const titleTextWidth = min(playAreaWidth * 0.9, 320); // 90% width for title text
     
-    // Draw "How to play:" header - position relative to play area
-    textAlign(CENTER);
-    textSize(headerSize);
-    fill('#333');
-    text("How to play:", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.12);
-    
-    // New language with tutorial equations
-    // First instruction
-    textSize(descriptionSize);
+    // Draw main instruction with same size as other text but bold
     textAlign(CENTER, CENTER);
+    textSize(descriptionSize);
+    textStyle(BOLD);
     textWrap(WORD);
-    text("Drag & drop ingredients to combine them based on the steps of a recipe!", 
-         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.20, maxTutorialTextWidth);
+    fill('#333');
+    text("Solve the recipe by assembling all ingredients into recipe-based combos!", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.11, titleTextWidth);
     
-    // First equation
+    // Reset text style to normal for other text
+    textStyle(NORMAL);
+    
+    // Updated first instruction - increased space from title text
+    textSize(descriptionSize);
+    textWrap(WORD);
+    text("Drag & drop to combine ingredients into new components.", 
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.22, maxTutorialTextWidth);
+    
+    // First equation - decreased vertical spacing
     drawTutorialEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
                         "", // Empty description as we're using the text above
-                        playAreaY + playAreaHeight * 0.30, false, descriptionSize);
+                        playAreaY + playAreaHeight * 0.32, false, descriptionSize);
     
-    // Second instruction
+    // Updated second instruction with non-breaking space
     textSize(descriptionSize);
-    text("Completed combos turn green. Yellow combos need more ingredients.", 
+    text("Yellow combos are partially complete. Add\u00A0more!", 
          playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.40, maxTutorialTextWidth);
     
-    // Second equation
+    // Second equation - decreased vertical spacing
     drawTutorialEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
                         "", // Empty description
                         playAreaY + playAreaHeight * 0.50, false, descriptionSize);
@@ -1421,17 +1418,21 @@ let intermediate_combinations = [
     // Third instruction
     textSize(descriptionSize);
     text("Complete the recipe with the fewest mistakes to make the grade.", 
-         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.60, maxTutorialTextWidth);
+         playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.58, maxTutorialTextWidth);
     
-    // Third equation
+    // Third equation - decreased vertical spacing
     drawTutorialEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
                         "", // Empty description
-                        playAreaY + playAreaHeight * 0.70, true, descriptionSize);
+                        playAreaY + playAreaHeight * 0.68, true, descriptionSize);
     
-    // Final instruction
+    // Final instruction - changed text and made bold
     textSize(descriptionSize);
-    text("New recipe everyday!", 
+    textStyle(BOLD);
+    text("New recipes daily!", 
          playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.80, maxTutorialTextWidth);
+    
+    // Reset text style to normal
+    textStyle(NORMAL);
     
     // Calculate button sizes relative to play area
     const buttonWidth = Math.max(playAreaWidth * 0.3, 120);
@@ -1451,7 +1452,7 @@ let intermediate_combinations = [
     push();
     textSize(Math.max(playAreaWidth * 0.016, 8)); // 1.6% of width, min 8px
     fill(100, 100, 100, 180); // Semi-transparent gray
-    text("v0.0323.11", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
+    text("v0.0324.13 - APlasker", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight - 5);
     pop();
   }
   
@@ -1502,13 +1503,13 @@ let intermediate_combinations = [
     noStroke();
     text("=", operatorX2, yPosition);
     
-    // Draw result vessel
-    drawTutorialVessel(resultX, adjustedY, resultName, resultColor, vesselWidth, vesselHeight);
-    
     // Draw starburst behind the result vessel if requested
     if (showStarburst) {
       drawStarburst(resultX, adjustedY);
     }
+    
+    // Draw result vessel
+    drawTutorialVessel(resultX, adjustedY, resultName, resultColor, vesselWidth, vesselHeight);
     
     // Draw description text below the equation
     fill('#333');
@@ -1579,7 +1580,7 @@ let intermediate_combinations = [
       rect(vesselWidth * 0.6, -vesselHeight * 0.25, handleWidth, handleHeight, handleRadius);
       
       // Green vessel (complete combination)
-      fill(COLORS.primary); // Changed from COLORS.vesselGreen to COLORS.primary for consistency
+      fill(COLORS.green); // Use our explicit green color instead of COLORS.primary
       stroke('black');
       strokeWeight(strokeW);
       
@@ -2040,7 +2041,7 @@ let intermediate_combinations = [
       letterColor = color(0, 120, 255); // Blue
     } else if (totalScore >= 2 && totalScore <= 3) {
       letterGrade = "B";
-      letterColor = COLORS.primary; // Green from vessels
+      letterColor = COLORS.green; // Use our explicit green color
     } else if (totalScore >= 4 && totalScore <= 7) {
       letterGrade = "C";
       letterColor = COLORS.tertiary; // Yellow from vessels
@@ -2416,8 +2417,9 @@ let intermediate_combinations = [
   
   // Keep the regular move history for during gameplay
   function drawMoveHistory() {
-    // Position at the bottom of the play area
-    const historyY = playAreaY + playAreaHeight * 0.95;
+    // Position counters at a fixed position 92% from top of play area
+    const historyY = playAreaY + playAreaHeight * 0.92;
+    
     const circleSize = 15;
     const circleSpacing = 20;
     const maxCountersPerRow = 10;
@@ -2426,7 +2428,7 @@ let intermediate_combinations = [
     
     // Filter moveHistory to only include red, black, and Easter Egg counters
     const filteredMoveHistory = moveHistory.filter(move => 
-      move === 'black' || move === '#333333' || move === '#FF5252' || 
+      move === 'black' || move === '#333333' || move === COLORS.vesselHint || move === '#FF5252' || 
       (typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')));
     
     // Limit the number of counters to display
@@ -2530,6 +2532,8 @@ let intermediate_combinations = [
       }
     }
     
+    // Remove tutorial hotspot check
+    
     if (!gameStarted) {
       // Check if start button was clicked
       if (startButton.isInside(mouseX, mouseY)) {
@@ -2555,6 +2559,16 @@ let intermediate_combinations = [
         handleLetterScoreInteraction(mouseX, mouseY);
         return false; // Prevent default browser behavior
       }
+      
+      // Check for random recipe hotspot (moved from the end)
+      if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(mouseX, mouseY)) {
+        console.log("Random recipe hotspot clicked at:", mouseX, mouseY);
+        isLoadingRandomRecipe = true;
+        loadRandomRecipe().finally(() => {
+          isLoadingRandomRecipe = false;
+        });
+        return;
+      }
     } else {
       // Check if hint button was clicked
       if (!showingHint && hintButton.isInside(mouseX, mouseY)) {
@@ -2574,6 +2588,8 @@ let intermediate_combinations = [
         }
       }
     }
+    
+    // Remove the check for random recipe hotspot from the end
   }
   
   function mouseDragged() {
@@ -2677,8 +2693,8 @@ let intermediate_combinations = [
             // Ensure we're using the COLORS object for consistency
             if (new_v.color === 'yellow') {
               moveHistory.push(COLORS.vesselYellow);
-            } else if (new_v.color === 'green') {
-              moveHistory.push(COLORS.vesselGreen);
+            } else if (new_v.color === 'green' || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary || new_v.color === COLORS.green) {
+              moveHistory.push(COLORS.green); // Use our explicit green color for all green vessels
             } else if (new_v.color === 'white') {
               moveHistory.push(COLORS.vesselBase);
             } else if (new_v.color === '#FF5252') {
@@ -2936,7 +2952,7 @@ let intermediate_combinations = [
           // Only turn green if not part of an active hint
           if (!hintActive || C.name !== hintVessel.name) {
           new_v.name = C.name;
-          new_v.color = 'green';
+          new_v.color = COLORS.green; // Use COLORS.green instead of string 'green'
             new_v.ingredients = []; // Clear ingredients since this is now a complete combination
             
             // Set the verb from the combination and display it
@@ -3028,7 +3044,7 @@ let intermediate_combinations = [
           
           if (hasAllRequired) {
             new_v.name = parentCombo.name;
-            new_v.color = COLORS.primary; // Use avocado green from color palette
+            new_v.color = COLORS.green; // Use our explicit green color
             new_v.complete_combinations = []; // Clear since this is now a complete combination
             
             // Set the verb from the parent combination and display it
@@ -3068,7 +3084,7 @@ let intermediate_combinations = [
         // Check if we have all required components for the final combination
         if (finalRecipeComponents.every(name => U.includes(name))) {
           new_v.name = final_combination.name;
-          new_v.color = COLORS.primary; // Use avocado green from color palette
+          new_v.color = COLORS.green; // Use our explicit green color
           new_v.complete_combinations = []; // Clear since this is the final combination
           
           // Set the verb from the final combination and display it
@@ -3205,7 +3221,7 @@ let intermediate_combinations = [
         
         if (hasAllRequired) {
           new_v.name = targetRecipe.name;
-          new_v.color = COLORS.primary; // Use avocado green from color palette
+          new_v.color = COLORS.green; // Use our explicit green color
           
           if (targetRecipe === final_combination) {
             new_v.complete_combinations = []; // Clear since this is the final combination
@@ -3291,14 +3307,16 @@ let intermediate_combinations = [
         gradeEmojis = `❌`; // Failing score
       }
       
-      // Determine egg emoji based on hint count
+      // Determine egg emoji based on Easter egg found
       let eggEmoji = '';
-      for (let i = 0; i < hintCount; i++) {
-        eggEmoji += '🍳';
+      if (moveHistory.some(move => 
+        typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')
+      )) {
+        eggEmoji = '🍳';
       }
       
       // Create the simplified emoji-based share text
-      let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${eggEmoji}\n\nPlay at: https://allcott25.github.io/ComboMeal/`;
+      let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${eggEmoji}\n\nhttps://allcott25.github.io/ComboMeal/`;
       
       // Skip Web Share API - directly use clipboard (more reliable)
       console.log("Using clipboard to share text:", shareText);
@@ -3309,7 +3327,7 @@ let intermediate_combinations = [
           // Create and show toast
           const toast = document.createElement('div');
           toast.className = 'share-toast';
-          toast.innerText = '🎉 Score copied to clipboard! Share with friends!';
+          toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
           document.body.appendChild(toast);
           
           // Fade in with a small delay to ensure DOM update
@@ -3371,7 +3389,7 @@ let intermediate_combinations = [
       hintCount++; // Increment hint counter
       
       // Add a bright blue counter for creating a hint vessel
-      moveHistory.push('#FF5252'); // Red color for hint creation (matching hint vessels)
+      moveHistory.push(COLORS.vesselHint); // Red color for hint creation (matching hint vessels)
       turnCounter++; // Increment turn counter for hint creation
       
       
@@ -3691,6 +3709,20 @@ let intermediate_combinations = [
   
   // Add touch support for mobile devices
   function touchStarted() {
+    // Update mouse coordinates to match touch position first
+    if (touches.length > 0) {
+      mouseX = touches[0].x;
+      mouseY = touches[0].y;
+    }
+    
+    // Check if any easter egg modal is active and handle the click  
+    for (let i = eggModals.length - 1; i >= 0; i--) {
+      if (eggModals[i].active && eggModals[i].checkClick(mouseX, mouseY)) {
+        // Modal was clicked, don't process any other clicks
+        return false;
+      }
+    }
+    
     // Prevent default touch behavior to avoid scrolling
     // Only do this if we're actually handling the touch
     let touchHandled = false;
@@ -3708,45 +3740,31 @@ let intermediate_combinations = [
           touchHandled = true;
         }
       } else if (gameWon) {
+        // Check for random recipe hotspot first
+        if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
+          console.log("Random recipe hotspot touched at:", touchX, touchY);
+          isLoadingRandomRecipe = true;
+          loadRandomRecipe().finally(() => {
+            isLoadingRandomRecipe = false;
+          });
+          touchHandled = true;
+          return false;
+        }
+        
         // Debugging log to help track touch coordinates
         console.log("Touch on win screen:", touchX, touchY);
         
-        // Check if recipe card was touched - use direct coordinate test
-        if (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
-            touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2) {
-          console.log("View Recipe triggered (direct coordinates)");
+        // Use simpler touch detection on win screen - top half shows recipe, bottom half shares score
+        if (touchY < height/2) {
+          // Top half = view recipe
+          console.log("View Recipe triggered (win screen touch - top half)");
           viewRecipe();
           touchHandled = true;
-        }
-        
-        // ENHANCED LETTER SCORE TOUCH DETECTION:
-        // Check both the hover flag and coordinates for maximum reliability
-        if ((isMouseOverLetterScore || 
-            (scoreX && scoreY && 
-             touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
-             touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2))) {
-          
-          console.log("Letter score touched - attempting interaction");
-          handleLetterScoreInteraction(touchX, touchY);
-          touchHandled = true;
-        }
-        
-        // Fallback for mobile touch (simplified approach):
-        // If not touching specific elements, use top/bottom half of screen
-        if (!touchHandled) {
-          // Top half = view recipe
-          if (touchY < height/2) {
-            console.log("View Recipe triggered (fallback)");
-            viewRecipe();
-            touchHandled = true;
-          }
-          
+        } else {
           // Bottom half = share score
-          if (touchY >= height/2) {
-            console.log("Share Score triggered (fallback)");
-            shareScore();
-            touchHandled = true;
-          }
+          console.log("Share Score triggered (win screen touch - bottom half)");
+          shareScore();
+          touchHandled = true;
         }
       } else {
         // Check if hint button was touched
@@ -3774,16 +3792,23 @@ let intermediate_combinations = [
       
       // Update the isMouseOverLetterScore flag for consistent hover state
       if (gameWon) {
-        isMouseOverLetterScore = (touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
-                                 touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2);
-        
-        isMouseOverCard = (touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
-                           touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2);
+        // Use simplified hover detection based on screen position
+        isMouseOverLetterScore = (touchY >= height/2);
+        isMouseOverCard = (touchY < height/2);
       }
       
       if (touchHandled) {
         return false; // Prevent default only if we handled the touch
       }
+    }
+    
+    // Check for random recipe hotspot last
+    if (gameWon && !isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
+      console.log("Random recipe hotspot touched at:", touchX, touchY);
+      isLoadingRandomRecipe = true;
+      loadRandomRecipe().finally(() => {
+        isLoadingRandomRecipe = false;
+      });
     }
     
     return true; // Allow default behavior if not handled
@@ -3803,33 +3828,15 @@ let intermediate_combinations = [
     // Initial arrangement of vessels
     arrangeVessels();
     
-    // Calculate the lowest vessel position
-    let lowestY = 0;
-    vessels.forEach(v => {
-      lowestY = Math.max(lowestY, v.y + v.h/2);
-    });
-    
-    // Set hint button position using a relative offset plus two full row heights
-    let hintButtonOffset = playAreaHeight * 0.06; // 6% of play area height (was 40px)
-    hintButtonOffset = Math.max(hintButtonOffset, 20); // Minimum 20px
-    
-    // Use a relative calculation for row height rather than depending on basic_h
-    // This is approximately the same as basic_h (80% of vessel width) + vertical_margin
-    let rowHeight = playAreaHeight * 0.08; // About 8% of play area height
-    rowHeight = Math.max(rowHeight, 30); // Minimum 30px to ensure visibility
-    hintButtonY = lowestY + hintButtonOffset + (rowHeight * 2); // Add two row heights
-    
-    // Ensure the hint button stays within the play area with a relative margin
-    let bottomMargin = playAreaHeight * 0.09; // 9% of play area height
-    bottomMargin = Math.max(bottomMargin, 30); // Minimum 30px
-    hintButtonY = Math.min(hintButtonY, playAreaY + playAreaHeight - bottomMargin);
+    // Set hint button at a fixed position 85% from top of play area
+    hintButtonY = playAreaY + playAreaHeight * 0.85;
     
     // Store the initial hint button position
     initialHintButtonY = hintButtonY;
     
     // Calculate button dimensions using relative values
     // Hint button - smaller action button
-    let buttonWidth = playAreaWidth * 0.15; // 15% of play area width (was 120px)
+    let buttonWidth = playAreaWidth * 0.15; // 15% of play area width
     let buttonHeight = buttonWidth * 0.333; // Maintain aspect ratio
     // Ensure minimum sizes for usability
     buttonWidth = Math.max(buttonWidth, 80);
@@ -4303,250 +4310,39 @@ let intermediate_combinations = [
   
   // Add touch release support for mobile devices
   function touchEnded() {
-    // If we have a dragged vessel, handle the release
-    if (draggedVessel) {
-      // Reset scale
-      draggedVessel.targetScale = 1.0;
-      
-      // Flag to track if a combination was attempted/made
-      let combinationAttempted = false;
-      
-      // Check if dragged vessel is over the hint vessel
-      if (showingHint && hintVessel && hintVessel.isInside(draggedVessel.x, draggedVessel.y)) {
-        // If the hint vessel is showing ingredients
-        if (hintVessel.ingredients.length > 0) {
-          // Add the dragged vessel ingredient to the hint vessel
-          if (draggedVessel.ingredients.length === 1) {
-            // We only allow adding single ingredients to the hint vessel
-            hintVessel.addIngredient(draggedVessel.ingredients[0]);
-            moveHistory.push('#FF5252'); // Add hint move to history (red)
-            triggerHapticFeedback('success'); // Haptic feedback on successful move
-            
-            // If hint is now complete, convert to a vessel and add to game
-            if (hintVessel.isComplete()) {
-              const newVessel = hintVessel.toVessel();
-              vessels.push(newVessel);
-              
-              // Debug log to verify flow before assigning preferred row
-              console.log("TOUCH ENDED (HINT VESSEL): About to assign preferred row to new vessel");
-              
-              // Assign the same row as the hint vessel was in
-              assignPreferredRow(newVessel, hintVessel.y);
-              
-              showingHint = false;
-              
-              // Check if we've won
-              if (newVessel.name === final_combination.name) {
-                gameWon = true;
-                triggerHapticFeedback('heavy'); // Strong haptic feedback on win
-              } else {
-                // Attempt to arrange vessels to accommodate the new one
-                arrangeVessels();
-              }
-            }
-            
-            // Snapback after successful hint vessel interaction
-            draggedVessel.snapBack();
-            draggedVessel = null;
-            return false;
-          }
-        }
-      }
-      
-      // Regular vessel combination logic (unchanged)
-      for (let targetVessel of vessels) {
-        // Skip self or if we've already attempted a combination
-        if (targetVessel === draggedVessel || combinationAttempted) {
-          continue;
-        }
-        
-        // Check if dragged vessel is overlapping target vessel
-        if (targetVessel.isInside(draggedVessel.x, draggedVessel.y)) {
-          combinationAttempted = true;
-          
-          // Attempt to combine vessels
-          const combinationResult = combineVessels(draggedVessel, targetVessel);
-          
-          if (combinationResult.success) {
-            // Remove the two vessels that were combined
-            vessels = vessels.filter(v => v !== draggedVessel && v !== targetVessel);
-            
-            // Add the new vessel
-            vessels.push(combinationResult.vessel);
-            
-            // Debug log to verify flow before assigning preferred row
-            console.log("TOUCH ENDED (COMBINE): About to assign preferred row to new vessel");
-            
-            // Assign preferred row based on touch position
-            if (touches.length > 0) {
-              assignPreferredRow(combinationResult.vessel, touches[0].y, touches[0].x);
-            } else {
-              // Fallback to the vessel's current position if no touch data
-              assignPreferredRow(combinationResult.vessel, targetVessel.y, targetVessel.x);
-            }
-            
-            // Add successful move to history (blue)
-            moveHistory.push('blue');
-            
-            // Add animation for successful combine
-            createCombineAnimation(
-              draggedVessel.x, 
-              draggedVessel.y, 
-              COLORS.primary,
-              combinationResult.vessel.x, 
-              combinationResult.vessel.y
-            );
-            
-            // Do haptic feedback
-            triggerHapticFeedback('medium');
-            
-            // Check if we've won
-            if (combinationResult.vessel.name === final_combination.name) {
-              gameWon = true;
-              triggerHapticFeedback('heavy'); // Strong haptic feedback on win
-            } else {
-              // Check if this combination triggered an easter egg
-              checkForEasterEgg(combinationResult.vessel.ingredients, draggedVessel, targetVessel);
-            }
-          } else {
-            // Combination failed
-            // Add unsuccessful move to history (black)
-            moveHistory.push('black');
-            
-            // Do haptic feedback for error
-            triggerHapticFeedback('error');
-            
-            // Trigger shake animation on both vessels
-            draggedVessel.shake();
-            targetVessel.shake();
-            
-            // Snap the dragged vessel back to its grid position
-            draggedVessel.snapBack();
-          }
-          
-          break;
-        }
-      }
-      
-      // If no combination was attempted at all, or if we're here for any other reason,
-      // make sure the vessel snaps back to its original position
-      if (!combinationAttempted) {
-        // No vessel to combine with, snap back
-        draggedVessel.snapBack();
-        
-        // Only add black counter and shake if the vessel was actually dragged
-        // (not just clicked and released in the same spot)
-        if (dist(draggedVessel.x, draggedVessel.y, draggedVessel.originalX, draggedVessel.originalY) > 10) {
-          // Add unsuccessful move to history (black)
-          moveHistory.push('black');
-          triggerHapticFeedback('error'); // Haptic feedback on unsuccessful move
-          
-          // Trigger shake animation on the dragged vessel
-          draggedVessel.shake();
-        }
-      }
-      
-      // Ensure vessel is back in position and arrange vessels as a safety measure
-      arrangeVessels();
-      
-      // Reset draggedVessel
-      draggedVessel = null;
+    // Update mouse coordinates to match touch position
+    if (touches.length > 0) {
+      mouseX = touches[0].x;
+      mouseY = touches[0].y;
     }
     
-    // Handle win screen touch interactions with better detection
-    else if (gameWon && touches.length > 0) {
-      let touchX = touches[0].x;
-      let touchY = touches[0].y;
-      
-      // First check if specific UI elements were touched
-      if (isMouseOverCard) {
-        console.log("View Recipe triggered from touchEnded");
-        viewRecipe();
-        return false;
-      }
-      
-      if (isMouseOverLetterScore) {
-        console.log("Share Score triggered from touchEnded");
-        shareScore();
-        return false;
-      }
-      
-      // Fallback to simpler top/bottom detection if no specific element was touched
-      // Top half of screen = recipe view
-      if (touchY < height/2) {
-        console.log("View Recipe triggered from touchEnded (fallback)");
-        viewRecipe();
-        return false;
-      }
-      
-      // Bottom half of screen = share score
-      if (touchY >= height/2) {
-        console.log("Share Score triggered from touchEnded (fallback)");
-        shareScore();
-        return false;
-      }
-    }
+    // Call the mouse event handler
+    mouseReleased();
     
-    return false; // Prevent default
+    // Prevent default to avoid scrolling
+    return false;
   }
   
   // Add touch move support for mobile devices
   function touchMoved() {
-    // If we have a dragged vessel, update its position
-    if (draggedVessel) {
-      if (touches.length > 0) {
-        let touchX = touches[0].x;
-        let touchY = touches[0].y;
-        
-        // Update vessel position
-        draggedVessel.x = touchX - offsetX;
-        draggedVessel.y = touchY - offsetY;
-        
-        // Keep vessel within play area bounds
-        draggedVessel.x = constrain(draggedVessel.x, playAreaX + draggedVessel.w/2, playAreaX + playAreaWidth - draggedVessel.w/2);
-        draggedVessel.y = constrain(draggedVessel.y, playAreaY + draggedVessel.h/2, playAreaY + playAreaHeight - draggedVessel.h/2);
-      }
-    }
-    // Enhanced hover state management for win screen elements
-    else if (gameWon && touches.length > 0) {
-      let touchX = touches[0].x;
-      let touchY = touches[0].y;
+    // Update mouse coordinates to match touch position
+    if (touches.length > 0) {
+      mouseX = touches[0].x;
+      mouseY = touches[0].y;
       
-      // Use precise coordinate checks for visual feedback
-      // Recipe card hover state
-      isMouseOverCard = (
-        cardX && cardY && 
-        touchX > cardX - cardWidth/2 && touchX < cardX + cardWidth/2 && 
-        touchY > cardY - cardHeight/2 && touchY < cardY + cardHeight/2
-      );
-      
-      // Letter score hover state
-      isMouseOverLetterScore = (
-        scoreX && scoreY && 
-        touchX > scoreX - scoreWidth/2 && touchX < scoreX + scoreWidth/2 && 
-        touchY > scoreY - scoreHeight/2 && touchY < scoreY + scoreHeight/2
-      );
-      
-      // Fallback for areas outside interactive elements
-      if (!isMouseOverCard && !isMouseOverLetterScore) {
-        // Top half of the screen = recipe card hover
-        if (touchY < height/2) {
-          isMouseOverCard = true;
-        }
-        
-        // Bottom half of the screen = letter score hover
-        if (touchY >= height/2) {
-          isMouseOverLetterScore = true;
-        }
-      }
-      
-      // Log only occasionally to avoid console spam
-      if (frameCount % 30 === 0) {
-        console.log("Updated hover states - card:", isMouseOverCard, "score:", isMouseOverLetterScore);
+      // Update hover states for win screen
+      if (gameWon) {
+        // Use simplified hover detection based on screen position
+        isMouseOverLetterScore = (mouseY >= height/2);
+        isMouseOverCard = (mouseY < height/2);
       }
     }
     
-    return false; // Prevent default
+    // Call the mouse event handler
+    mouseDragged();
+    
+    // Prevent default to avoid scrolling
+    return false;
   }
   
   function isOnlyFinalComboRemaining() {
@@ -4666,5 +4462,102 @@ let intermediate_combinations = [
     
     return false; // Interaction was not for letter score
   }
+  
+  // Function to check if a point is within the random recipe hotspot area
+  function isInRandomRecipeHotspot(x, y) {
+    // Calculate the position of the "!" in "YOU MADE IT!"
+    const rewardMessage = "YOU MADE IT!";
+    const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36);
+    textSize(rewardMessageSize);
+    textStyle(BOLD);
+    
+    // Calculate the total width of the title to center each letter
+    let totalWidth = 0;
+    let letterWidths = [];
+    
+    // First calculate individual letter widths
+    for (let i = 0; i < rewardMessage.length; i++) {
+      let letterWidth = textWidth(rewardMessage[i]);
+      letterWidths.push(letterWidth);
+      totalWidth += letterWidth;
+    }
+    
+    // Add kerning (50% increase in spacing)
+    const kerningFactor = 0.5; // 50% extra space
+    let totalKerning = 0;
+    
+    // Calculate total kerning space (only between letters, not at the ends)
+    for (let i = 0; i < rewardMessage.length - 1; i++) {
+      totalKerning += letterWidths[i] * kerningFactor;
+    }
+    
+    // Starting x position (centered with kerning)
+    let startX = playAreaX + playAreaWidth/2 - (totalWidth + totalKerning)/2;
+    
+    // Calculate the position of the "!"
+    let exclamationX = startX;
+    for (let i = 0; i < rewardMessage.length - 1; i++) {
+      exclamationX += letterWidths[i] * (1 + kerningFactor);
+    }
+    exclamationX += letterWidths[rewardMessage.length - 1]/2;
+    
+    let exclamationY = playAreaY + playAreaHeight * 0.06;
+    
+    // Create a 60x60 pixel hotspot around the "!"
+    const isInHotspot = x >= exclamationX - 30 && x <= exclamationX + 30 && 
+                        y >= exclamationY - 30 && y <= exclamationY + 30;
+    
+    // Debug visualization when hovering over hotspot
+    if (isInHotspot) {
+      noFill();
+      stroke(255, 0, 0, 100); // Semi-transparent red for random recipe
+      strokeWeight(2);
+      rect(exclamationX - 30, exclamationY - 30, 60, 60);
+      console.log("Hovering over random recipe hotspot at:", exclamationX, exclamationY);
+    }
+    
+    return isInHotspot;
+  }
+  
+  // Function to load a random recipe
+  async function loadRandomRecipe() {
+    try {
+      console.log("Loading random recipe...");
+      const recipeData = await fetchRandomRecipe();
+      
+      if (!recipeData) {
+        console.error("No random recipe data found");
+        isLoadingRandomRecipe = false;
+        return;
+      }
+      
+      // Update game variables with recipe data
+      intermediate_combinations = recipeData.intermediateCombinations;
+      final_combination = recipeData.finalCombination;
+      easter_eggs = recipeData.easterEggs;
+      ingredients = recipeData.baseIngredients;
+      recipeUrl = recipeData.recipeUrl;
+      recipeDescription = recipeData.description || "A delicious recipe that's sure to please everyone at the table!";
+      
+      // Get author information from the database if it exists
+      recipeAuthor = recipeData.author || "";
+      
+      // Reset game state
+      gameStarted = false;
+      gameWon = false;
+      moveHistory = [];
+      hintCount = 0;
+      vessels = [];
+      animations = [];
+      
+      console.log("Random recipe loaded successfully");
+    } catch (error) {
+      console.error("Error loading random recipe:", error);
+      isLoadingRandomRecipe = false;
+    }
+  }
+  
+  // Add loading state variable at the top with other game state variables
+  let isLoadingRandomRecipe = false;
   
   
