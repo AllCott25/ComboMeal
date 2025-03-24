@@ -3317,36 +3317,64 @@ let intermediate_combinations = [
       
       // Create the simplified emoji-based share text
       let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${eggEmoji}\n\nhttps://allcott25.github.io/ComboMeal/`;
+      const shareUrl = "https://allcott25.github.io/ComboMeal/";
       
-      // Skip Web Share API - directly use clipboard (more reliable)
-      console.log("Using clipboard to share text:", shareText);
+      // Check if this is running on mobile/iOS
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       
-      // Copy to clipboard
-      navigator.clipboard.writeText(shareText)
-        .then(() => {
-          // Create and show toast
-          const toast = document.createElement('div');
-          toast.className = 'share-toast';
-          toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
-          document.body.appendChild(toast);
-          
-          // Fade in with a small delay to ensure DOM update
-          setTimeout(() => {
-            toast.style.opacity = 1;
-          }, 50);
-          
-          // Fade out and remove after 3 seconds (longer display time)
-          setTimeout(() => {
-            toast.style.opacity = 0;
-            setTimeout(() => {
-              document.body.removeChild(toast);
-            }, 500);
-          }, 3000);
+      // Try Web Share API first for mobile devices
+      if (isMobile && navigator.share) {
+        navigator.share({
+          title: 'My Combo Meal Score',
+          text: shareText,
+          url: shareUrl
         })
-        .catch(err => {
-          console.error('Error copying to clipboard:', err);
-          alert('Error copying to clipboard: ' + err);
+        .then(() => {
+          console.log('Successfully shared using Web Share API');
+        })
+        .catch(error => {
+          console.log('Error sharing:', error);
+          // Fall back to clipboard if sharing fails
+          useClipboardFallback();
         });
+      } else {
+        // Use clipboard for desktop or if navigator.share is not available
+        useClipboardFallback();
+      }
+      
+      function useClipboardFallback() {
+        // Copy to clipboard
+        navigator.clipboard.writeText(shareText)
+          .then(() => {
+            // Create and show toast
+            const toast = document.createElement('div');
+            toast.className = 'share-toast';
+            toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
+            document.body.appendChild(toast);
+            
+            // Fade in with a small delay to ensure DOM update
+            setTimeout(() => {
+              toast.style.opacity = 1;
+            }, 50);
+            
+            // Fade out and remove after 3 seconds (longer display time)
+            setTimeout(() => {
+              toast.style.opacity = 0;
+              setTimeout(() => {
+                document.body.removeChild(toast);
+              }, 500);
+            }, 3000);
+          })
+          .catch(err => {
+            console.error('Error copying to clipboard:', err);
+            // More helpful error message for iOS users
+            if (isMobile) {
+              alert('Share option not available. Please manually copy this text:\n\n' + shareText);
+            } else {
+              alert('Error copying to clipboard: ' + err);
+            }
+          });
+      }
       
       // Reset hover states to prevent persistent highlighting
       isMouseOverCard = false;
@@ -3358,7 +3386,16 @@ let intermediate_combinations = [
   }
   
   function viewRecipe() {
-    window.open(recipeUrl, '_blank');
+    // Check if this is running on iOS or mobile
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // Use direct navigation for mobile devices
+      window.location.href = recipeUrl;
+    } else {
+      // Use new window for desktop
+      window.open(recipeUrl, '_blank');
+    }
     
     // Reset hover states to prevent persistent highlighting
     isMouseOverCard = false;
