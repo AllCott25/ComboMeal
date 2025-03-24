@@ -3367,12 +3367,8 @@ let intermediate_combinations = [
           })
           .catch(err => {
             console.error('Error copying to clipboard:', err);
-            // More helpful error message for iOS users
-            if (isMobile) {
-              alert('Share option not available. Please manually copy this text:\n\n' + shareText);
-            } else {
-              alert('Error copying to clipboard: ' + err);
-            }
+            // Show custom in-game modal for copying
+            showShareModal(shareText);
           });
       }
       
@@ -3390,8 +3386,16 @@ let intermediate_combinations = [
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
     if (isMobile) {
-      // Use direct navigation for mobile devices
-      window.location.href = recipeUrl;
+      // Create a temporary DOM element to open in a new tab
+      const a = document.createElement('a');
+      a.href = recipeUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      
+      // Append to body, click, and remove
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else {
       // Use new window for desktop
       window.open(recipeUrl, '_blank');
@@ -4596,5 +4600,90 @@ let intermediate_combinations = [
   
   // Add loading state variable at the top with other game state variables
   let isLoadingRandomRecipe = false;
+  
+  // New function to show a custom modal for sharing
+  function showShareModal(text) {
+    // Create modal container
+    const modal = document.createElement('div');
+    modal.style.position = 'fixed';
+    modal.style.top = '0';
+    modal.style.left = '0';
+    modal.style.width = '100%';
+    modal.style.height = '100%';
+    modal.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    modal.style.display = 'flex';
+    modal.style.flexDirection = 'column';
+    modal.style.alignItems = 'center';
+    modal.style.justifyContent = 'center';
+    modal.style.zIndex = '1000';
+    
+    // Create modal content
+    const content = document.createElement('div');
+    content.style.backgroundColor = '#FFFFFF';
+    content.style.padding = '20px';
+    content.style.borderRadius = '10px';
+    content.style.maxWidth = '90%';
+    content.style.textAlign = 'center';
+    
+    // Create header
+    const header = document.createElement('h3');
+    header.innerText = 'Copy Your Score';
+    header.style.marginTop = '0';
+    header.style.color = '#778F5D'; // Avocado green
+    
+    // Create text field
+    const textField = document.createElement('textarea');
+    textField.value = text;
+    textField.style.width = '100%';
+    textField.style.padding = '10px';
+    textField.style.marginTop = '10px';
+    textField.style.marginBottom = '15px';
+    textField.style.borderRadius = '5px';
+    textField.style.border = '1px solid #ccc';
+    textField.style.height = '80px';
+    textField.readOnly = true;
+    
+    // Create instructions
+    const instructions = document.createElement('p');
+    instructions.innerText = 'Tap and hold the text above to select and copy';
+    instructions.style.fontSize = '14px';
+    instructions.style.color = '#333';
+    
+    // Create close button
+    const closeButton = document.createElement('button');
+    closeButton.innerText = 'Close';
+    closeButton.style.backgroundColor = '#778F5D'; // Avocado green
+    closeButton.style.color = 'white';
+    closeButton.style.border = 'none';
+    closeButton.style.padding = '10px 20px';
+    closeButton.style.borderRadius = '5px';
+    closeButton.style.marginTop = '15px';
+    closeButton.style.cursor = 'pointer';
+    
+    // Add event listener to close modal
+    closeButton.addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+    
+    // Add event listener to select all text when tapped
+    textField.addEventListener('focus', () => {
+      textField.select();
+    });
+    
+    // Assemble modal
+    content.appendChild(header);
+    content.appendChild(textField);
+    content.appendChild(instructions);
+    content.appendChild(closeButton);
+    modal.appendChild(content);
+    
+    // Add to document
+    document.body.appendChild(modal);
+    
+    // Focus the text field to make it easier to copy
+    setTimeout(() => {
+      textField.focus();
+    }, 100);
+  }
   
   
