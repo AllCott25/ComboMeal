@@ -3318,37 +3318,30 @@ let intermediate_combinations = [
       let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${eggEmoji}\n\nhttps://allcott25.github.io/ComboMeal/`;
       const shareUrl = "https://allcott25.github.io/ComboMeal/";
       
-      // Check if this is running on mobile/iOS
-      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-      const isAndroid = /Android/i.test(navigator.userAgent);
-      const isMobile = isIOS || isAndroid;
+      // Check if mobile
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       
-      // Try Web Share API first for all mobile devices
+      // Use the native Web Share API directly if on mobile devices
       if (isMobile && navigator.share) {
-        navigator.share({
-          title: 'My Combo Meal Score',
-          text: shareText,
-          url: shareUrl
-        })
-        .then(() => {
-          console.log('Successfully shared using Web Share API');
-        })
-        .catch(error => {
-          console.log('Error sharing:', error);
-          // If Web Share API fails, go directly to system sharing on iOS
-          if (isIOS) {
-            // On iOS, directly open the system share sheet via SMS (most universal)
-            window.location.href = `sms:&body=${encodeURIComponent(shareText)}`;
-          } else {
-            // For non-iOS, use clipboard as fallback
+        // On iOS, force a small delay on first share attempt to avoid browser init issues
+        setTimeout(() => {
+          navigator.share({
+            title: 'My Combo Meal Score',
+            text: shareText,
+            url: shareUrl
+          })
+          .then(() => {
+            console.log('Successfully shared using Web Share API');
+          })
+          .catch(error => {
+            console.log('Error sharing:', error);
+            
+            // Fallback if Web Share API fails
             clipboardShareFallback(shareText);
-          }
-        });
-      } else if (isIOS) {
-        // If Web Share API isn't available on iOS, go directly to SMS sharing
-        window.location.href = `sms:&body=${encodeURIComponent(shareText)}`;
+          });
+        }, 100); // Short delay helps with first-time initialization on iOS
       } else {
-        // Desktop or Android without Web Share: use clipboard
+        // Desktop or browsers without Web Share API
         clipboardShareFallback(shareText);
       }
       
@@ -3361,34 +3354,94 @@ let intermediate_combinations = [
     }
   }
   
-  // Separate clipboard sharing function for non-iOS devices
+  // Separate clipboard sharing function for fallback
   function clipboardShareFallback(text) {
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        // Create and show toast
+    try {
+      // On iOS, sometimes the toast works better than clipboard API
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      
+      if (isIOS) {
+        // For iOS, create a simple share toast with instructions
         const toast = document.createElement('div');
         toast.className = 'share-toast';
-        toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
+        toast.style.position = 'fixed';
+        toast.style.bottom = '30px';
+        toast.style.left = '50%';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.backgroundColor = 'rgba(119, 143, 93, 0.9)'; // Avocado green
+        toast.style.color = 'white';
+        toast.style.padding = '12px 24px';
+        toast.style.borderRadius = '8px';
+        toast.style.zIndex = '1000';
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.3s ease';
+        toast.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+        toast.style.fontWeight = 'bold';
+        toast.style.fontSize = '16px';
+        toast.style.textAlign = 'center';
+        toast.innerText = 'Tap and hold to share your score manually 👇';
+        
         document.body.appendChild(toast);
         
-        // Fade in with a small delay to ensure DOM update
+        // Fade in
         setTimeout(() => {
-          toast.style.opacity = 1;
+          toast.style.opacity = '1';
         }, 50);
         
-        // Fade out and remove after 3 seconds
+        // Fade out after 3 seconds
         setTimeout(() => {
-          toast.style.opacity = 0;
+          toast.style.opacity = '0';
           setTimeout(() => {
-            document.body.removeChild(toast);
+            if (toast.parentNode) {
+              document.body.removeChild(toast);
+            }
           }, 500);
         }, 3000);
-      })
-      .catch(err => {
-        console.error('Error copying to clipboard:', err);
-        // Only show modal as absolute last resort
-        alert("Please copy this score manually:\n\n" + text);
-      });
+        
+        // Try to copy to clipboard silently
+        try {
+          navigator.clipboard.writeText(text).then(() => {
+            console.log('Text copied to clipboard silently as fallback');
+          });
+        } catch (clipErr) {
+          console.log('Silent clipboard copy failed, but toast is still shown');
+        }
+      } else {
+        // For non-iOS, use clipboard API with toast
+        navigator.clipboard.writeText(text)
+          .then(() => {
+            // Create and show toast
+            const toast = document.createElement('div');
+            toast.className = 'share-toast';
+            toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
+            document.body.appendChild(toast);
+            
+            // Fade in with a small delay to ensure DOM update
+            setTimeout(() => {
+              toast.style.opacity = '1';
+            }, 50);
+            
+            // Fade out and remove after 3 seconds
+            setTimeout(() => {
+              toast.style.opacity = '0';
+              setTimeout(() => {
+                if (toast.parentNode) {
+                  document.body.removeChild(toast);
+                }
+              }, 500);
+            }, 3000);
+          })
+          .catch(err => {
+            console.error('Error copying to clipboard:', err);
+            // Only show modal as absolute last resort
+            alert("Please copy this score manually:\n\n" + text);
+          });
+      }
+    } catch (error) {
+      console.error('Fallback share error:', error);
+      // Last resort
+      alert("Please copy this score manually:\n\n" + text);
+    }
   }
   
   function viewRecipe() {
