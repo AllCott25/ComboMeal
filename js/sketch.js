@@ -3361,50 +3361,52 @@ let intermediate_combinations = [
       const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
       
       if (isIOS) {
-        // For iOS, create a simple share toast with instructions
-        const toast = document.createElement('div');
-        toast.className = 'share-toast';
-        toast.style.position = 'fixed';
-        toast.style.bottom = '30px';
-        toast.style.left = '50%';
-        toast.style.transform = 'translateX(-50%)';
-        toast.style.backgroundColor = 'rgba(119, 143, 93, 0.9)'; // Avocado green
-        toast.style.color = 'white';
-        toast.style.padding = '12px 24px';
-        toast.style.borderRadius = '8px';
-        toast.style.zIndex = '1000';
-        toast.style.opacity = '0';
-        toast.style.transition = 'opacity 0.3s ease';
-        toast.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
-        toast.style.fontWeight = 'bold';
-        toast.style.fontSize = '16px';
-        toast.style.textAlign = 'center';
-        toast.innerText = 'Tap and hold to share your score manually 👇';
-        
-        document.body.appendChild(toast);
-        
-        // Fade in
-        setTimeout(() => {
-          toast.style.opacity = '1';
-        }, 50);
-        
-        // Fade out after 3 seconds
-        setTimeout(() => {
-          toast.style.opacity = '0';
-          setTimeout(() => {
-            if (toast.parentNode) {
-              document.body.removeChild(toast);
-            }
-          }, 500);
-        }, 3000);
-        
-        // Try to copy to clipboard silently
+        // For iOS, try to copy to clipboard silently
         try {
           navigator.clipboard.writeText(text).then(() => {
-            console.log('Text copied to clipboard silently as fallback');
+            // Show a simpler toast notification
+            const toast = document.createElement('div');
+            toast.className = 'share-toast';
+            toast.style.position = 'fixed';
+            toast.style.bottom = '30px';
+            toast.style.left = '50%';
+            toast.style.transform = 'translateX(-50%)';
+            toast.style.backgroundColor = 'rgba(119, 143, 93, 0.9)'; // Avocado green
+            toast.style.color = 'white';
+            toast.style.padding = '12px 24px';
+            toast.style.borderRadius = '8px';
+            toast.style.zIndex = '1000';
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s ease';
+            toast.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+            toast.style.fontWeight = 'bold';
+            toast.style.fontSize = '16px';
+            toast.style.textAlign = 'center';
+            toast.innerText = '🍽️ Score copied to clipboard! 🍽️';
+            
+            document.body.appendChild(toast);
+            
+            // Fade in
+            setTimeout(() => {
+              toast.style.opacity = '1';
+            }, 50);
+            
+            // Fade out after 3 seconds
+            setTimeout(() => {
+              toast.style.opacity = '0';
+              setTimeout(() => {
+                if (toast.parentNode) {
+                  document.body.removeChild(toast);
+                }
+              }, 500);
+            }, 3000);
+            
+            console.log('Text copied to clipboard silently on iOS');
           });
         } catch (clipErr) {
-          console.log('Silent clipboard copy failed, but toast is still shown');
+          console.log('Silent clipboard copy failed on iOS, showing modal as fallback');
+          // Last resort - show alert
+          alert("Please copy this score manually:\n\n" + text);
         }
       } else {
         // For non-iOS, use clipboard API with toast
@@ -3445,19 +3447,34 @@ let intermediate_combinations = [
   }
   
   function viewRecipe() {
-    if (isRecipeButtonVisible && inWinScreen) {
-      const recipeUrl = `https://learnto.cook/card?id=${currentRecipe.id}`;
+    // Simply try to open the recipe URL - no need for extra conditions
+    try {
+      // Get the recipe ID safely with fallbacks
+      let recipeId = '';
       
-      try {
-        // Directly open in new tab with window.open
-        window.open(recipeUrl, '_blank');
-      } catch (e) {
-        // Fallback if window.open fails
-        window.location.href = recipeUrl;
+      if (final_combination && final_combination.id) {
+        recipeId = final_combination.id;
+      } else if (currentRecipe && currentRecipe.id) {
+        recipeId = currentRecipe.id;
+      } else if (recipe_data && recipe_data.id) {
+        recipeId = recipe_data.id;
       }
       
-      // Reset hover states for buttons
-      buttons.forEach(b => b.isHovering = false);
+      if (recipeId) {
+        const recipeUrl = `https://learnto.cook/card?id=${recipeId}`;
+        console.log("Opening recipe URL:", recipeUrl);
+        
+        // Directly open in new tab with window.open
+        window.open(recipeUrl, '_blank');
+      } else {
+        console.warn("Could not find recipe ID to open");
+      }
+    } catch (e) {
+      // Fallback if window.open fails
+      console.error("Error opening recipe:", e);
+      if (recipeUrl) {
+        window.location.href = recipeUrl;
+      }
     }
   }
   
