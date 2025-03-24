@@ -3314,8 +3314,8 @@ let intermediate_combinations = [
         eggEmoji = '🍳';
       }
       
-      // Create the simplified emoji-based share text
-      let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${eggEmoji}\n\nhttps://allcott25.github.io/ComboMeal/`;
+      // Create the simplified emoji-based share text - WITHOUT the URL
+      let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${eggEmoji}`;
       const shareUrl = "https://allcott25.github.io/ComboMeal/";
       
       // Check if mobile
@@ -3336,8 +3336,8 @@ let intermediate_combinations = [
           .catch(error => {
             console.log('Error sharing:', error);
             
-            // Fallback if Web Share API fails
-            clipboardShareFallback(shareText);
+            // Fallback if Web Share API fails - combine text and URL for clipboard
+            clipboardShareFallback(shareText + '\n\n' + shareUrl);
           });
         }, 100); // Short delay helps with first-time initialization on iOS
       } else {
@@ -3445,28 +3445,20 @@ let intermediate_combinations = [
   }
   
   function viewRecipe() {
-    // Check if this is running on iOS or mobile
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      // Create a temporary DOM element to open in a new tab
-      const a = document.createElement('a');
-      a.href = recipeUrl;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
+    if (isRecipeButtonVisible && inWinScreen) {
+      const recipeUrl = `https://learnto.cook/card?id=${currentRecipe.id}`;
       
-      // Append to body, click, and remove
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } else {
-      // Use new window for desktop
-      window.open(recipeUrl, '_blank');
+      try {
+        // Directly open in new tab with window.open
+        window.open(recipeUrl, '_blank');
+      } catch (e) {
+        // Fallback if window.open fails
+        window.location.href = recipeUrl;
+      }
+      
+      // Reset hover states for buttons
+      buttons.forEach(b => b.isHovering = false);
     }
-    
-    // Reset hover states to prevent persistent highlighting
-    isMouseOverCard = false;
-    isMouseOverLetterScore = false;
   }
   
   function mouseMoved() {
