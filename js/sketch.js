@@ -3938,10 +3938,11 @@ let intermediate_combinations = [
   
   // Add touch support for mobile devices
   function touchStarted() {
-    // Update mouse coordinates to match touch position first
+    // Update mouse coordinates to match normalized touch position
     if (touches.length > 0) {
-      mouseX = touches[0].x;
-      mouseY = touches[0].y;
+      const normalized = normalizeTouchCoordinates(touches[0].x, touches[0].y);
+      mouseX = normalized.x;
+      mouseY = normalized.y;
     }
     
     // Check if any easter egg modal is active and handle the click  
@@ -4555,10 +4556,11 @@ let intermediate_combinations = [
   
   // Add touch move support for mobile devices
   function touchMoved() {
-    // Update mouse coordinates to match touch position
+    // Update mouse coordinates to match normalized touch position
     if (touches.length > 0) {
-      mouseX = touches[0].x;
-      mouseY = touches[0].y;
+      const normalized = normalizeTouchCoordinates(touches[0].x, touches[0].y);
+      mouseX = normalized.x;
+      mouseY = normalized.y;
       
       // Update hover states for win screen
       if (gameWon) {
@@ -5015,6 +5017,25 @@ let intermediate_combinations = [
         circle(x, y, circleSize);
       }
     }
+  }
+  
+  // Add after the existing utility functions, before setup()
+  function normalizeTouchCoordinates(x, y) {
+    // Get the device pixel ratio to handle high DPI displays
+    const dpr = window.devicePixelRatio || 1;
+    
+    // Get the canvas's bounding rectangle to account for any scaling
+    const rect = canvas.getBoundingClientRect();
+    
+    // Calculate the scale factors
+    const scaleX = canvas.width / (rect.width * dpr);
+    const scaleY = canvas.height / (rect.height * dpr);
+    
+    // Normalize the coordinates
+    return {
+      x: (x - rect.left) * scaleX,
+      y: (y - rect.top) * scaleY
+    };
   }
   
   
