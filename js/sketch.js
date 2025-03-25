@@ -4539,39 +4539,16 @@ let intermediate_combinations = [
     endShape(CLOSE);
   }
   
-  // Add touch release support for mobile devices
   function touchEnded() {
-    // Update mouse coordinates to match touch position
-    if (touches.length > 0) {
-      mouseX = touches[0].x;
-      mouseY = touches[0].y;
-    }
-    
-    // Call the mouse event handler
-    mouseReleased();
-    
-    // Prevent default to avoid scrolling
-    return false;
-  }
-  
-  // Add touch move support for mobile devices
-  function touchMoved() {
     // Update mouse coordinates to match normalized touch position
     if (touches.length > 0) {
       const normalized = normalizeTouchCoordinates(touches[0].x, touches[0].y);
       mouseX = normalized.x;
       mouseY = normalized.y;
-      
-      // Update hover states for win screen
-      if (gameWon) {
-        // Use simplified hover detection based on screen position
-        isMouseOverLetterScore = (mouseY >= height/2);
-        isMouseOverCard = (mouseY < height/2);
-      }
     }
     
     // Call the mouse event handler
-    mouseDragged();
+    mouseReleased();
     
     // Prevent default to avoid scrolling
     return false;
@@ -5036,6 +5013,29 @@ let intermediate_combinations = [
       x: (x - rect.left) * scaleX,
       y: (y - rect.top) * scaleY
     };
+  }
+  
+  // Add touch move support for mobile devices
+  function touchMoved() {
+    // Update mouse coordinates to match normalized touch position
+    if (touches.length > 0) {
+      const normalized = normalizeTouchCoordinates(touches[0].x, touches[0].y);
+      mouseX = normalized.x;
+      mouseY = normalized.y;
+      
+      // Update hover states for win screen
+      if (gameWon) {
+        // Use simplified hover detection based on screen position
+        isMouseOverLetterScore = (mouseY >= height/2);
+        isMouseOverCard = (mouseY < height/2);
+      }
+    }
+    
+    // Call the mouse event handler
+    mouseDragged();
+    
+    // Prevent default to avoid scrolling
+    return false;
   }
   
   
