@@ -329,6 +329,12 @@ let intermediate_combinations = [
       let v = new Vessel([], [], this.name, COLORS.vesselHint, this.x, this.y, vesselWidth, vesselHeight);
       v.isAdvanced = true; // Mark as advanced for proper rendering
       v.pulse();
+      
+      // Add to completedGreenVessels with isHint flag - APlasker
+      if (!completedGreenVessels.some(vessel => vessel.name === this.name)) {
+        completedGreenVessels.push({name: this.name, isHint: true});
+      }
+      
       return v;
     }
   }
@@ -1268,8 +1274,8 @@ let intermediate_combinations = [
         }
       }
       
-      // Draw move history
-      drawMoveHistory();
+      // Draw game counters (combo and error) - APlasker
+      drawGameCounters();
     }
     
     // Draw any active easter egg modals
@@ -1388,7 +1394,7 @@ let intermediate_combinations = [
     textStyle(BOLD);
     textWrap(WORD);
     fill('#333');
-    text("Solve the recipe by assembling all ingredients into recipe-based combos!", 
+    text("Decode the dish by assembling all ingredients into recipe-based combos!", 
          playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.11, titleTextWidth);
     
     // Reset text style to normal for other text
@@ -2026,26 +2032,26 @@ let intermediate_combinations = [
     // Calculate total score (only counting red hint and black moves)
     const totalScore = blackMoves + redHintMoves;
     
-    // Determine letter grade and color based on total score
+    // Determine letter grade and color based on ONLY blackMoves (errors)
     // Using global letterGrade variable
     let letterColor;
     // Using the global isAPlus variable now
     isAPlus = false;
     
-    if (totalScore === 0) {
+    if (blackMoves === 0) {
       letterGrade = "A";
       letterColor = color(0, 120, 255); // Blue
-      isAPlus = true; // Mark as A+ for diamond decoration
-    } else if (totalScore === 1) {
-      letterGrade = "A";
-      letterColor = color(0, 120, 255); // Blue
-    } else if (totalScore >= 2 && totalScore <= 3) {
+      // A+ is achieved with zero errors AND zero hints
+      if (redHintMoves === 0) {
+        isAPlus = true; // Mark as A+ for diamond decoration
+      }
+    } else if (blackMoves >= 1 && blackMoves <= 2) {
       letterGrade = "B";
       letterColor = COLORS.green; // Use our explicit green color
-    } else if (totalScore >= 4 && totalScore <= 7) {
+    } else if (blackMoves >= 3 && blackMoves <= 4) {
       letterGrade = "C";
       letterColor = COLORS.tertiary; // Yellow from vessels
-    } else { // totalScore >= 8
+    } else { // blackMoves >= 5
       letterGrade = "X";
       letterColor = COLORS.secondary; // Red from vessels
     }
@@ -2477,6 +2483,65 @@ let intermediate_combinations = [
         fill(moveColor);
         stroke(0);
         strokeWeight(2); // Increased to 2px
+        circle(x, y, circleSize);
+      }
+    }
+  }
+  
+  // Draw combo counter showing progress toward completing all combinations - APlasker
+  function drawComboCounter() {
+    // Position to the left of move history
+    const counterY = playAreaY + playAreaHeight * 0.92;
+    const circleSize = 18;
+    const circleSpacing = 25;
+    const labelOffset = 20; // Reduced space for "Combos:" text to make it closer to circles
+    
+    // Get the total number of possible combinations (including final combination)
+    const totalCombos = intermediate_combinations.length + 1; // +1 for final recipe - APlasker
+    
+    // Calculate starting position (from right side toward center)
+    const startX = playAreaX + playAreaWidth * 0.25;
+    
+    // Draw "Combos:" label - match hint button text style
+    fill('black');
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(14); // Match size with hint button
+    textStyle(BOLD);
+    text("Combos:", startX - 5, counterY); // Moved closer to circles
+    
+    // Draw combo circles
+    for (let i = 0; i < totalCombos; i++) {
+      const x = startX + (i * circleSpacing) + labelOffset;
+      const y = counterY;
+      
+      // Get completed vessels count
+      const completedCount = completedGreenVessels.length;
+      
+      // Instead of checking specific combos, just fill in from left to right - APlasker
+      const isCompleted = i < completedCount;
+      
+      if (isCompleted) {
+        // Check if this combo was completed with a hint - APlasker
+        const isHintCombo = completedGreenVessels[i] && completedGreenVessels[i].isHint;
+        
+        // Completed combo: 100% opacity circle with white checkmark
+        // Use hint color (red) if completed with hint, otherwise green
+        fill(isHintCombo ? COLORS.vesselHint : COLORS.green);
+        stroke('black');
+        strokeWeight(2);
+        circle(x, y, circleSize * 1.2);
+        
+        // Draw white checkmark
+        stroke('white');
+        strokeWeight(3);
+        line(x - circleSize * 0.3, y, x - circleSize * 0.1, y + circleSize * 0.3);
+        line(x - circleSize * 0.1, y + circleSize * 0.3, x + circleSize * 0.4, y - circleSize * 0.3);
+      } else {
+        // Incomplete combo: 50% opacity green circle
+        fill(COLORS.green + '80'); // Add 80 for 50% opacity in hex
+        stroke('black');
+        strokeWeight(1.5);
         circle(x, y, circleSize);
       }
     }
@@ -2964,6 +3029,11 @@ let intermediate_combinations = [
               }
             }
             
+            // Add to completedGreenVessels when creating a green vessel - APlasker
+            if (!completedGreenVessels.some(vessel => vessel.name === C.name)) {
+              completedGreenVessels.push({name: C.name});
+            }
+            
             console.log(`Created green vessel for ${C.name} with ingredients: ${U.join(', ')}`);
           }
         } else {
@@ -3053,6 +3123,11 @@ let intermediate_combinations = [
               new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
             }
             
+            // Add parent combo to completed vessels - APlasker
+            if (!completedGreenVessels.some(vessel => vessel.name === parentCombo.name)) {
+              completedGreenVessels.push({name: parentCombo.name});
+            }
+            
             console.log(`Created green vessel for ${parentCombo.name}`);
           } else {
             console.log(`Created yellow vessel with combinations: ${U.join(', ')}`);
@@ -3091,6 +3166,11 @@ let intermediate_combinations = [
           if (final_combination.verb) {
             new_v.verb = final_combination.verb;
             new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
+          }
+          
+          // Add final combo to completedGreenVessels too - APlasker
+          if (!completedGreenVessels.some(vessel => vessel.name === final_combination.name)) {
+            completedGreenVessels.push({name: final_combination.name});
           }
           
           console.log(`Created green vessel for final combination ${final_combination.name}`);
@@ -3314,8 +3394,15 @@ let intermediate_combinations = [
         eggEmoji = '🍳';
       }
       
+      // Count red hint moves from moveHistory
+      // Add hint indicators (question mark emoji) based on how many hints were used
+      let hintEmojis = '';
+      for (let i = 0; i < hintCount; i++) {
+        hintEmojis += '❓';
+      }
+      
       // Create the simplified emoji-based share text - WITHOUT the URL
-      let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${eggEmoji}`;
+      let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${hintEmojis} ${eggEmoji}`;
       const shareUrl = "https://allcott25.github.io/ComboMeal/";
       
       // Check if mobile
@@ -3350,7 +3437,7 @@ let intermediate_combinations = [
       isMouseOverLetterScore = false;
     } catch (error) {
       console.error("Error in shareScore function:", error);
-      alert("Sorry, there was an error sharing your score. Please try again.");
+      alert("Whoops! Something's broken. Let me know and I'll fix it ✌️");
     }
   }
   
@@ -3447,33 +3534,62 @@ let intermediate_combinations = [
   }
   
   function viewRecipe() {
-    // Simply try to open the recipe URL - no need for extra conditions
     try {
       // Get the recipe ID safely with fallbacks
       let recipeId = '';
       
       if (final_combination && final_combination.id) {
         recipeId = final_combination.id;
-      } else if (currentRecipe && currentRecipe.id) {
-        recipeId = currentRecipe.id;
       } else if (recipe_data && recipe_data.id) {
         recipeId = recipe_data.id;
       }
       
-      if (recipeId) {
-        const recipeUrl = `https://learnto.cook/card?id=${recipeId}`;
-        console.log("Opening recipe URL:", recipeUrl);
-        
-        // Directly open in new tab with window.open
-        window.open(recipeUrl, '_blank');
+      // Use the recipeUrl from Supabase if available - APlasker
+      let urlToOpen = 'https://www.google.com'; // Default fallback to Google
+      
+      if (recipeUrl) {
+        urlToOpen = recipeUrl; // Use the URL loaded from Supabase
+        console.log("Opening recipe URL from database:", urlToOpen);
       } else {
-        console.warn("Could not find recipe ID to open");
+        console.warn("No recipe URL found in database, using fallback");
+      }
+      
+      // Create anchor element with correct attributes for new tab
+      const anchorEl = document.createElement('a');
+      anchorEl.href = urlToOpen;
+      anchorEl.target = '_blank'; // Force new tab
+      anchorEl.rel = 'noopener noreferrer'; // Security best practice
+      
+      // iOS Safari needs the element to be in the DOM and clicked
+      document.body.appendChild(anchorEl);
+      
+      // Programmatically trigger a click
+      anchorEl.click();
+      
+      // Clean up the DOM
+      setTimeout(() => {
+        if (document.body.contains(anchorEl)) {
+          document.body.removeChild(anchorEl);
+        }
+      }, 100);
+      
+      // Fallback in case the DOM approach doesn't work (older browsers)
+      try {
+        window.open(urlToOpen, '_blank');
+      } catch (innerErr) {
+        console.log('Anchor method should have worked, window.open fallback unnecessary');
       }
     } catch (e) {
-      // Fallback if window.open fails
+      // Error handler for any unexpected issues
       console.error("Error opening recipe:", e);
-      if (recipeUrl) {
-        window.location.href = recipeUrl;
+      
+      // Final fallback - try direct location change as last resort
+      // This won't open in a new tab but is better than nothing
+      try {
+        window.location.href = "https://www.google.com"; // Changed to Google fallback - APlasker
+      } catch (finalErr) {
+        console.error("All attempts to open recipe failed:", finalErr);
+        alert("Unable to open recipe. Please try visiting Google directly.");
       }
     }
   }
@@ -3995,6 +4111,7 @@ let intermediate_combinations = [
     showingHint = false;
     hintVessel = null;
     hintCount = 0; // Reset hint count when game starts
+    completedGreenVessels = []; // Reset completed green vessels - APlasker
   }
   
   // Function to get current time in EST for debugging
@@ -4756,6 +4873,148 @@ let intermediate_combinations = [
     setTimeout(() => {
       textField.focus();
     }, 100);
+  }
+  
+  // Combined function to draw both combo counter and move history in a single row - APlasker
+  function drawGameCounters() {
+    // Position counters lower in the play area
+    const counterY = playAreaY + playAreaHeight * 0.95; // Moved down from 0.92
+    
+    // Center of the play area for overall positioning
+    const centerX = playAreaX + playAreaWidth / 2;
+    
+    // Use a consistent circle size for all counters - APlasker
+    const circleSize = 15;
+    const comboSpacing = 22;
+    const errorSpacing = 22; // Match combo spacing for visual consistency - APlasker
+    
+    // Get the total number of possible combinations (including final combination)
+    const totalCombos = intermediate_combinations.length + 1;
+    
+    // --- ERROR COUNTER SECTION ---
+    const totalErrorSlots = 4; // Show 4 slots for errors - APlasker
+    
+    // Filter moveHistory to only include error markers (black only) - APlasker
+    const filteredMoveHistory = moveHistory.filter(move => 
+      move === 'black' || move === '#333333');
+    
+    // Limit the number of counters to display
+    const displayCount = Math.min(filteredMoveHistory.length, totalErrorSlots);
+    
+    // Consistent label width for both sections
+    const labelWidth = 65;
+    
+    // Calculate total width needed for combo counters
+    const comboWidth = (totalCombos * comboSpacing) + labelWidth;
+    
+    // Calculate width needed for error counters
+    const errorWidth = (totalErrorSlots * errorSpacing) + labelWidth;
+    
+    // Calculate divider width
+    const dividerWidth = 40; // Space for divider symbol (🍴)
+    
+    // Calculate starting positions to center the entire counter display
+    const totalWidth = comboWidth + dividerWidth + errorWidth;
+    const startX = centerX - (totalWidth / 2);
+    
+    // --- RESET ALL TEXT PROPERTIES FOR CONSISTENCY - APlasker ---
+    textFont(bodyFont);
+    textStyle(NORMAL);
+    
+    // --- DRAW COMBO COUNTERS ---
+    // Draw "Combos:" label
+    fill('black');
+    noStroke();
+    textAlign(RIGHT, CENTER);
+    textSize(14);
+    textStyle(BOLD);
+    const comboLabelX = startX + labelWidth; // Position for "Combos:" text
+    text("Combos:", comboLabelX, counterY);
+    
+    // Draw combo circles
+    for (let i = 0; i < totalCombos; i++) {
+      const x = comboLabelX + 15 + (i * comboSpacing);
+      const y = counterY;
+      
+      // Get completed vessels count
+      const completedCount = completedGreenVessels.length;
+      
+      // Fill in from left to right
+      const isCompleted = i < completedCount;
+      
+      if (isCompleted) {
+        // Check if this combo was completed with a hint
+        const isHintCombo = completedGreenVessels[i] && completedGreenVessels[i].isHint;
+        
+        // Completed combo: 100% opacity circle with white checkmark
+        fill(isHintCombo ? COLORS.vesselHint : COLORS.green);
+        stroke('black');
+        strokeWeight(1.5);
+        circle(x, y, circleSize);
+        
+        // Draw white checkmark
+        stroke('white');
+        strokeWeight(2.5);
+        line(x - circleSize * 0.3, y, x - circleSize * 0.1, y + circleSize * 0.3);
+        line(x - circleSize * 0.1, y + circleSize * 0.3, x + circleSize * 0.4, y - circleSize * 0.3);
+      } else {
+        // Incomplete combo: 50% opacity green circle
+        fill(COLORS.green + '80'); // Add 80 for 50% opacity in hex
+        stroke('black');
+        strokeWeight(1);
+        circle(x, y, circleSize);
+      }
+    }
+    
+    // --- DRAW DIVIDER ---
+    const dividerX = startX + comboWidth + (dividerWidth / 2);
+    fill('black');
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    textStyle(NORMAL); // Reset text style for divider - APlasker
+    text("🍴", dividerX, counterY);
+    
+    // --- DRAW ERROR COUNTERS ---
+    // Reset text properties before drawing error counters - APlasker
+    textFont(bodyFont);
+    textSize(14);
+    textStyle(BOLD);
+    
+    // Draw "Errors:" label 
+    textAlign(LEFT, CENTER);
+    const errorLabelX = dividerX + (dividerWidth / 2);
+    text("Errors:", errorLabelX, counterY);
+    
+    // Draw error circles - both filled and empty placeholders
+    for (let i = 0; i < totalErrorSlots; i++) {
+      // Fix spacing to prevent overlap with label - APlasker
+      const x = errorLabelX + labelWidth + (i * errorSpacing);
+      const y = counterY;
+      
+      if (i < displayCount) {
+        // Filled error counter (black)
+        fill('black');
+        stroke('black');
+        strokeWeight(1.5);
+        circle(x, y, circleSize);
+        
+        // If there are 5+ errors, add red X's to error counters - APlasker
+        if (filteredMoveHistory.length >= 5) {
+          stroke(COLORS.vesselHint); // Changed to burnt orange hint color - APlasker
+          strokeWeight(2.5); // Made X's bolder - APlasker
+          // Draw X
+          line(x - circleSize/3, y - circleSize/3, x + circleSize/3, y + circleSize/3);
+          line(x + circleSize/3, y - circleSize/3, x - circleSize/3, y + circleSize/3);
+        }
+      } else {
+        // Empty error placeholder - 50% opacity black - APlasker
+        fill('rgba(0, 0, 0, 0.5)');
+        stroke('black');
+        strokeWeight(1);
+        circle(x, y, circleSize);
+      }
+    }
   }
   
   
