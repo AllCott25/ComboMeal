@@ -3938,11 +3938,10 @@ let intermediate_combinations = [
   
   // Add touch support for mobile devices
   function touchStarted() {
-    // Update mouse coordinates to match normalized touch position
+    // Update mouse coordinates to match touch position first
     if (touches.length > 0) {
-      const normalized = normalizeTouchCoordinates(touches[0].x, touches[0].y);
-      mouseX = normalized.x;
-      mouseY = normalized.y;
+      mouseX = touches[0].x;
+      mouseY = touches[0].y;
     }
     
     // Check if any easter egg modal is active and handle the click  
@@ -4539,16 +4538,38 @@ let intermediate_combinations = [
     endShape(CLOSE);
   }
   
+  // Add touch release support for mobile devices
   function touchEnded() {
-    // Update mouse coordinates to match normalized touch position
+    // Update mouse coordinates to match touch position
     if (touches.length > 0) {
-      const normalized = normalizeTouchCoordinates(touches[0].x, touches[0].y);
-      mouseX = normalized.x;
-      mouseY = normalized.y;
+      mouseX = touches[0].x;
+      mouseY = touches[0].y;
     }
     
     // Call the mouse event handler
     mouseReleased();
+    
+    // Prevent default to avoid scrolling
+    return false;
+  }
+  
+  // Add touch move support for mobile devices
+  function touchMoved() {
+    // Update mouse coordinates to match touch position
+    if (touches.length > 0) {
+      mouseX = touches[0].x;
+      mouseY = touches[0].y;
+      
+      // Update hover states for win screen
+      if (gameWon) {
+        // Use simplified hover detection based on screen position
+        isMouseOverLetterScore = (mouseY >= height/2);
+        isMouseOverCard = (mouseY < height/2);
+      }
+    }
+    
+    // Call the mouse event handler
+    mouseDragged();
     
     // Prevent default to avoid scrolling
     return false;
@@ -4994,48 +5015,6 @@ let intermediate_combinations = [
         circle(x, y, circleSize);
       }
     }
-  }
-  
-  // Add after the existing utility functions, before setup()
-  function normalizeTouchCoordinates(x, y) {
-    // Get the device pixel ratio to handle high DPI displays
-    const dpr = window.devicePixelRatio || 1;
-    
-    // Get the canvas's bounding rectangle to account for any scaling
-    const rect = canvas.getBoundingClientRect();
-    
-    // Calculate the scale factors
-    const scaleX = canvas.width / (rect.width * dpr);
-    const scaleY = canvas.height / (rect.height * dpr);
-    
-    // Normalize the coordinates
-    return {
-      x: (x - rect.left) * scaleX,
-      y: (y - rect.top) * scaleY
-    };
-  }
-  
-  // Add touch move support for mobile devices
-  function touchMoved() {
-    // Update mouse coordinates to match normalized touch position
-    if (touches.length > 0) {
-      const normalized = normalizeTouchCoordinates(touches[0].x, touches[0].y);
-      mouseX = normalized.x;
-      mouseY = normalized.y;
-      
-      // Update hover states for win screen
-      if (gameWon) {
-        // Use simplified hover detection based on screen position
-        isMouseOverLetterScore = (mouseY >= height/2);
-        isMouseOverCard = (mouseY < height/2);
-      }
-    }
-    
-    // Call the mouse event handler
-    mouseDragged();
-    
-    // Prevent default to avoid scrolling
-    return false;
   }
   
   
