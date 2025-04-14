@@ -1,0 +1,60 @@
+Updates made on March 26, 2024:
+
+- Modified the layer order in the tutorial to place the yellow starburst behind the green vessel instead of on top of it
+- Updated the share text to show egg emoji only when an Easter egg is found, matching the visual indicator
+- Simplified share text by removing "Play at:" prefix from URL
+- Updated by: APlasker 
+
+March 26, 2024 Updates (by APlasker):
+
+1. Modified layer order in tutorial to place yellow starburst behind green vessel
+2. Updated share text to show egg emoji only when Easter egg is found
+3. Simplified share text by removing "Play at:" prefix from URL
+4. Added invisible tutorial hotspot in top-left corner of win screen for beta testing (40x40 pixels)
+
+[2024-03-26 15:30] Added invisible hotspots for beta testing:
+- Tutorial hotspot moved to "Y" in "YOU MADE IT!"
+- Random recipe hotspot added to "!" in "YOU MADE IT!"
+- Added random recipe loading functionality
+- Added debug logging for hotspot interactions
+- Made hotspots work on both desktop and mobile
+- No visual changes to the game
+- By APlasker 
+
+[2024-03-26 15:45] Improved random recipe hotspot:
+- Increased hotspot size from 40x40 to 60x60 pixels
+- Added debug visualization (semi-transparent red rectangle) when hovering over hotspot
+- Added more detailed debug logging for hotspot interactions
+- By APlasker 
+
+[2024-03-26 16:00] Swapped win screen hotspots:
+- Moved random recipe hotspot to "Y" in "YOU MADE IT!"
+- Moved tutorial hotspot to "!" in "YOU MADE IT!"
+- Kept 60x60 pixel size and debug visualization
+- Debug visualization now uses green for tutorial and red for random recipe
+- By APlasker 
+
+[2024-03-26 16:15] Fixed random recipe hotspot:
+- Moved random recipe check to end of event handlers
+- Added loading state to prevent multiple clicks
+- Added proper async handling with finally block
+- By APlasker 
+
+[2024-03-26 16:30] Enhanced random recipe functionality:
+- Modified random recipe loading to exclude the current day's recipe
+- Added additional error handling and logging
+- Improved user experience by ensuring variety when using the random recipe feature
+- By APlasker
+
+[2024-03-26 16:45] Fixed random recipe loading errors:
+- Fixed date function usage to properly exclude current recipe
+- Improved error handling to prevent UI getting stuck in loading state
+- Simplified implementation to use existing date function
+- By APlasker
+
+[2024-03-26 17:00] Simplified hotspot functionality:
+- Removed tutorial hotspot function
+- Moved random recipe hotspot to "!" in "YOU MADE IT!"
+- Kept the same visual debugging features
+- Improved code organization by moving the hotspot check earlier in the event handlers
+- By APlasker

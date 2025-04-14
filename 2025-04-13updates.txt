@@ -1,0 +1,15 @@
+CM11 Updates - 2025-04-13 22:33:24
+Implemented by: APlasker
+
+Changes Made:
+1. Updated the mouseReleased function in js/sketch.js to use COLORS constants instead of hardcoded color strings
+2. Added drawTutorialVessel function that uses COLORS constants for consistent color handling
+
+These changes improve code consistency by replacing all hardcoded color values with references 
+to the COLORS constants. The functionality remains identical, but the code is now more maintainable
+and easier to update if color schemes change in the future.
+
+Testing:
+1. Test that vessel color combinations work correctly
+2. Verify that the easter egg functionality still works when using yellow vessels
+3. Confirm that tutorial vessels display with the correct colors and outlines 

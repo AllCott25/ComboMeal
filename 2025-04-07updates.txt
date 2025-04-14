@@ -1,0 +1,18 @@
+# ComboMeal Game Updates - 2025-04-07 - 13:29 EDT
+
+## Changes made by APlasker:
+
+- Updated the error counter terminology to "Wrongos" instead of "Errors"
+- Changed the label from "Errors:" to "Wrongos:" in the game interface
+- Updated related comments in the code to maintain terminology consistency
+- Fixed spacing issue between "Wrongos:" label and counter markers to prevent overlap
+- Made label width responsive to screen size to ensure proper spacing on all devices
+- Added dramatic cloud-like animation for verbs that covers the play area
+- Replaced small verb bubbles with a dramatic puff of smoke animation that reveals the cooking action
+- Improved visual feedback with organic cloud shapes and large, bold text for cooking verbs
+- Fixed issues with verb animation visibility and added fallback verbs when recipes don't specify them
+- Added debugging features to ensure proper display of cooking verbs during combinations
+- Enhanced cloud animation with better text visibility and smoother transitions
+- All core gameplay mechanics remain the same, only the visual presentation has been enhanced
+
+These updates were applied to maintain a more fun and playful tone in the game interface and to add visual drama to successful combinations. 

@@ -1,0 +1,11 @@
+      
+      // Reset dragged vessel and ensure proper grid arrangement
+      draggedVessel = null;
+      arrangeVessels();
+    } 
+    // Handle win screen touch events
+    }
+    else if (gameWon && touches.length > 0) {
+      let touchX = touches[0].x;
+      let touchY = touches[0].y;
+      

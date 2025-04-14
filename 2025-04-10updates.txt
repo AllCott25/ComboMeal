@@ -1,0 +1,41 @@
+CM11 Game Updates - April 10, 2025
+Time: 16:25 EDT
+Developer: APlasker
+
+ERROR MESSAGE SYSTEM ANALYSIS:
+
+1. Current Implementation:
+   - Error messages are stored in arrays in both js/byline.js and js/sketch.js
+   - Messages include phrases like "Sounds tasty, but not quite right" and "Need a peek at the recipe? Try a hint!"
+   - The system tracks used messages to avoid repetition
+   - Different messages are shown for first errors versus subsequent errors
+   - Implementation uses the showRandomErrorMessage() function to manage display logic
+
+2. Key Features:
+   - Randomization of messages to provide variety to users
+   - State tracking with variables like firstErrorOccurred and usedErrorMessages
+   - Transition effects when displaying new messages via updateBylineWithTransition
+   - Reset mechanism when all messages have been displayed
+
+3. Files Containing Error Message Logic:
+   - js/byline.js: Contains core error message array and display logic
+   - js/sketch.js: Contains similar implementation, likely for integration with game mechanics
+
+BUG FIX - HELP MODAL TEXT ERROR:
+
+1. Issue Fixed:
+   - Fixed "Uncaught ReferenceError: totalHeight is not defined" error in help.js
+   - Error occurred when text() function was called with incorrect parameters in drawHelpVessel function
+
+2. Solution:
+   - Modified text() function calls in drawHelpVessel to use correct parameter signature
+   - Removed the unnecessary height parameter when drawing text which was causing the error
+   - Maintained the same visual appearance of text in the help modal
+
+3. Testing:
+   - To verify the fix, open the help modal by clicking the help icon during gameplay
+   - Confirm that all vessel text displays correctly without console errors
+
+This analysis provides a foundation for any future modifications or enhancements to the error messaging system.
+
+Note: No code changes were made during this analysis; this document serves as documentation only. 

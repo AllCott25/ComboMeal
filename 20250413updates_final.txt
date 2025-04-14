@@ -1,0 +1,38 @@
+/*
+ * Culinary Logic Puzzle Updates
+ * Date: April 13, 2025 (22:16 EDT)
+ * Made by: APlasker
+ */
+
+VESSEL STYLING CONSISTENCY UPDATES:
+
+1. Modified all vessel outlines (stroke width) to use screen height as a reference 
+   instead of vessel dimensions. This ensures consistent outline thickness across
+   all vessel types regardless of their individual sizes.
+   - Set stroke width to 0.25% of screen height with a minimum of 2px
+
+2. Modified all vessel text fonts to use screen height as a reference instead of 
+   vessel dimensions. This ensures consistent font sizes across all vessel types.
+   - Set font size to 1.5% of screen height with a minimum of 10px
+
+3. Applied these changes to:
+   - Regular game vessels (basic and advanced)
+   - Hint vessels
+   - Tutorial vessels
+   - Help modal vessels
+
+4. Reduced vessel scaling during dragging from 1.1x to 1.05x to prevent text 
+   from becoming too large and creating unwanted line breaks while still providing
+   visual feedback that the vessel is being dragged.
+   - Updated both mouse and touch handlers
+
+5. Implemented separate scaling for vessel body and text to allow for more refined
+   visual feedback:
+   - Added new bodyScale and textScale properties to vessels
+   - When dragging, the vessel body scales to 105% while text only scales to 102.5%
+   - When pulsing (after successful combinations), the vessel body scales to 120% 
+     while text only scales to 110%
+   - This helps prevent text from becoming too large and creating unwanted line breaks
+
+This update enhances visual consistency and makes the game look more polished 
+with equal styling between base and advanced vessels. 

@@ -1,0 +1,82 @@
+COMBOMEAL UPDATES - April 8, 2025 (13:51 EDT) - APlasker
+
+ENHANCEMENTS & FIXES:
+
+- Fixed verb animation system to prioritize showing verb animations over combine animations for completed combinations
+- Modified animation timing to ensure verb animations are more visible and last longer on screen
+- Added additional console logs to help debug animation sequence and visibility
+- Made explicit verb animations appear immediately upon successful combinations instead of waiting
+- Added clear verb fallbacks ("Mix" for intermediate combinations, "Prepare" for final combinations)
+- Fixed potential race condition where combine animations could override verb animations
+- Extended verb animation duration by 50% to improve visibility and readability
+- Added progress tracking for verb animations to help with debugging
+- Fixed default vessel verbDisplayTime to prevent accidental triggering
+- Fixed color error in verb animation text that was causing the game to freeze
+- Fixed cloud shape irregularity on the right side of the verb animation by increasing point count and improving consistency
+- Extended the pulse animation hold time for completed combinations from 300ms to 500ms for better visibility
+- Corrected the yellow vessel color to properly use COLORS.vesselYellow for partial combinations
+- Fixed color mapping in Vessel constructor to ensure consistent color usage throughout the game
+
+DRAMATIC ANIMATION IMPROVEMENTS:
+- Completely redesigned the verb animation sequence for maximum dramatic effect
+- Vessels now initially appear without their name displayed
+- Verb animation begins at vessel's center and moves halfway to center screen (not all the way)
+- Animation begins at 75% of vessel size rather than starting from zero
+- Increased the cloud opacity by 20% for better visibility
+- Growth phase is 25% faster and fadeout phase 50% faster for better pacing
+- Animation now fades out quickly rather than shrinking at the end
+- Vessel name only appears after the verb animation reaches its peak 
+- Creates a polished theatrical sequence: vessel appears → dramatic verb → name revealed
+
+These changes make the verb animations much more prominent when vessels are successfully combined, 
+enhancing the visual feedback when players complete combinations correctly. 
+
+## Combo Meal Updates - 2025-04-08
+Time: 14:26 EDT
+Developer: APlasker
+
+### 🆕 Added Dynamic Byline Feature
+
+A new dynamic byline has been added underneath the "COMBO MEAL" title to provide helpful guidance to players during gameplay. This feature:
+
+1. Shows a default message of "Drag & drop to combine ingredients!" during normal gameplay.
+2. Changes to "Stuck? Use a Hint!" when:
+   - The player makes an unsuccessful move (drops a vessel in an invalid location)
+   - 15 seconds of inactivity is detected
+
+The "Stuck? Use a Hint!" message will display for 5 seconds before reverting back to the default message. This subtle UI improvement helps guide new players when they get stuck without disrupting the core gameplay experience.
+
+### ✨ Enhancements to Byline (14:45 EDT)
+
+The byline feature has been improved with the following enhancements:
+
+1. **Game Screen Only**: The byline now only appears during active gameplay, not on the tutorial or win screens
+2. **Visual Consistency**: Styling now matches the tutorial text with bold formatting for better readability
+3. **Smooth Transitions**: Added a smooth fade transition effect when byline messages change
+
+These enhancements make the feature more polished and integrated with the existing visual design of the game.
+
+### 🔧 Improved Byline Transitions (15:37 EDT)
+
+The byline transition system has been completely reworked to provide a more reliable and visually pleasing experience:
+
+1. **Sequential Transitions**: Implemented a clear sequence of:
+   - Fade out completely
+   - Change the message text
+   - Fade in with new message
+   
+2. **Interruption Prevention**: Added guards to prevent multiple transitions from overlapping or interrupting each other
+
+3. **Smoother Animation**: Refined the fade timing for a more polished look (0.25 seconds for each transition phase)
+
+This update addresses the random fade issues in the previous implementation by using a more predictable state machine approach.
+
+### How to Test:
+1. Start a new game
+2. Wait for 15 seconds without interacting - the byline should fade to "Stuck? Use a Hint!" with a smooth transition
+3. Try combining incompatible ingredients - the byline should change with a fade effect
+4. After 5 seconds, the byline should fade back to the default message
+5. Verify the byline only appears during gameplay, not on the tutorial screen
+6. Verify that transitions are sequential (fade out → change → fade in) and don't overlap
+
+No impact to grid placement, gameplay mechanics, or vessel interaction. 

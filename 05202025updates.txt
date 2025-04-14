@@ -1,0 +1,88 @@
+May 20, 2025 Updates - APlasker
+
+FEATURE ADDITION: Combo Counter Display (14:52 EDT)
+- Added a visual "Combos:" counter to track player progress through recipes
+- Displays circles for each intermediate combination needed for the recipe
+- Incomplete combinations show as 50% opacity avocado green circles
+- Completed combinations appear as 100% opacity green circles with white checkmarks
+- Counter positioned to the left of the existing Turn Counter for easy visibility
+- Each time a player creates a green vessel, the corresponding circle gets checked off
+
+Implementation Details:
+1. Added completedGreenVessels array to track which combinations have been completed
+2. Created drawComboCounter function to render the UI
+3. Updated combineVessels function to track each successful green vessel creation
+4. Added counter to main game loop in the draw function
+
+UPDATE (15:12 EDT):
+- Modified counter to include final recipe in the count
+- Changed behavior to check off circles from left to right in order of completion
+- Updated text style to match hint button (size and positioning)
+- Added tracking for parent combinations and final recipe in completedGreenVessels array
+
+UPDATE (15:30 EDT):
+- Added hint vessel integration with combo counter
+- Combos completed using a hint now appear in red instead of green in the counter
+- Modified HintVessel.toVessel() to track completed hint combinations
+- Each combo now stores whether it was completed with a hint for visual distinction
+
+UPDATE (15:45 EDT):
+- Redesigned the counter area to be a unified single-row display
+- Combined the combo counter and error counter into one centrally aligned interface
+- Positioned counters lower on the screen for better visibility (at 95% of play area height)
+- Added a 🍴 fork/knife divider between combo and error sections
+- Renamed "Turn Counter" to "Errors:" to better reflect its purpose
+- Adjusted sizing and spacing for better visual balance
+- Created new drawGameCounters function to replace separate counter functions
+
+UPDATE (16:00 EDT):
+- Enhanced error counter to show 4 placeholder slots from the beginning
+- Used 50% opacity black circles to represent unfilled error slots
+- Removed all hint-related counter markers from error display
+- Standardized spacing between labels and counters for visual consistency
+- Improved alignment between "Combos:" and "Errors:" sections
+
+UPDATE (16:15 EDT):
+- Fixed text formatting issues when hint button is clicked
+- Corrected spacing for error counters to prevent overlap with the "Errors:" label
+- Added text style resets to maintain consistent formatting
+- Improved layout consistency between the combo and error sections
+
+UPDATE (16:30 EDT):
+- Fixed recipe URL linking issue
+- Updated viewRecipe() function to use the actual recipe URL stored in Supabase
+- Added Google as the fallback URL when no recipe URL is available
+- Eliminated hardcoded placeholder URLs for better user experience
+- Improved error handling for recipe link navigation
+
+UPDATE (16:45 EDT):
+- Fixed recipe navigation error by removing reference to undefined variable
+- Eliminated reference to non-existent 'currentRecipe' variable in viewRecipe function
+- Simplified recipe ID lookup to only use valid sources (final_combination and recipe_data)
+- Ensured more reliable navigation to recipe URLs with minimal code change
+- Improved stability of recipe card functionality
+
+UPDATE (17:00 EDT):
+- Standardized all counter sizes to a consistent 15px diameter
+- Fixed font inconsistency issues when clicking hint button
+- Added explicit font reset calls at key points to maintain styling
+- Made error and combo counter spacing identical (22px) for visual harmony
+- Ensured consistent stroke weights and styling between filled and empty counters
+- Applied proper font and text style resets before each text element
+
+UPDATE (17:15 EDT):
+- Added visual indicator for excessive errors (5+)
+- When a player makes 5 or more mistakes, all error counters display small red X's
+- Implemented bright red (#FF3333) diagonal lines to form X's within the error circles
+- Enhanced the visual feedback for players who are struggling
+- Used proportional sizing to ensure the X marks scale with the counter size
+
+UPDATE (17:20 EDT):
+- Enhanced visual appearance of error X marks
+- Changed X color from bright red to burnt orange (matching hint vessel color)
+- Increased stroke weight from 2.0 to 2.5 pixels for better visibility
+- Created stronger visual connection between hint usage and errors
+- Maintained consistent color theming across game UI elements
+
+This feature enhances player experience by providing immediate visual feedback on 
+progress and helps players strategize which combinations to focus on next. 

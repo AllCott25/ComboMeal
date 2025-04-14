@@ -1,0 +1,34 @@
+ComboMeal Game Updates - 03-24-2025 22:20:34 EDT
+Modified by APlasker
+
+SCORING SYSTEM CHANGES:
+
+1. Letter grade calculation is now based ONLY on error count (blackMoves):
+   - A: 0 errors
+   - B: 1-2 errors
+   - C: 3-4 errors
+   - X: 5+ errors
+   - A+ is now achieved with both 0 errors AND 0 hints
+
+2. Share functionality:
+   - Added hint indicators (❓) to the shared score text
+   - One ❓ emoji is added for each hint used
+   - Updated share text format: "Combo Meal 🍴 Recipe [number]: [grade emojis] [hint emojis] [egg emoji]"
+
+These changes make the scoring system more forgiving by separating errors from hint usage while still encouraging players to solve puzzles without hints for the highest score. 
+
+BUG FIXES (03-24-2025 22:40 EDT):
+
+1. Fixed ReferenceError in shareScore function:
+   - The function now calculates hint count locally instead of relying on an external variable
+   - This resolves the "Can't find variable: redHintMoves" error when sharing scores
+
+2. Improved error message:
+   - Updated the error alert message to be more friendly
+   - New message: "Whoops! Something's broken. Let me know and I'll fix it ✌️" 
+
+ADDITIONAL FIXES (03-24-2025 22:42 EDT):
+
+3. Fixed missing hint indicators in share text:
+   - Now using the global hintCount variable directly instead of recounting from moveHistory
+   - This ensures the share text ❓ emoji count matches the visual indicators on the letter score 

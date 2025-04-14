@@ -1,0 +1,63 @@
+ENHANCEMENT: Improved Vessel Position Inheritance - APlasker (April 11, 2025 - 16:36)
+
+CHANGES IMPLEMENTED:
+
+1. Enhanced position inheritance in vessel combination code:
+   - Modified combineVessels function to set better position information for new vessels
+   - New vessels now inherit position based on average position of both parent vessels
+   - Added isNewlyCombined property to track newly created vessels
+
+2. Added persistence to position preferences:
+   - Enhanced arrangeVessels function to prioritize newly combined vessels
+   - Prevented immediate clearing of position preferences for newly created vessels
+   - Position preferences now persist through multiple arrangement cycles for new vessels
+   - Added special handling for hint-generated vessels
+
+EXPECTED BEHAVIOR:
+- When two vessels are combined, the resulting partial combination will appear in the same row
+- Vessels should now maintain their row position more consistently after combinations
+- Hint button clicks should cause less disruption to vessel arrangement
+
+TEST METHODS:
+- Combine two vessels from the same row - verify the new vessel appears in that row
+- Create multiple combinations in quick succession - verify position stability
+- Use the hint button and verify that surrounding vessels maintain their positions
+
+These changes should significantly improve the position predictability of vessels after combinations.
+
+--------------------------------------------------------
+
+ENHANCEMENT: Advanced Position Persistence System - APlasker (April 11, 2025 - 16:48)
+
+CHANGES IMPLEMENTED:
+
+1. Added Comprehensive Position Tracking:
+   - Added new vessel properties: positionStrength, homeRow, homeColumn, positionHistory
+   - Vessels now track how many turns they've spent in a specific position
+   - After 3 turns in the same position, vessels establish a "home" position
+
+2. Implemented Gradual Position Preference Decay:
+   - Position preferences now have a "strength" value (0-1)
+   - Newly created/positioned vessels start with maximum strength (1.0)
+   - Strength decays gradually with each turn (10-20% per turn)
+   - Preferences are only cleared when strength falls below 0.2
+
+3. Enhanced Position Prioritization:
+   - Added a priority system that considers multiple factors:
+     * Newly combined vessels have highest priority
+     * Higher position strength gives higher priority
+     * Vessels with longer position history get higher priority
+   - Vessels try to retain their home positions when moved slightly
+
+EXPECTED BEHAVIOR:
+- Vessels should maintain their positions over multiple turns/combinations
+- The more time a vessel spends in a position, the more likely it is to stay there
+- When dragging vessels, they'll prefer to return to established positions if dropped nearby
+- Position stability should be maintained even after several sequential combinations
+
+TEST METHODS:
+- Create several combinations in sequence and verify position stability across turns
+- Drag a vessel that's been in position for several turns, then drop it nearby - it should return to its original position
+- Combine vessels in different parts of the play area and verify overall grid stability
+
+These enhancements create a much more stable and predictable vessel placement system while still allowing flexibility in the overall layout. 

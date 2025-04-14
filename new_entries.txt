@@ -1,0 +1,10 @@
+# Culinary Logic Puzzle Updates
+
+## March 26, 2025 - 5:00 PM - v0.0326.08
+FIX: Hint Vessel Mobile Interaction Issues
+- Fixed issue where ingredients weren't being properly added to the hint vessel
+- Fixed issue where vessels weren't being removed after adding ingredients to hint
+- Improved handling of multiple ingredients for hint vessels
+- Enhanced error detection and handling for hint vessel interactions
+- Added better success/failure handling for hint vessel combinations
+- Ensured consistent removal of used vessels after hint combinations

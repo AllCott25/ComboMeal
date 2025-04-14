@@ -1,0 +1,69 @@
+COMBO MEAL GAME UPDATES
+Date: March 24, 2025
+Time: 16:09:18 EDT
+Updated by: APlasker
+
+CHANGES IMPLEMENTED:
+1. Fixed mobile touch controls to properly handle ingredient combinations
+2. Synchronized touch and mouse event handlers to ensure consistent behavior
+3. Fixed Easter Egg modal dismissal on touch devices
+4. Eliminated "stuck vessel" bug when attempting incorrect combinations
+5. Fixed hint vessel interaction on touch devices
+6. Fixed win screen touch interactions (View Recipe and Share Score buttons)
+7. Added improved hover feedback on win screen for touch devices
+8. Enhanced iOS/mobile compatibility for Recipe Card and Score Sharing
+9. Refined iOS user experience with better URL opening and sharing options
+10. Implemented reliable native sharing on iOS using the Web Share API
+11. Removed unnecessary "Tap and hold" prompt on iOS devices
+12. Fixed "isRecipeButtonVisible is not defined" error in recipe viewing
+13. Improved recipe link handling to reliably open in new tabs/windows across all browsers
+
+TECHNICAL DETAILS:
+- Refactored touchEnded and touchMoved functions to reuse mouseReleased and mouseDragged logic
+- Updated touchStarted to properly handle Easter Egg modals
+- Added proper coordinate transformation between touch and mouse events
+- Simplified win screen touch detection to use top/bottom screen division instead of precise coordinates
+- Fixed reference errors related to cardX and cardY variables
+- Enhanced touchMoved to provide visual feedback when dragging across the win screen
+- Optimized Web Share API implementation with timing adjustments for iOS reliability
+- Modified recipe link navigation to use DOM-based approach to open in new tab on iOS
+- Added improved fallback mechanism for iOS with visual feedback
+- Implemented graceful degradation path for different device types and sharing capabilities
+- Added robust recipe ID detection with multiple fallback options
+- Simplified clipboard sharing with cleaner UI and removed unnecessary elements
+- Enhanced recipe link handling with DOM-based approach for better cross-browser compatibility
+- Added multiple fallback mechanisms for recipe URL opening to ensure reliable behavior
+
+This update resolves the issues preventing mobile users from completing the game and interacting with the win screen, with special attention to iOS compatibility and sharing functionality. 
+
+March 24, 2025 Updates - APlasker
+=============================================
+
+1. iOS & Mobile Compatibility Improvements
+   - Enhanced mobile touch controls to prevent scrolling issues
+   - Synchronized touch and mouse event handlers for consistent behavior
+   - Fixed several bugs affecting touch devices
+
+2. Sharing Feature Improvements
+   - Implemented Web Share API for iOS devices
+   - Added direct access to native share features
+   - Improved sharing experience with cleaner text formatting
+   - Fixed duplicate URL issue in share message
+   - Enhanced share feedback with proper timing adjustments
+   - Removed unnecessary "Tap and hold" prompt on iOS devices
+   - Simplified clipboard copying process with better user feedback
+
+3. Recipe Link Fixes
+   - Simplified recipe link handling to reliably open in new tabs
+   - Improved URL handling with proper fallbacks
+   - Fixed clickability issues with recipe card links
+   - Fixed "isRecipeButtonVisible is not defined" error
+   - Added robust recipe ID detection with multiple fallback options
+   - Enhanced cross-browser compatibility for opening links in new tabs/windows
+   - Added DOM-based approach for better iOS Safari compatibility
+
+4. User Experience Refinements
+   - Added visual feedback for touch interactions
+   - Improved timing for mobile UI elements
+   - Created cleaner share text format with proper emoji display
+   - Improved error handling throughout the experience 

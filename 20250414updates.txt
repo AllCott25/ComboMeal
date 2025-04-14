@@ -1,0 +1,28 @@
+# Background Pattern Update (v0.0414.01)
+April 14, 2025 (14:16 EDT)
+Updated by APlasker
+
+## Changes Made
+
+1. Modified the `drawTopBottomFlowers()` function to place flowers at the very top and bottom edges of the screen when in mobile/narrow view:
+   - Changed flower positioning from relative to play area to fixed edge positioning
+   - Flowers now appear in single rows at the top and bottom edges with minimal spacing
+   - Added safety checks to prevent overlap with the play area
+   - Reduced the safety margin for more consistent edge placement
+   - Maintained the existing color patterns and flower sizes
+
+## Technical Details
+
+- Changed from variable distance calculations to fixed positioning at screen edges
+- Top row is positioned at `smallerPetalSize * 1.5` from the top
+- Bottom row is positioned at `windowHeight - (smallerPetalSize * 1.5)` from the bottom
+- Added safety checks to ensure flowers don't overlap with the play area content
+- No changes to the desktop view flower patterns
+
+## Testing Instructions
+
+1. View the game on a narrow screen or mobile device where side flowers don't appear
+2. Verify that a single row of flowers appears at the very top of the screen
+3. Verify that a single row of flowers appears at the very bottom of the screen
+4. Try different screen sizes to ensure the flowers remain visible without overlapping game elements
+5. Rotate device to ensure the pattern adjusts properly in both orientations 

@@ -1,0 +1,103 @@
+CM11 Game Updates - April 10, 2024
+Time: 14:30 EST
+Developer: APlasker
+
+Changes Made:
+1. Fixed "Uncaught ReferenceError: totalHeight is not defined" in help modal
+   - Removed reference to undefined totalHeight variable
+   - Simplified text rendering code to use existing textHeight variable
+   - Cleaned up unnecessary comments
+
+2. Fixed "Uncaught TypeError: scale is not a function" in help modal
+   - Renamed 'scale' variable to 'scaleFactor' to avoid conflict with p5.js scale() function
+   - Updated the scale() function call to use the renamed variable
+
+3. Increased vessel size in Help modal
+   - Increased modal width from 80% to 85% of play area width
+   - Increased vessel width from 17% to 25% of content width (47% larger)
+   - Adjusted vessel positioning and spacing for better layout
+   - Improved text sizing for operators (+ and = signs)
+
+4. Improved Help modal interaction
+   - Made the entire screen clickable to close the help modal
+   - Preserved X button functionality for explicit closing
+   - Simplified the click detection logic
+
+5. Enhanced Help modal vessel appearance
+   - Increased spacing between vessels from 22% to 30% of content width
+   - Made vessel text bold for better readability
+   - Improved vessel positioning for more balanced layout
+
+6. Further increased Help modal vessel size and spacing
+   - Increased vessel width to 22% of content width
+   - Matched spacing between vessels to 22% of content width
+   - Adjusted vessel positioning for optimal layout
+   - Ensured consistent spacing throughout the help modal
+
+7. Improved text centering in Help modal vessels
+   - Fixed vertical and horizontal centering of multi-line vessel names
+   - Implemented dynamic calculation of text block height based on number of lines
+   - Added proper spacing between lines for better readability
+   - Ensured consistent text positioning across all vessel types
+
+8. Adjusted vertical positioning of vessel text
+   - Moved all vessel text higher by 5% of vessel height
+   - Improved visibility of "+" text in multi-line vessel names
+   - Enhanced readability of "PB&J Sandwich" and other vessel names
+   - Maintained consistent text positioning across all vessel types
+
+9. Standardized description text size in Help modal
+   - Increased text size from 2.5% to 3% of modal width for better visibility
+   - Removed width constraints to allow text to render at its natural size
+   - Ensured consistent text size across all three instruction descriptions
+   - Improved readability and visual consistency of help modal text
+
+10. Changed help modal description text rendering from canvas-based to HTML elements
+    - This ensures all three description sentences have exactly the same size and appearance
+    - Text is now rendered at 3% of modal width with consistent styling
+    - Added proper cleanup of HTML elements when modal is closed
+    - Improved text positioning and alignment for better readability
+
+Testing Steps:
+1. Open the help modal by clicking the help button
+2. Verify that vessel names with "+" signs display correctly on two lines
+3. Verify that single-line vessel names display correctly
+4. Check that no JavaScript errors appear in the console when opening/closing the modal
+5. Verify that the starburst effect displays correctly in the help modal
+6. Confirm that vessels are now larger and more visible in the help modal
+7. Check that the layout remains responsive on different screen sizes
+8. Test that clicking anywhere on the screen closes the help modal
+9. Verify that the X button still works to close the modal
+10. Confirm that vessels have more space between them
+11. Verify that vessel text is now bold and more readable
+12. Check that vessels are now 22% of the modal width
+13. Verify that spacing between vessels matches the vessel width
+14. Confirm that multi-line vessel names are properly centered vertically and horizontally
+15. Check that the spacing between lines is consistent and visually appealing
+16. Verify that the "+" text in multi-line vessel names is now higher and more visible
+17. Confirm that "PB&J Sandwich" and other vessel names are positioned higher in their vessels
+18. Verify that all three description sentences in the help modal have the same text size
+19. Check that the text size is appropriate and readable on different screen sizes
+
+Note: The CORS warning regarding site.webmanifest is unrelated to these fixes and doesn't affect game functionality.
+
+[2024-04-10 15:45] - APlasker
+- Updated the help button design and position
+- Moved the help button from top-left to top-right corner
+- Changed the button style from solid green to transparent with green outline
+- Changed the icon from "i" to "?" for better clarity
+- Maintained hover effects (red outline and text when hovered)
+
+[2024-04-10 16:00] - APlasker
+- Fixed help modal closing functionality
+- Restored the checkClick method that was accidentally removed during previous updates
+- Ensured the modal can be closed by clicking anywhere on the screen
+- Maintained the X button functionality for explicit closing
+- Added proper cleanup of HTML elements when the modal is closed
+
+[2024-04-10 16:15] - APlasker
+- Refined the help button design and position
+- Moved the button further right (20px from edge) and higher up (20px from top)
+- Adjusted the question mark to be lower in the circle for better visual balance
+- Changed the question mark from bold to normal weight for a cleaner look
+- These changes ensure the button is visually distinct from the "Combo Meal" text 

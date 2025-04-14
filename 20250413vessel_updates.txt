@@ -1,0 +1,35 @@
+/*
+ * Culinary Logic Puzzle Updates
+ * Date: April 13, 2025 (22:22 EDT)
+ * Made by: APlasker
+ */
+
+VESSEL UNIFICATION UPDATES:
+
+1. Unified the implementation of red (#FF5252/COLORS.vesselHint) and yellow vessels
+   across the codebase. Red vessels now share exactly the same shape as yellow vessels,
+   with color being the only difference.
+
+2. Changes implemented:
+   - Updated Vessel.draw() method to use a single condition for both red and yellow vessels
+   - Updated drawTutorialVessel() function to handle red vessels identically to yellow
+   - Updated drawHelpVessel() function in help.js to apply the same unification
+
+3. Benefits:
+   - Simplified code by removing duplicate logic
+   - Improved consistency in visual appearance
+   - Reduced risk of bugs by centralizing vessel shape logic
+   - Made future vessel shape changes easier to implement and maintain
+
+4. No functional changes to game mechanics - this is purely a code simplification
+   and visual consistency improvement.
+
+This update completes the unification of vessel shapes across the game while
+maintaining the distinct color coding for different vessel types.
+
+FOLLOW-UP FIX (22:38 EDT):
+- Fixed an issue where tutorial vessels were not displaying due to a duplicate
+  drawTutorialVessel function definition at the end of sketch.js
+- Removed the duplicate function and kept a renamed version (drawSimpleTutorialVessel)
+  for potential future use
+- Tutorial vessels now display correctly on the start screen 

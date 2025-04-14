@@ -1,0 +1,16 @@
+COMBO MEAL - Updates (April 11, 2025)
+Time: 16:18 EDT
+Developer: APlasker
+
+Changes:
+- Modified vessel drawing order to ensure dragged vessels always appear on top of other vessels
+- Added code to prioritize the currently dragged vessel in the rendering stack
+- Improved user experience by preventing other elements from overlapping dragged vessels
+- Enhanced the drawing system to render dragged vessels after all UI elements (counters, buttons, help icon)
+- Implemented a secondary drawing pass for dragged vessels to ensure they're always the top-most element
+
+Testing:
+- To verify the changes, try dragging vessels over other vessels and UI elements
+- The dragged vessel should always appear on top with no overlapping elements
+- Check that the vessel appears above counters, the hint button, and the help icon
+- Both mouse and touch interactions should work the same way 

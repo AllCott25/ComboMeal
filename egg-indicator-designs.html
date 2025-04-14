@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Egg Indicator Design Options</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .design-container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            width: 300px;
+        }
+        .design-title {
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 18px;
+            color: #444;
+        }
+        .design-description {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Egg Indicator Design Options</h1>
+    <h2>10 Different Styles for Letter Score Egg Indicators</h2>
+    
+    <div class="container" id="designs-container">
+        <!-- Design containers will be added here by JavaScript -->
+    </div>
+
+    <script>
+        // Colors
+        const COLORS = {
+            primary: '#778F5D',    // Avocado green
+            secondary: '#FF5252',  // Red
+            tertiary: '#FFC107'    // Yellow
+        };
+
+        // Create containers for each design
+        const designsContainer = document.getElementById('designs-container');
+        const designCount = 10;
+        
+        for (let i = 1; i <= designCount; i++) {
+            const designContainer = document.createElement('div');
+            designContainer.className = 'design-container';
+            designContainer.innerHTML = `
+                <h3 class="design-title">Design ${i}</h3>
+                <div id="design${i}"></div>
+                <p class="design-description" id="description${i}"></p>
+            `;
+            designsContainer.appendChild(designContainer);
+        }
+
+        // Create sketches for each design
+        function createSketch(designNumber, drawFunction, description) {
+            new p5(function(p) {
+                p.setup = function() {
+                    p.createCanvas(250, 250);
+                    document.getElementById(`description${designNumber}`).textContent = description;
+                };
+                
+                p.draw = function() {
+                    p.background(245);
+                    
+                    // Draw letter grade circle background
+                    p.push();
+                    p.translate(p.width/2, p.height/2);
+                    
+                    // Draw circle background
+                    p.fill(70, 130, 180, 76); // Blue with 30% opacity
+                    p.noStroke();
+                    p.circle(0, 0, 140);
+                    
+                    // Draw letter grade
+                    p.fill(70, 130, 180); // Blue
+                    p.textAlign(p.CENTER, p.CENTER);
+                    p.textSize(70);
+                    p.textStyle(p.BOLD);
+                    p.text("A", 0, 0);
+                    
+                    // Draw the egg indicator
+                    drawFunction(p);
+                    
+                    p.pop();
+                    
+                    // Only draw once
+                    p.noLoop();
+                };
+            }, `design${designNumber}`);
+        }
+
+        // Design 1: Current Design (Baseline)
+        createSketch(1, function(p) {
+            // Position the egg in the top left corner of the letter grade
+            const eggX = -50 + 65;
+            const eggY = -50 - 100 + 40;
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 40);
+            p.noStroke();
+            p.push();
+            p.translate(4, 4);
+            
+            // First rounded rectangle (horizontal on top)
+            p.rectMode(p.CENTER);
+            p.rect(eggX, eggY - 15, 130, 30, 15);
+            
+            // Vertical rectangles with various heights
+            p.rect(eggX - 35 - 20, eggY + 15 + 10, 30, 100 - 5, 15);
+            p.rect(eggX - 20, eggY + 15 + 10, 30, 100 - 30, 15);
+            p.rect(eggX + 35 - 20, eggY + 15 + 10, 30, 100 - 70, 15);
+            p.rect(eggX - 15 - 20, eggY + 35 + 10, 30, 60 - 40, 15);
+            p.rect(eggX + 15 - 20, eggY + 35 + 10, 30, 60 - 90, 15);
+            p.pop();
+            
+            // Draw the egg white
+            p.fill(255);
+            p.noStroke();
+            
+            // First rounded rectangle (horizontal on top)
+            p.rectMode(p.CENTER);
+            p.rect(eggX, eggY - 15, 130, 30, 15);
+            
+            // Vertical rectangles with various heights
+            p.rect(eggX - 35 - 20, eggY + 15 + 10, 30, 100 - 5, 15);
+            p.rect(eggX - 20, eggY + 15 + 10, 30, 100 - 30, 15);
+            p.rect(eggX + 35 - 20, eggY + 15 + 10, 30, 100 - 70, 15);
+            p.rect(eggX - 15 - 20, eggY + 35 + 10, 30, 60 - 40, 15);
+            p.rect(eggX + 15 - 20, eggY + 35 + 10, 30, 60 - 90, 15);
+            
+            // Draw the yolk with gradient
+            const yolkSize = 40;
+            for (let i = 5; i >= 0; i--) {
+                const currentYolkSize = yolkSize * (1 - i * 0.05);
+                const alpha = 255 - i * 10;
+                p.fill(255, 204, 0, alpha);
+                p.noStroke();
+                p.ellipse(eggX - 40, eggY - 20, currentYolkSize, currentYolkSize * 0.8);
+            }
+            
+            // Add highlight to the yolk
+            p.fill(255, 255, 255, 100);
+            p.noStroke();
+            p.ellipse(eggX - 40 - 5, eggY - 20 - 5, yolkSize * 0.4, yolkSize * 0.3);
+            
+            // Add a thin outline to the yolk
+            p.noFill();
+            p.stroke(200, 150, 0, 100);
+            p.strokeWeight(1);
+            p.ellipse(eggX - 40, eggY - 20, yolkSize, yolkSize * 0.8);
+        }, "Current design with multiple rounded rectangles and asymmetrical shape.");
+
+        // Design 2: Simplified Egg
+        createSketch(2, function(p) {
+            const eggX = -50;
+            const eggY = -70;
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 40);
+            p.noStroke();
+            p.push();
+            p.translate(3, 3);
+            
+            // Egg white (single oval)
+            p.ellipse(eggX, eggY + 20, 80, 100);
+            p.pop();
+            
+            // Egg white
+            p.fill(255);
+            p.noStroke();
+            p.ellipse(eggX, eggY + 20, 80, 100);
+            
+            // Yolk
+            const yolkSize = 40;
+            for (let i = 5; i >= 0; i--) {
+                const currentYolkSize = yolkSize * (1 - i * 0.05);
+                const alpha = 255 - i * 10;
+                p.fill(255, 204, 0, alpha);
+                p.ellipse(eggX, eggY, currentYolkSize, currentYolkSize * 0.9);
+            }
+            
+            // Highlight
+            p.fill(255, 255, 255, 100);
+            p.ellipse(eggX - 8, eggY - 8, yolkSize * 0.4, yolkSize * 0.3);
+            
+            // Outline
+            p.noFill();
+            p.stroke(200, 150, 0, 100);
+            p.strokeWeight(1);
+            p.ellipse(eggX, eggY, yolkSize, yolkSize * 0.9);
+        }, "Simplified oval egg with centered yolk for a cleaner look.");
+
+        // Design 3: Cartoon Fried Egg
+        createSketch(3, function(p) {
+            const eggX = -60;
+            const eggY = -60;
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 40);
+            p.noStroke();
+            p.push();
+            p.translate(4, 4);
+            
+            // Egg white (blob shape with bezier curves)
+            p.beginShape();
+            p.vertex(eggX - 40, eggY + 10);
+            p.bezierVertex(eggX - 60, eggY - 20, eggX - 20, eggY - 50, eggX + 10, eggY - 40);
+            p.bezierVertex(eggX + 40, eggY - 50, eggX + 60, eggY - 10, eggX + 50, eggY + 20);
+            p.bezierVertex(eggX + 70, eggY + 40, eggX + 30, eggY + 60, eggX, eggY + 50);
+            p.bezierVertex(eggX - 30, eggY + 70, eggX - 60, eggY + 40, eggX - 40, eggY + 10);
+            p.endShape();
+            p.pop();
+            
+            // Egg white
+            p.fill(255);
+            p.noStroke();
+            p.beginShape();
+            p.vertex(eggX - 40, eggY + 10);
+            p.bezierVertex(eggX - 60, eggY - 20, eggX - 20, eggY - 50, eggX + 10, eggY - 40);
+            p.bezierVertex(eggX + 40, eggY - 50, eggX + 60, eggY - 10, eggX + 50, eggY + 20);
+            p.bezierVertex(eggX + 70, eggY + 40, eggX + 30, eggY + 60, eggX, eggY + 50);
+            p.bezierVertex(eggX - 30, eggY + 70, eggX - 60, eggY + 40, eggX - 40, eggY + 10);
+            p.endShape();
+            
+            // Yolk
+            const yolkSize = 45;
+            for (let i = 5; i >= 0; i--) {
+                const currentYolkSize = yolkSize * (1 - i * 0.05);
+                const alpha = 255 - i * 10;
+                p.fill(255, 204, 0, alpha);
+                p.ellipse(eggX, eggY, currentYolkSize, currentYolkSize);
+            }
+            
+            // Highlight
+            p.fill(255, 255, 255, 120);
+            p.ellipse(eggX - 10, eggY - 10, yolkSize * 0.5, yolkSize * 0.4);
+            
+            // Outline
+            p.noFill();
+            p.stroke(200, 150, 0, 120);
+            p.strokeWeight(1.5);
+            p.ellipse(eggX, eggY, yolkSize, yolkSize);
+        }, "Cartoon-style fried egg with organic blob shape using bezier curves.");
+
+        // Design 4: Minimalist Egg Icon
+        createSketch(4, function(p) {
+            const eggX = -50;
+            const eggY = -60;
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 30);
+            p.noStroke();
+            p.push();
+            p.translate(2, 2);
+            p.rect(eggX - 30, eggY - 30, 60, 60, 30);
+            p.pop();
+            
+            // White square with rounded corners
+            p.fill(255);
+            p.noStroke();
+            p.rect(eggX - 30, eggY - 30, 60, 60, 30);
+            
+            // Yellow circle for yolk
+            p.fill(255, 204, 0);
+            p.ellipse(eggX, eggY, 30, 30);
+            
+            // Highlight
+            p.fill(255, 255, 255, 100);
+            p.ellipse(eggX - 5, eggY - 5, 12, 10);
+        }, "Minimalist egg icon with rounded square white and simple yellow circle yolk.");
+
+        // Design 5: Egg in a Pan
+        createSketch(5, function(p) {
+            const eggX = -50;
+            const eggY = -60;
+            
+            // Draw pan handle
+            p.fill(100);
+            p.noStroke();
+            p.rect(eggX + 35, eggY - 5, 30, 10, 5);
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 30);
+            p.noStroke();
+            p.push();
+            p.translate(3, 3);
+            p.ellipse(eggX, eggY, 70, 70);
+            p.pop();
+            
+            // Draw pan
+            p.fill(150);
+            p.ellipse(eggX, eggY, 70, 70);
+            
+            // Draw egg white
+            p.fill(255);
+            p.ellipse(eggX, eggY, 60, 60);
+            
+            // Draw yolk
+            p.fill(255, 204, 0);
+            p.ellipse(eggX, eggY, 30, 30);
+            
+            // Highlight
+            p.fill(255, 255, 255, 100);
+            p.ellipse(eggX - 5, eggY - 5, 12, 10);
+            
+            // Pan rim highlight
+            p.noFill();
+            p.stroke(200);
+            p.strokeWeight(1);
+            p.arc(eggX, eggY, 68, 68, p.PI + p.QUARTER_PI, p.TWO_PI - p.QUARTER_PI);
+        }, "Egg in a frying pan with handle, showing the egg in context.");
+
+        // Design 6: Cracked Egg
+        createSketch(6, function(p) {
+            const eggX = -50;
+            const eggY = -60;
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 40);
+            p.noStroke();
+            p.push();
+            p.translate(3, 3);
+            
+            // Egg white splat
+            p.beginShape();
+            for (let i = 0; i < 12; i++) {
+                const angle = p.map(i, 0, 12, 0, p.TWO_PI);
+                const r = i % 2 === 0 ? 40 : 30;
+                const x = eggX + r * p.cos(angle);
+                const y = eggY + 15 + r * p.sin(angle);
+                p.vertex(x, y);
+            }
+            p.endShape(p.CLOSE);
+            
+            // Egg shell pieces
+            p.arc(eggX - 25, eggY - 25, 30, 40, p.PI, p.TWO_PI);
+            p.arc(eggX + 25, eggY - 20, 30, 35, p.PI, p.TWO_PI);
+            p.pop();
+            
+            // Egg white splat
+            p.fill(255);
+            p.noStroke();
+            p.beginShape();
+            for (let i = 0; i < 12; i++) {
+                const angle = p.map(i, 0, 12, 0, p.TWO_PI);
+                const r = i % 2 === 0 ? 40 : 30;
+                const x = eggX + r * p.cos(angle);
+                const y = eggY + 15 + r * p.sin(angle);
+                p.vertex(x, y);
+            }
+            p.endShape(p.CLOSE);
+            
+            // Egg shell pieces
+            p.fill(240);
+            p.arc(eggX - 25, eggY - 25, 30, 40, p.PI, p.TWO_PI);
+            p.arc(eggX + 25, eggY - 20, 30, 35, p.PI, p.TWO_PI);
+            
+            // Shell inner
+            p.fill(250);
+            p.arc(eggX - 25, eggY - 25, 26, 36, p.PI, p.TWO_PI);
+            p.arc(eggX + 25, eggY - 20, 26, 31, p.PI, p.TWO_PI);
+            
+            // Yolk
+            p.fill(255, 204, 0);
+            p.ellipse(eggX, eggY + 10, 35, 35);
+            
+            // Highlight
+            p.fill(255, 255, 255, 100);
+            p.ellipse(eggX - 8, eggY + 2, 15, 12);
+            
+            // Crack lines
+            p.stroke(100);
+            p.strokeWeight(1);
+            p.noFill();
+            p.beginShape();
+            p.vertex(eggX - 10, eggY - 40);
+            p.vertex(eggX - 5, eggY - 30);
+            p.vertex(eggX - 15, eggY - 20);
+            p.vertex(eggX - 5, eggY - 10);
+            p.endShape();
+            
+            p.beginShape();
+            p.vertex(eggX + 10, eggY - 35);
+            p.vertex(eggX + 20, eggY - 25);
+            p.vertex(eggX + 10, eggY - 15);
+            p.vertex(eggX + 15, eggY - 5);
+            p.endShape();
+        }, "Cracked egg with shell pieces and splattered egg white for a dynamic look.");
+
+        // Design 7: Pixel Art Egg
+        createSketch(7, function(p) {
+            const eggX = -50;
+            const eggY = -60;
+            const pixelSize = 5;
+            
+            // Pixel art egg pattern (pre-defined grid)
+            const eggPattern = [
+                "    WWWW    ",
+                "  WWWWWWWW  ",
+                " WWWWWWWWWW ",
+                "WWWWWYYYWWWW",
+                "WWWWYYYYYYYW",
+                "WWWWYYYYYYYW",
+                "WWWWYYYYYYYW",
+                "WWWWWYYYWWWW",
+                " WWWWWWWWWW ",
+                "  WWWWWWWW  ",
+                "    WWWW    "
+            ];
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 40);
+            p.noStroke();
+            p.push();
+            p.translate(2, 2);
+            
+            // Draw pixel art
+            for (let y = 0; y < eggPattern.length; y++) {
+                for (let x = 0; x < eggPattern[y].length; x++) {
+                    const char = eggPattern[y][x];
+                    if (char !== ' ') {
+                        p.rect(
+                            eggX - (eggPattern[y].length * pixelSize) / 2 + x * pixelSize,
+                            eggY - (eggPattern.length * pixelSize) / 2 + y * pixelSize,
+                            pixelSize,
+                            pixelSize
+                        );
+                    }
+                }
+            }
+            p.pop();
+            
+            // Draw pixel art
+            for (let y = 0; y < eggPattern.length; y++) {
+                for (let x = 0; x < eggPattern[y].length; x++) {
+                    const char = eggPattern[y][x];
+                    if (char === 'W') {
+                        p.fill(255);
+                        p.rect(
+                            eggX - (eggPattern[y].length * pixelSize) / 2 + x * pixelSize,
+                            eggY - (eggPattern.length * pixelSize) / 2 + y * pixelSize,
+                            pixelSize,
+                            pixelSize
+                        );
+                    } else if (char === 'Y') {
+                        p.fill(255, 204, 0);
+                        p.rect(
+                            eggX - (eggPattern[y].length * pixelSize) / 2 + x * pixelSize,
+                            eggY - (eggPattern.length * pixelSize) / 2 + y * pixelSize,
+                            pixelSize,
+                            pixelSize
+                        );
+                    }
+                }
+            }
+        }, "Pixel art style egg with blocky aesthetic for a retro gaming feel.");
+
+        // Design 8: Egg with Bacon
+        createSketch(8, function(p) {
+            const eggX = -50;
+            const eggY = -60;
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 40);
+            p.noStroke();
+            p.push();
+            p.translate(3, 3);
+            
+            // Egg white
+            p.ellipse(eggX, eggY + 10, 60, 50);
+            
+            // Bacon strips
+            p.rect(eggX - 40, eggY - 20, 80, 10, 2);
+            p.rect(eggX - 35, eggY - 5, 70, 10, 2);
+            p.pop();
+            
+            // Egg white
+            p.fill(255);
+            p.noStroke();
+            p.ellipse(eggX, eggY + 10, 60, 50);
+            
+            // Bacon strips
+            p.fill(220, 120, 100);
+            p.rect(eggX - 40, eggY - 20, 80, 10, 2);
+            p.rect(eggX - 35, eggY - 5, 70, 10, 2);
+            
+            // Bacon fat
+            p.fill(250, 230, 220);
+            p.rect(eggX - 40, eggY - 20, 15, 10, 2);
+            p.rect(eggX + 10, eggY - 20, 15, 10, 2);
+            p.rect(eggX - 35, eggY - 5, 12, 10, 2);
+            p.rect(eggX + 5, eggY - 5, 12, 10, 2);
+            
+            // Yolk
+            p.fill(255, 204, 0);
+            p.ellipse(eggX, eggY + 10, 30, 30);
+            
+            // Highlight
+            p.fill(255, 255, 255, 100);
+            p.ellipse(eggX - 5, eggY + 5, 12, 10);
+        }, "Egg with bacon strips for a breakfast theme, adding context to the egg.");
+
+        // Design 9: Egg with Face
+        createSketch(9, function(p) {
+            const eggX = -50;
+            const eggY = -60;
+            
+            // Draw drop shadow
+            p.fill(0, 0, 0, 40);
+            p.noStroke();
+            p.push();
+            p.translate(3, 3);
+            p.ellipse(eggX, eggY + 10, 70, 80);
+            p.pop();
+            
+            // Egg white
+            p.fill(255);
+            p.noStroke();
+            p.ellipse(eggX, eggY + 10, 70, 80);
+            
+            // Yolk
+            p.fill(255, 204, 0);
+            p.ellipse(eggX, eggY, 40, 40);
+            
+            // Eyes
+            p.fill(0);
+            p.ellipse(eggX - 10, eggY - 5, 6, 8);
+            p.ellipse(eggX + 10, eggY - 5, 6, 8);
+            
+            // Smile
+            p.noFill();
+            p.stroke(0);
+            p.strokeWeight(2);
+            p.arc(eggX, eggY + 5, 25, 20, 0.1, p.PI - 0.1);
+            
+            // Highlight
+            p.fill(255, 255, 255, 100);
+            p.noStroke();
+            p.ellipse(eggX - 12, eggY - 12, 15, 12);
+        }, "Cute egg with a smiling face in the yolk for a playful, character-based design.");
+
+        // Design 10: 3D Egg Effect
+        createSketch(10, function(p) {
+            const eggX = -50;
+            const eggY = -60;
+            
+            // 3D effect base shadow
+            p.fill(0, 0, 0, 20);
+            p.noStroke();
+            p.ellipse(eggX, eggY + 15, 75, 65);
+            
+            // Egg white with gradient for 3D effect
+            for (let i = 6; i >= 0; i--) {
+                const size = 70 - i * 2;
+                const brightness = 255 - i * 5;
+                p.fill(brightness);
+                p.ellipse(eggX, eggY + 10, size, size * 0.85);
+            }
+            
+            // Yolk with 3D effect
+            for (let i = 8; i >= 0; i--) {
+                const size = 35 - i * 1.5;
+                const r = 255;
+                const g = 204 - i * 8;
+                const b = 0;
+                p.fill(r, g, b);
+                p.ellipse(eggX, eggY, size, size * 0.9);
+            }
+            
+            // Highlight for 3D effect
+            p.fill(255, 255, 255, 150);
+            p.ellipse(eggX - 8, eggY - 8, 15, 12);
+            
+            // Edge highlight
+            p.noFill();
+            p.stroke(255, 255, 255, 100);
+            p.strokeWeight(2);
+            p.arc(eggX, eggY + 10, 68, 58, p.PI + p.QUARTER_PI, p.TWO_PI - p.QUARTER_PI);
+        }, "3D-style egg with gradient shading and highlights for a more realistic appearance.");
+    </script>
+</body>
+</html> 

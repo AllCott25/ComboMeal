@@ -1,0 +1,18 @@
+ComboMeal5 Updates (03/24/2025 - 13:14)
+By: APlasker
+
+Tutorial Page Updates:
+1. Changed "How to play" to "Solve the recipe by assembling all ingredients into recipe-based combos!"
+2. Shortened first instruction to "Drag & drop to combine ingredients into new components."
+3. Changed second instruction to "Yellow combos are partially complete. Add more!"
+4. Increased text size throughout the tutorial for better readability
+5. Updated version number to v0.0324.13 - APlasker
+
+Additional Formatting Changes:
+1. Made the main "Solve the recipe" text bold with same size as other instructions
+2. Increased the width for the main instruction text to 90% of play area
+3. Adjusted spacing between elements to improve readability
+4. Repositioned elements to provide better visual hierarchy
+5. Added non-breaking space between "Add" and "more!" to prevent line break between these words
+6. Adjusted vertical position of the main instruction text
+7. Changed "New recipe everyday!" to "New recipes daily!" and applied bold formatting 

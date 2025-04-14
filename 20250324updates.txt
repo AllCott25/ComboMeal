@@ -1,0 +1,12 @@
+ComboMeal5 Color Updates - March 24, 2025 12:50 PM EDT
+Updated by APlasker
+
+CHANGES:
+- Further standardized color usage for green vessels to fix inconsistent colors
+- Fixed direct string assignment of 'green' to use COLORS.green consistently
+- Simplified complex green color checks in multiple parts of the code
+- Consolidated moveHistory code to use COLORS.green for all green vessel types
+
+This update further standardizes the use of the avocado green color (#778F5D) throughout the game. The previous updates had already replaced most instances, but this update addresses additional edge cases where string literals and mixed color references were causing inconsistent rendering.
+
+All vessels using any green color reference should now consistently use the avocado green color defined in COLORS.green. 

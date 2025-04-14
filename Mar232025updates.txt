@@ -1,0 +1,27 @@
+March 23, 2025 - Updated by APlasker
+
+UPDATE 1: Color Consistency for Counter Display (13:59 EDT)
+- Updated the counter color in the moveHistory to use COLORS.vesselHint instead of the hardcoded '#FF5252'
+- Modified the drawMoveHistory filter to recognize both colors during transition
+- This ensures visual consistency between the hint vessel and its associated counters 
+
+UPDATE 2: Counter Positioning Fix (14:04 EDT)
+- Modified drawMoveHistory function to prevent counters from overlapping with the hint vessel
+- Added a safety margin calculation to ensure counters always appear below the hint vessel
+- Implemented a simple Math.max approach to maintain the original position when possible
+
+UPDATE 3: Counter Visibility Enhancement (14:10 EDT)
+- Added a maximum height constraint for counter positioning
+- Ensures counters are always visible within the play area
+- Fixed an issue where counters might be positioned too low on the screen 
+
+UPDATE 4: Improved Visual Spacing (14:15 EDT)
+- Increased the safety margin between hint vessel and counters
+- Implemented an adaptive spacing calculation (8% of play area height with 60px minimum)
+- Provides better visual separation between interface elements 
+
+UPDATE 5: Fixed Positioning Implementation (14:20 EDT)
+- Simplified the positioning logic for both hint button/vessel and counters
+- Set the hint button to always appear at 85% from top of play area
+- Positioned counters at fixed 92% from top of play area
+- Eliminated complex calculations for more reliable display across different screen sizes 

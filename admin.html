@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culinary Logic Puzzle - Admin</title>
+    <link rel="stylesheet" href="css/admin.css">
+    
+    <!-- Favicon Support -->
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="manifest" href="assets/site.webmanifest">
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Culinary Logic Puzzle - Admin Panel</h1>
+        </header>
+        
+        <!-- Login Section -->
+        <div id="login-section" class="section">
+            <h2>Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit">Login</button>
+            </form>
+            <div id="login-error" class="error-message"></div>
+        </div>
+        
+        <!-- Admin Panel (hidden until logged in) -->
+        <div id="admin-panel" class="section hidden">
+            <div class="tabs">
+                <button class="tab-button active" data-tab="recipe-form">Recipe</button>
+                <button class="tab-button" data-tab="combinations-form">Combinations</button>
+                <button class="tab-button" data-tab="ingredients-form">Ingredients</button>
+                <button class="tab-button" data-tab="eastereggs-form">Easter Eggs</button>
+                <button class="tab-button" data-tab="test-section">Test</button>
+            </div>
+            
+            <!-- Recipe Form -->
+            <div id="recipe-form" class="tab-content active">
+                <h2>Add New Recipe</h2>
+                <form id="recipe-form-element">
+                    <div class="form-group">
+                        <label for="recipe-name">Recipe Name:</label>
+                        <input type="text" id="recipe-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-date">Date (YYYY-MM-DD):</label>
+                        <input type="date" id="recipe-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-url">Recipe URL:</label>
+                        <input type="url" id="recipe-url">
+                    </div>
+                    <button type="submit">Save Recipe</button>
+                </form>
+                <div id="recipe-message" class="message"></div>
+            </div>
+            
+            <!-- Combinations Form -->
+            <div id="combinations-form" class="tab-content">
+                <h2>Add Combinations</h2>
+                <form id="combinations-form-element">
+                    <div class="form-group">
+                        <label for="combo-recipe">Recipe:</label>
+                        <select id="combo-recipe" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="combo-name">Combination Name:</label>
+                        <input type="text" id="combo-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="combo-verb">Verb (cooking action):</label>
+                        <input type="text" id="combo-verb" placeholder="e.g., simmer, whip, bake">
+                    </div>
+                    <div class="form-group">
+                        <label for="combo-is-final">Is Final Combination:</label>
+                        <input type="checkbox" id="combo-is-final">
+                    </div>
+                    <button type="submit">Save Combination</button>
+                </form>
+                <div id="combinations-message" class="message"></div>
+                
+                <!-- Existing Combinations Section -->
+                <div class="existing-items-section">
+                    <h3>Existing Combinations</h3>
+                    <div id="existing-combinations" class="existing-items-list">
+                        <p>Select a recipe to view its combinations.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Ingredients Form -->
+            <div id="ingredients-form" class="tab-content">
+                <h2>Add Ingredients</h2>
+                <form id="ingredients-form-element">
+                    <div class="form-group">
+                        <label for="ing-combo">Combination:</label>
+                        <select id="ing-combo" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ing-name">Ingredient Name:</label>
+                        <input type="text" id="ing-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ing-is-base">Is Base Ingredient:</label>
+                        <input type="checkbox" id="ing-is-base" checked>
+                    </div>
+                    <button type="submit">Save Ingredient</button>
+                </form>
+                <div id="ingredients-message" class="message"></div>
+                
+                <!-- Bulk Ingredients Section -->
+                <h3>Add Multiple Ingredients</h3>
+                <form id="bulk-ingredients-form">
+                    <div class="form-group">
+                        <label for="bulk-ing-combo">Combination:</label>
+                        <select id="bulk-ing-combo" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="bulk-ingredients">Ingredients (one per line):</label>
+                        <textarea id="bulk-ingredients" rows="5" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="bulk-ing-is-base">All Are Base Ingredients:</label>
+                        <input type="checkbox" id="bulk-ing-is-base" checked>
+                    </div>
+                    <button type="submit">Save All Ingredients</button>
+                </form>
+                <div id="bulk-ingredients-message" class="message"></div>
+            </div>
+            
+            <!-- Easter Eggs Form -->
+            <div id="eastereggs-form" class="tab-content">
+                <h2>Add Easter Eggs</h2>
+                <form id="eastereggs-form-element">
+                    <div class="form-group">
+                        <label for="egg-recipe">Recipe:</label>
+                        <select id="egg-recipe" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="egg-name">Easter Egg Name:</label>
+                        <input type="text" id="egg-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="egg-ing1">Ingredient 1:</label>
+                        <select id="egg-ing1" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="egg-ing2">Ingredient 2:</label>
+                        <select id="egg-ing2" required></select>
+                    </div>
+                    <button type="submit">Save Easter Egg</button>
+                </form>
+                <div id="eastereggs-message" class="message"></div>
+            </div>
+            
+            <!-- Test Section -->
+            <div id="test-section" class="tab-content">
+                <h2>Test Recipe</h2>
+                <div class="form-group">
+                    <label for="test-recipe">Select Recipe to Test:</label>
+                    <select id="test-recipe"></select>
+                </div>
+                <button id="test-button">Test Recipe</button>
+                <div id="test-results" class="results-container">
+                    <h3>Test Results</h3>
+                    <div id="test-output"></div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 Culinary Logic Puzzle - Admin Panel</p>
+        </footer>
+    </div>
+    
+    <script src="js/admin.js"></script>
+</body>
+</html> 
