@@ -1215,7 +1215,7 @@ function drawWinScreen() {
     }
   }
 
-  // Updated to directly open the recipe link when the card is clicked - APlasker
+  // Updated to use a real HTML anchor element for maximum compatibility - APlasker
   function viewRecipe() {
     try {
       console.log("View recipe triggered via direct card click");
@@ -1230,14 +1230,35 @@ function drawWinScreen() {
         console.warn("No recipe URL found in database, using fallback");
       }
       
-      // When executed directly from a user interaction (click/tap), window.open works on iOS
-      // This is the key difference - the window.open call is directly in the event handler chain
-      window.open(urlToOpen, '_blank', 'noopener,noreferrer');
+      // Create a real HTML anchor element that iOS will recognize as a legitimate link
+      const linkElement = document.createElement('a');
+      linkElement.href = urlToOpen;
+      linkElement.target = '_blank';
+      linkElement.rel = 'noopener noreferrer';
+      
+      // These styles make the link invisible but still functional
+      linkElement.style.position = 'absolute';
+      linkElement.style.top = '-9999px';
+      linkElement.style.left = '-9999px';
+      linkElement.textContent = 'View Recipe';
+      
+      // Add to the document (required for iOS)
+      document.body.appendChild(linkElement);
+      
+      // Trigger a click on this real element
+      linkElement.click();
+      
+      // Clean up after a short delay
+      setTimeout(() => {
+        if (document.body.contains(linkElement)) {
+          document.body.removeChild(linkElement);
+        }
+      }, 100);
       
     } catch (error) {
       console.error("Error opening recipe:", error);
       
-      // Simple alert fallback if window.open fails
+      // Simple alert fallback if the approach fails
       alert("Unable to open recipe link. Please visit: " + (recipeUrl || "https://www.google.com"));
     }
   }
