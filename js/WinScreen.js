@@ -1,9 +1,109 @@
 function showWinScreen() {
   gameWon = true;
   triggerHapticFeedback('completion');
+  
+  // Create the clickable recipe image link when the win screen appears
+  createRecipeImageLink();
+}
+
+// New function to create a real HTML clickable image that links to the recipe - APlasker
+function createRecipeImageLink() {
+  // First, remove any existing recipe link element to avoid duplicates
+  removeRecipeImageLink();
+  
+  // Only create the link if we have a valid recipe URL
+  if (!recipeUrl) {
+    console.warn("No recipe URL available, skipping clickable image creation");
+    return;
+  }
+  
+  // Create a container to hold the link and image
+  const linkContainer = document.createElement('div');
+  linkContainer.id = 'recipe-image-link-container';
+  linkContainer.style.position = 'absolute';
+  linkContainer.style.pointerEvents = 'auto'; // Ensure it's clickable
+  linkContainer.style.zIndex = '100'; // Make sure it's above the canvas
+  linkContainer.style.overflow = 'hidden'; // For rounded corners
+  linkContainer.style.borderRadius = '8px'; // Match the rounded corners of the canvas image
+  
+  // Create the anchor element
+  const recipeLink = document.createElement('a');
+  recipeLink.href = recipeUrl;
+  recipeLink.target = '_blank';
+  recipeLink.rel = 'noopener noreferrer';
+  recipeLink.style.display = 'block'; // Make it block to contain the image
+  
+  // Create a placeholder image or use a real image if available
+  const recipeImg = document.createElement('img');
+  
+  // Set image source - either use a placeholder or the actual recipe image URL
+  if (typeof recipeImage !== 'undefined' && recipeImage) {
+    // If we have a p5.js image object, we need to extract its source
+    // Since we can't directly access p5 image source, use a placeholder
+    recipeImg.src = 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20fill%3D%22%23f0f0f0%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E%3C%2Fsvg%3E';
+  } else {
+    // Use a placeholder for the image
+    recipeImg.src = 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20fill%3D%22%23f0f0f0%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E%3C%2Fsvg%3E';
+  }
+  
+  // Set image styling
+  recipeImg.style.width = '100%';
+  recipeImg.style.height = '100%';
+  recipeImg.style.objectFit = 'cover';
+  recipeImg.style.display = 'block';
+  
+  // Assemble the elements
+  recipeLink.appendChild(recipeImg);
+  linkContainer.appendChild(recipeLink);
+  
+  // Add to document
+  document.body.appendChild(linkContainer);
+  
+  // Position will be updated in drawWinScreen
+  positionRecipeImageLink();
+}
+
+// Function to position the recipe image link to match the canvas position
+function positionRecipeImageLink() {
+  const linkContainer = document.getElementById('recipe-image-link-container');
+  if (!linkContainer) return;
+  
+  // Calculate recipe card size based on current viewport dimensions
+  const cardWidth = min(playAreaWidth, 600);
+  const cardHeight = playAreaHeight * 0.38;
+  
+  // Position card based on adjusted spacing
+  const cardX = playAreaX + playAreaWidth / 2;
+  const cardY = playAreaY + playAreaHeight * 0.10 + cardHeight / 2;
+  
+  // Calculate image dimensions
+  const imageWidth = min(cardWidth * 0.45, 220);
+  const imageHeight = imageWidth; // Keep square
+  
+  // Get image position
+  const imageX = cardX - cardWidth/2 + cardWidth * 0.28;
+  const imageY = cardY - cardHeight/2 + cardHeight * 0.53;
+  
+  // Position the link element to match the canvas image
+  // Convert from center-based coordinates to top-left
+  linkContainer.style.left = (imageX - imageWidth/2) + 'px';
+  linkContainer.style.top = (imageY - imageHeight/2) + 'px';
+  linkContainer.style.width = imageWidth + 'px';
+  linkContainer.style.height = imageHeight + 'px';
+}
+
+// Function to remove the recipe image link
+function removeRecipeImageLink() {
+  const linkContainer = document.getElementById('recipe-image-link-container');
+  if (linkContainer) {
+    document.body.removeChild(linkContainer);
+  }
 }
 
 function drawWinScreen() {
+    // Ensure the recipe image link is positioned correctly with the current dimensions
+    positionRecipeImageLink();
+    
     // Isolate drawing context for the entire win screen
     push();
     
@@ -1062,64 +1162,185 @@ function drawWinScreen() {
     }
   }
   
-  function viewRecipe() {
+  // New function to show a recipe link modal - APlasker
+  function showRecipeModal() {
     try {
-      // Get the recipe ID safely with fallbacks
-      let recipeId = '';
+      console.log("Showing recipe link modal");
       
-      if (final_combination && final_combination.id) {
-        recipeId = final_combination.id;
-      } else if (recipe_data && recipe_data.id) {
-        recipeId = recipe_data.id;
-      }
+      // Get recipe URL with fallbacks
+      let urlToOpen = 'https://www.google.com'; // Default fallback
+      let recipeName = "this recipe";
       
-      // Use the recipeUrl from Supabase if available - APlasker
-      let urlToOpen = 'https://www.google.com'; // Default fallback to Google
-      
+      // Get the proper URL
       if (recipeUrl) {
-        urlToOpen = recipeUrl; // Use the URL loaded from Supabase
-        console.log("Opening recipe URL from database:", urlToOpen);
+        urlToOpen = recipeUrl;
+        console.log("Using recipe URL from database:", urlToOpen);
       } else {
         console.warn("No recipe URL found in database, using fallback");
       }
       
-      // Create anchor element with correct attributes for new tab
-      const anchorEl = document.createElement('a');
-      anchorEl.href = urlToOpen;
-      anchorEl.target = '_blank'; // Force new tab
-      anchorEl.rel = 'noopener noreferrer'; // Security best practice
+      // Get recipe name if available
+      if (final_combination && final_combination.name) {
+        recipeName = final_combination.name;
+      }
       
-      // iOS Safari needs the element to be in the DOM and clicked
-      document.body.appendChild(anchorEl);
+      // Set the modal active flag if it exists
+      if (typeof window.modalActive !== 'undefined') {
+        window.modalActive = true;
+      } else if (typeof modalActive !== 'undefined') {
+        modalActive = true;
+      }
       
-      // Programmatically trigger a click
-      anchorEl.click();
+      // Create modal container
+      const modal = document.createElement('div');
+      modal.style.position = 'fixed';
+      modal.style.top = '0';
+      modal.style.left = '0';
+      modal.style.width = '100%';
+      modal.style.height = '100%';
+      modal.style.backgroundColor = 'rgba(0,0,0,0.7)';
+      modal.style.display = 'flex';
+      modal.style.flexDirection = 'column';
+      modal.style.alignItems = 'center';
+      modal.style.justifyContent = 'center';
+      modal.style.zIndex = '1000';
+      modal.style.pointerEvents = 'auto';
       
-      // Clean up the DOM
-      setTimeout(() => {
-        if (document.body.contains(anchorEl)) {
-          document.body.removeChild(anchorEl);
+      // Close modal when clicking outside content
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          e.stopPropagation();
+          // Reset modal active flag
+          if (typeof window.modalActive !== 'undefined') {
+            window.modalActive = false;
+          } else if (typeof modalActive !== 'undefined') {
+            modalActive = false;
+          }
+          document.body.removeChild(modal);
         }
-      }, 100);
+      });
       
-      // Fallback in case the DOM approach doesn't work (older browsers)
-      try {
-        window.open(urlToOpen, '_blank');
-      } catch (innerErr) {
-        console.log('Anchor method should have worked, window.open fallback unnecessary');
-      }
-    } catch (e) {
-      // Error handler for any unexpected issues
-      console.error("Error opening recipe:", e);
+      // Create modal content
+      const content = document.createElement('div');
+      content.style.backgroundColor = '#FFFFFF';
+      content.style.padding = '25px';
+      content.style.borderRadius = '10px';
+      content.style.maxWidth = '90%';
+      content.style.width = '350px';
+      content.style.textAlign = 'center';
+      content.style.boxShadow = '0 4px 10px rgba(0,0,0,0.3)';
       
-      // Final fallback - try direct location change as last resort
-      // This won't open in a new tab but is better than nothing
-      try {
-        window.location.href = "https://www.google.com"; // Changed to Google fallback - APlasker
-      } catch (finalErr) {
-        console.error("All attempts to open recipe failed:", finalErr);
-        alert("Unable to open recipe. Please try visiting Google directly.");
+      // Prevent events from bubbling through content
+      content.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      
+      // Create header
+      const header = document.createElement('h3');
+      header.innerText = 'View Full Recipe';
+      header.style.marginTop = '0';
+      header.style.color = '#778F5D'; // Avocado green
+      header.style.fontFamily = 'Arial, sans-serif';
+      
+      // Create recipe name
+      const recipeText = document.createElement('p');
+      recipeText.innerText = recipeName;
+      recipeText.style.fontSize = '16px';
+      recipeText.style.fontWeight = 'bold';
+      recipeText.style.color = '#333';
+      recipeText.style.margin = '15px 0';
+      
+      // Create button container
+      const buttonContainer = document.createElement('div');
+      buttonContainer.style.display = 'flex';
+      buttonContainer.style.flexDirection = 'column';
+      buttonContainer.style.gap = '10px';
+      buttonContainer.style.marginTop = '15px';
+      buttonContainer.style.width = '100%';
+      
+      // Create open recipe button (as a direct link)
+      const openButton = document.createElement('a');
+      openButton.href = urlToOpen;
+      openButton.target = '_blank'; // Open in new tab
+      openButton.rel = 'noopener noreferrer'; // Security best practice
+      openButton.innerText = 'Open Recipe Website';
+      openButton.style.backgroundColor = '#778F5D'; // Avocado green
+      openButton.style.color = 'white';
+      openButton.style.border = 'none';
+      openButton.style.padding = '12px 20px';
+      openButton.style.borderRadius = '5px';
+      openButton.style.cursor = 'pointer';
+      openButton.style.fontWeight = 'bold';
+      openButton.style.textDecoration = 'none';
+      openButton.style.display = 'inline-block';
+      openButton.style.textAlign = 'center';
+      
+      // Create close button
+      const closeButton = document.createElement('button');
+      closeButton.innerText = 'Close';
+      closeButton.style.backgroundColor = '#f5f5f5';
+      closeButton.style.color = '#333';
+      closeButton.style.border = '1px solid #ddd';
+      closeButton.style.padding = '12px 20px';
+      closeButton.style.borderRadius = '5px';
+      closeButton.style.cursor = 'pointer';
+      closeButton.style.fontWeight = 'normal';
+      
+      // Add event listener to close modal
+      closeButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Reset modal active flag
+        if (typeof window.modalActive !== 'undefined') {
+          window.modalActive = false;
+        } else if (typeof modalActive !== 'undefined') {
+          modalActive = false;
+        }
+        document.body.removeChild(modal);
+      });
+      
+      // Assemble modal
+      buttonContainer.appendChild(openButton);
+      buttonContainer.appendChild(closeButton);
+      content.appendChild(header);
+      content.appendChild(recipeText);
+      content.appendChild(buttonContainer);
+      modal.appendChild(content);
+      
+      // Add to document
+      document.body.appendChild(modal);
+      
+    } catch (error) {
+      console.error("Error showing recipe modal:", error);
+      alert("Unable to open recipe link. Please try again later.");
+    }
+  }
+
+  // Updated to use a real HTML anchor element for maximum compatibility - APlasker
+  function viewRecipe() {
+    try {
+      console.log("View recipe triggered via direct card click");
+      
+      // We don't need to do anything here anymore since the image link handles the navigation
+      // Keep only for backward compatibility if the image link fails
+      
+      // Get the proper URL with fallbacks
+      let urlToOpen = 'https://www.google.com'; // Default fallback
+      
+      if (recipeUrl) {
+        urlToOpen = recipeUrl;
+        console.log("Using recipe URL from database:", urlToOpen);
+      } else {
+        console.warn("No recipe URL found in database, using fallback");
+        
+        // In case the image link isn't working, provide a fallback method
+        alert("Unable to open recipe link. Please visit: " + urlToOpen);
       }
+      
+    } catch (error) {
+      console.error("Error opening recipe:", error);
+      
+      // Simple alert fallback
+      alert("Unable to open recipe link. Please try visiting the recipe directly.");
     }
   }
   
@@ -1213,6 +1434,32 @@ function drawWinScreen() {
       // Get author information from the database if it exists
       recipeAuthor = recipeData.author || "";
       
+      // Load the recipe image if URL is provided
+      if (recipeData.imgUrl) {
+        console.log("Loading random recipe image from URL:", recipeData.imgUrl);
+        isLoadingImage = true;
+        
+        // Use loadImage with success and error callbacks
+        loadImage(
+          recipeData.imgUrl,
+          // Success callback
+          (img) => {
+            console.log("Random recipe image loaded successfully");
+            recipeImage = img;
+            isLoadingImage = false;
+          },
+          // Error callback
+          (err) => {
+            console.error("Error loading random recipe image:", err);
+            recipeImage = null; // Set to null to indicate loading failed
+            isLoadingImage = false;
+          }
+        );
+      } else {
+        // Clear previous image if no URL is provided
+        recipeImage = null;
+      }
+      
       // Reset game state
       gameStarted = false;
       gameWon = false;
@@ -1225,6 +1472,7 @@ function drawWinScreen() {
     } catch (error) {
       console.error("Error loading random recipe:", error);
       isLoadingRandomRecipe = false;
+      isLoadingImage = false;
     }
   }
   
