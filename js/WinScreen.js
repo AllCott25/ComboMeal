@@ -1,109 +1,9 @@
 function showWinScreen() {
   gameWon = true;
   triggerHapticFeedback('completion');
-  
-  // Create the clickable recipe image link when the win screen appears
-  createRecipeImageLink();
-}
-
-// New function to create a real HTML clickable image that links to the recipe - APlasker
-function createRecipeImageLink() {
-  // First, remove any existing recipe link element to avoid duplicates
-  removeRecipeImageLink();
-  
-  // Only create the link if we have a valid recipe URL
-  if (!recipeUrl) {
-    console.warn("No recipe URL available, skipping clickable image creation");
-    return;
-  }
-  
-  // Create a container to hold the link and image
-  const linkContainer = document.createElement('div');
-  linkContainer.id = 'recipe-image-link-container';
-  linkContainer.style.position = 'absolute';
-  linkContainer.style.pointerEvents = 'auto'; // Ensure it's clickable
-  linkContainer.style.zIndex = '100'; // Make sure it's above the canvas
-  linkContainer.style.overflow = 'hidden'; // For rounded corners
-  linkContainer.style.borderRadius = '8px'; // Match the rounded corners of the canvas image
-  
-  // Create the anchor element
-  const recipeLink = document.createElement('a');
-  recipeLink.href = recipeUrl;
-  recipeLink.target = '_blank';
-  recipeLink.rel = 'noopener noreferrer';
-  recipeLink.style.display = 'block'; // Make it block to contain the image
-  
-  // Create a placeholder image or use a real image if available
-  const recipeImg = document.createElement('img');
-  
-  // Set image source - either use a placeholder or the actual recipe image URL
-  if (typeof recipeImage !== 'undefined' && recipeImage) {
-    // If we have a p5.js image object, we need to extract its source
-    // Since we can't directly access p5 image source, use a placeholder
-    recipeImg.src = 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20fill%3D%22%23f0f0f0%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E%3C%2Fsvg%3E';
-  } else {
-    // Use a placeholder for the image
-    recipeImg.src = 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20fill%3D%22%23f0f0f0%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E%3C%2Fsvg%3E';
-  }
-  
-  // Set image styling
-  recipeImg.style.width = '100%';
-  recipeImg.style.height = '100%';
-  recipeImg.style.objectFit = 'cover';
-  recipeImg.style.display = 'block';
-  
-  // Assemble the elements
-  recipeLink.appendChild(recipeImg);
-  linkContainer.appendChild(recipeLink);
-  
-  // Add to document
-  document.body.appendChild(linkContainer);
-  
-  // Position will be updated in drawWinScreen
-  positionRecipeImageLink();
-}
-
-// Function to position the recipe image link to match the canvas position
-function positionRecipeImageLink() {
-  const linkContainer = document.getElementById('recipe-image-link-container');
-  if (!linkContainer) return;
-  
-  // Calculate recipe card size based on current viewport dimensions
-  const cardWidth = min(playAreaWidth, 600);
-  const cardHeight = playAreaHeight * 0.38;
-  
-  // Position card based on adjusted spacing
-  const cardX = playAreaX + playAreaWidth / 2;
-  const cardY = playAreaY + playAreaHeight * 0.10 + cardHeight / 2;
-  
-  // Calculate image dimensions
-  const imageWidth = min(cardWidth * 0.45, 220);
-  const imageHeight = imageWidth; // Keep square
-  
-  // Get image position
-  const imageX = cardX - cardWidth/2 + cardWidth * 0.28;
-  const imageY = cardY - cardHeight/2 + cardHeight * 0.53;
-  
-  // Position the link element to match the canvas image
-  // Convert from center-based coordinates to top-left
-  linkContainer.style.left = (imageX - imageWidth/2) + 'px';
-  linkContainer.style.top = (imageY - imageHeight/2) + 'px';
-  linkContainer.style.width = imageWidth + 'px';
-  linkContainer.style.height = imageHeight + 'px';
-}
-
-// Function to remove the recipe image link
-function removeRecipeImageLink() {
-  const linkContainer = document.getElementById('recipe-image-link-container');
-  if (linkContainer) {
-    document.body.removeChild(linkContainer);
-  }
 }
 
 function drawWinScreen() {
-    // Ensure the recipe image link is positioned correctly with the current dimensions
-    positionRecipeImageLink();
-    
     // Isolate drawing context for the entire win screen
     push();
     
@@ -1315,13 +1215,10 @@ function drawWinScreen() {
     }
   }
 
-  // Updated to use a real HTML anchor element for maximum compatibility - APlasker
+  // Updated to use an embedded iframe web view for maximum compatibility - APlasker
   function viewRecipe() {
     try {
       console.log("View recipe triggered via direct card click");
-      
-      // We don't need to do anything here anymore since the image link handles the navigation
-      // Keep only for backward compatibility if the image link fails
       
       // Get the proper URL with fallbacks
       let urlToOpen = 'https://www.google.com'; // Default fallback
@@ -1331,16 +1228,86 @@ function drawWinScreen() {
         console.log("Using recipe URL from database:", urlToOpen);
       } else {
         console.warn("No recipe URL found in database, using fallback");
-        
-        // In case the image link isn't working, provide a fallback method
-        alert("Unable to open recipe link. Please visit: " + urlToOpen);
       }
       
-    } catch (error) {
-      console.error("Error opening recipe:", error);
+      // Create overlay container
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '100%';
+      overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.85)';
+      overlay.style.zIndex = '1000';
+      overlay.style.display = 'flex';
+      overlay.style.flexDirection = 'column';
       
-      // Simple alert fallback
-      alert("Unable to open recipe link. Please try visiting the recipe directly.");
+      // Create back button container (for positioning at top)
+      const topBar = document.createElement('div');
+      topBar.style.padding = '15px';
+      topBar.style.display = 'flex';
+      topBar.style.justifyContent = 'space-between';
+      topBar.style.alignItems = 'center';
+      
+      // Create back button
+      const backButton = document.createElement('button');
+      backButton.innerText = '← Back to Game';
+      backButton.style.backgroundColor = '#778F5D'; // Avocado green
+      backButton.style.color = 'white';
+      backButton.style.border = 'none';
+      backButton.style.borderRadius = '5px';
+      backButton.style.padding = '10px 15px';
+      backButton.style.fontSize = '16px';
+      backButton.style.cursor = 'pointer';
+      backButton.style.fontWeight = 'bold';
+      
+      // Create recipe title
+      const recipeTitle = document.createElement('div');
+      if (final_combination && final_combination.name) {
+        recipeTitle.innerText = final_combination.name;
+      } else {
+        recipeTitle.innerText = "Recipe";
+      }
+      recipeTitle.style.color = 'white';
+      recipeTitle.style.fontSize = '16px';
+      recipeTitle.style.fontWeight = 'bold';
+      
+      // Add back button functionality
+      backButton.addEventListener('click', function() {
+        if (overlay && document.body.contains(overlay)) {
+          document.body.removeChild(overlay);
+        }
+      });
+      
+      // Create iframe container (takes remaining height)
+      const iframeContainer = document.createElement('div');
+      iframeContainer.style.flex = '1';
+      iframeContainer.style.padding = '0 10px 10px 10px';
+      
+      // Create iframe
+      const iframe = document.createElement('iframe');
+      iframe.src = urlToOpen;
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.style.borderRadius = '8px';
+      iframe.style.backgroundColor = 'white';
+      
+      // Assemble the overlay
+      topBar.appendChild(backButton);
+      topBar.appendChild(recipeTitle);
+      iframeContainer.appendChild(iframe);
+      overlay.appendChild(topBar);
+      overlay.appendChild(iframeContainer);
+      
+      // Add to document
+      document.body.appendChild(overlay);
+      
+    } catch (error) {
+      console.error("Error showing recipe:", error);
+      
+      // Simple alert fallback if the approach fails
+      alert("Unable to show recipe. Please visit: " + (recipeUrl || "https://www.google.com"));
     }
   }
   
