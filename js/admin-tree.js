@@ -184,12 +184,13 @@ async function handleRecipeSubmit(e) {
     const description = document.getElementById('recipe-description').value;
     const author = document.getElementById('recipe-author').value;
     const url = document.getElementById('recipe-url').value;
+    const imgUrl = document.getElementById('recipe-img-url').value;
     
     try {
         const { data, error } = await supabase
             .from('recipes')
             .insert([
-                { name, date: date, description, author, recipe_url: url }
+                { name, date: date, description, author, recipe_url: url, img_url: imgUrl }
             ])
             .select();
         
@@ -760,6 +761,7 @@ function showEditRecipeForm(recipe) {
     document.getElementById('edit-recipe-description').value = recipe.description || '';
     document.getElementById('edit-recipe-author').value = recipe.author || '';
     document.getElementById('edit-recipe-url').value = recipe.recipe_url || '';
+    document.getElementById('edit-recipe-img-url').value = recipe.img_url || '';
     
     editRecipeForm.style.display = 'block';
 }
@@ -774,13 +776,14 @@ async function handleEditRecipeSubmit(e) {
     const description = document.getElementById('edit-recipe-description').value;
     const author = document.getElementById('edit-recipe-author').value;
     const url = document.getElementById('edit-recipe-url').value;
+    const imgUrl = document.getElementById('edit-recipe-img-url').value;
     
-    console.log("Attempting to update recipe:", { recId, name, date, description, author, url });
+    console.log("Attempting to update recipe:", { recId, name, date, description, author, url, imgUrl });
     
     try {
         const { data, error } = await supabase
             .from('recipes')
-            .update({ name, date, description, author, recipe_url: url })
+            .update({ name, date, description, author, recipe_url: url, img_url: imgUrl })
             .eq('rec_id', recId)
             .select();
         
