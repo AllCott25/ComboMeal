@@ -1944,6 +1944,15 @@ let intermediate_combinations = [
     if (modalActive) {
       // Use helper function to check if interacting with a modal element
       if (isModalElement(touches[0].x, touches[0].y)) {
+        // Get the element at the touch coordinates
+        const touchedElement = document.elementFromPoint(touches[0].x, touches[0].y);
+        
+        // Special handling for anchor elements - allow their default behavior
+        if (touchedElement && touchedElement.tagName === 'A') {
+          console.log('Touch interaction on link element - allowing default behavior');
+          return true; // Allow default behavior for links
+        }
+        
         // Allow the event to proceed to HTML elements
         console.log('Touch interaction allowed for modal element');
         return true;
@@ -2892,7 +2901,8 @@ let intermediate_combinations = [
       target.closest('#feedback-modal') || 
       target.tagName === 'INPUT' || 
       target.tagName === 'TEXTAREA' || 
-      target.tagName === 'BUTTON'
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'A' // Add anchor tag to allow links to work
     );
   }
   
