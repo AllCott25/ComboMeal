@@ -401,7 +401,7 @@ function drawWinScreen() {
     } else {
       fill('#666'); // Gray text normally
     }
-    text("View Full Recipe →", cardX, cardY + cardHeight/2 - cardHeight * 0.07); // 7% of card height from bottom
+    text("Recipe Details →", cardX, cardY + cardHeight/2 - cardHeight * 0.07); // 7% of card height from bottom
     pop(); // End View Full Recipe context
     
     // ===== SCORE SECTION =====
@@ -1093,6 +1093,7 @@ function drawWinScreen() {
       
       // Create modal container
       const modal = document.createElement('div');
+      modal.id = 'recipe-modal'; // Add ID for easier debugging and targeting
       modal.style.position = 'fixed';
       modal.style.top = '0';
       modal.style.left = '0';
@@ -1106,17 +1107,32 @@ function drawWinScreen() {
       modal.style.zIndex = '1000';
       modal.style.pointerEvents = 'auto';
       
+      // Helper function to close modal - APlasker
+      const closeModal = () => {
+        console.log("Closing recipe modal via background click");
+        // Reset modal active flag
+        if (typeof window.modalActive !== 'undefined') {
+          window.modalActive = false;
+        } else if (typeof modalActive !== 'undefined') {
+          modalActive = false;
+        }
+        // Remove from DOM
+        document.body.removeChild(modal);
+      };
+      
       // Close modal when clicking outside content
       modal.addEventListener('click', (e) => {
         if (e.target === modal) {
           e.stopPropagation();
-          // Reset modal active flag
-          if (typeof window.modalActive !== 'undefined') {
-            window.modalActive = false;
-          } else if (typeof modalActive !== 'undefined') {
-            modalActive = false;
-          }
-          document.body.removeChild(modal);
+          closeModal();
+        }
+      });
+      
+      // Additional touch event for mobile - APlasker
+      modal.addEventListener('touchend', (e) => {
+        if (e.target === modal) {
+          e.stopPropagation();
+          closeModal();
         }
       });
       
@@ -1137,25 +1153,17 @@ function drawWinScreen() {
       
       // Create header
       const header = document.createElement('h3');
-      header.innerText = 'View Full Recipe';
+      header.innerText = 'Now leaving Combo Meal...';
       header.style.marginTop = '0';
       header.style.color = '#778F5D'; // Avocado green
       header.style.fontFamily = 'Arial, sans-serif';
-      
-      // Create recipe name
-      const recipeText = document.createElement('p');
-      recipeText.innerText = recipeName;
-      recipeText.style.fontSize = '16px';
-      recipeText.style.fontWeight = 'bold';
-      recipeText.style.color = '#333';
-      recipeText.style.margin = '15px 0';
+      header.style.marginBottom = '25px'; // Added margin to maintain spacing after removing recipe name
       
       // Create button container
       const buttonContainer = document.createElement('div');
       buttonContainer.style.display = 'flex';
       buttonContainer.style.flexDirection = 'column';
       buttonContainer.style.gap = '10px';
-      buttonContainer.style.marginTop = '15px';
       buttonContainer.style.width = '100%';
       
       // Create open recipe button (as a direct link)
@@ -1163,7 +1171,7 @@ function drawWinScreen() {
       openButton.href = urlToOpen;
       openButton.target = '_blank'; // Open in new tab
       openButton.rel = 'noopener noreferrer'; // Security best practice
-      openButton.innerText = 'Open Recipe Website';
+      openButton.innerText = 'Go to Recipe';
       openButton.style.backgroundColor = '#778F5D'; // Avocado green
       openButton.style.color = 'white';
       openButton.style.border = 'none';
@@ -1177,7 +1185,7 @@ function drawWinScreen() {
       
       // Create close button
       const closeButton = document.createElement('button');
-      closeButton.innerText = 'Close';
+      closeButton.innerText = 'Cancel';
       closeButton.style.backgroundColor = '#f5f5f5';
       closeButton.style.color = '#333';
       closeButton.style.border = '1px solid #ddd';
@@ -1189,20 +1197,13 @@ function drawWinScreen() {
       // Add event listener to close modal
       closeButton.addEventListener('click', (e) => {
         e.stopPropagation();
-        // Reset modal active flag
-        if (typeof window.modalActive !== 'undefined') {
-          window.modalActive = false;
-        } else if (typeof modalActive !== 'undefined') {
-          modalActive = false;
-        }
-        document.body.removeChild(modal);
+        closeModal();
       });
       
       // Assemble modal
       buttonContainer.appendChild(openButton);
       buttonContainer.appendChild(closeButton);
       content.appendChild(header);
-      content.appendChild(recipeText);
       content.appendChild(buttonContainer);
       modal.appendChild(content);
       
