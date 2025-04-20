@@ -337,6 +337,8 @@ function processRecipeData(recipe, combinations, ingredients, easterEggs = []) {
     recipeName: recipe.name,
     recipeUrl: recipe.recipe_url || "https://www.example.com/recipe",
     imgUrl: recipe.img_url || null,
+    day_number: recipe.day_number || "###",
+    date: recipe.date || "###",
     intermediateCombinations,
     finalCombination,
     baseIngredients: [...new Set(baseIngredients)],

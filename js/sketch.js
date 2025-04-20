@@ -1281,11 +1281,15 @@ let intermediate_combinations = [
       // Store recipe data in the global variable
       recipe_data = recipeData;
       
+      // Store the recipe object globally for stats access
+      recipe = recipeData;
+      
       // Update game variables with recipe data
       intermediate_combinations = recipeData.intermediateCombinations;
       final_combination = recipeData.finalCombination;
       easter_eggs = recipeData.easterEggs;
       ingredients = recipeData.baseIngredients;
+      base_ingredients = recipeData.baseIngredients; // Ensure base_ingredients is set for stats
       recipeUrl = recipeData.recipeUrl;
       recipeDescription = recipeData.description || "A delicious recipe that's sure to please everyone at the table!";
       
@@ -1305,14 +1309,23 @@ let intermediate_combinations = [
             console.log("Recipe image loaded successfully");
             recipeImage = img;
             isLoadingImage = false;
+            
+            // Set flag that data is loaded for stats display
+            recipeDataLoadedForStats = true;
           },
           // Error callback
           (err) => {
             console.error("Error loading recipe image:", err);
             recipeImage = null; // Set to null to indicate loading failed
             isLoadingImage = false;
+            
+            // Still set the flag even if image fails - we have the other data
+            recipeDataLoadedForStats = true;
           }
         );
+      } else {
+        // No image to load, so mark data as ready immediately
+        recipeDataLoadedForStats = true;
       }
       
       console.log("Recipe data loaded successfully");
@@ -1322,6 +1335,10 @@ let intermediate_combinations = [
       loadingError = true;
       isLoadingRecipe = false;
       isLoadingImage = false;
+      
+      // Set data loaded flag to true even on error, so we can show the title screen
+      // with fallback values for the stats
+      recipeDataLoadedForStats = true;
     }
   }
   
@@ -1509,7 +1526,7 @@ let intermediate_combinations = [
     }
     
     // Check for help icon click
-    if (gameStarted && !gameWon && isHelpIconHovered) {
+    if (!gameWon && isHelpIconHovered) {
       if (typeof showHelpModal === 'function') {
         showHelpModal();
         return false; // Prevent other click handling
@@ -1906,6 +1923,10 @@ let intermediate_combinations = [
   function startGame() {
     gameStarted = true;
     
+    // Trigger help button animation from rectangular to circular
+    helpButtonAnimating = true;
+    helpButtonAnimationProgress = 0;
+    
     // Initialize lastAction to current frame count when game starts - APlasker
     lastAction = frameCount;
     
@@ -2086,9 +2107,44 @@ let intermediate_combinations = [
       }
       
       // Check for help icon touch
-      if (gameStarted && !gameWon) {
-        // Check if touch is on help icon
-        if (dist(touchX, touchY, helpIconX, helpIconY) < helpIconSize/2) {
+      if (!gameWon) {
+        // Check if touch is on help icon - adapt to current shape
+        const progress = helpButtonAnimationProgress;
+        
+        // Define dimensions for rectangular button mode 
+        const rectWidth = Math.max(playAreaWidth * 0.15, 90); // Width for "How to Play" text
+        const rectHeight = helpIconSize; // Same height as circle
+        
+        // Calculate the 90% horizontal position in the play area
+        const finalCircleX = playAreaX + (playAreaWidth * 0.9);
+        const circleX = finalCircleX; // Circle is always at the 90% mark
+        
+        // Calculate the rectangle center position to align right edges
+        const rectX = circleX + helpIconSize/2 - rectWidth/2;
+        
+        // Calculate interpolated width based on animation progress
+        const currentWidth = rectWidth - (rectWidth - helpIconSize) * progress;
+        
+        // Calculate current center X position (transitions from rectangle center to circle center)
+        const currentCenterX = rectX + (circleX - rectX) * progress;
+        
+        // Different hit detection based on shape
+        let touchedHelpButton = false;
+        
+        if (progress < 0.5) {
+          // More rectangular - use rectangle hit detection
+          touchedHelpButton = (
+            touchX > currentCenterX - currentWidth/2 &&
+            touchX < currentCenterX + currentWidth/2 &&
+            touchY > helpIconY - rectHeight/2 &&
+            touchY < helpIconY + rectHeight/2
+          );
+        } else {
+          // More circular - use circle hit detection
+          touchedHelpButton = dist(touchX, touchY, circleX, helpIconY) < helpIconSize/2;
+        }
+        
+        if (touchedHelpButton) {
           if (typeof showHelpModal === 'function') {
             showHelpModal();
             touchHandled = true;
@@ -2806,34 +2862,118 @@ let intermediate_combinations = [
   // Variables for the help icon
   let helpIconX, helpIconY, helpIconSize;
   let isHelpIconHovered = false;
+  let helpButtonAnimationProgress = 0; // 0 = rectangular, 1 = circular
+  let helpButtonAnimating = false;
+  let helpButtonAnimationDuration = 7; // Animation duration in frames (reduced for 4x speed)
+  
+  // Variable to track if recipe data is fully loaded for stats display
+  let recipeDataLoadedForStats = false;
   
   // Function to draw the help icon
   function drawHelpIcon() {
-    // Position in top-right corner with more padding
-    helpIconX = playAreaX + playAreaWidth - 20; // Moved further right (from 30 to 20)
-    helpIconY = playAreaY + 20; // Moved further up (from 30 to 20)
+    // Calculate the 90% horizontal position in the play area
+    const finalCircleX = playAreaX + (playAreaWidth * 0.9);
+    
+    // Position vertically at 2% of play area height from the top (reduced from 5%)
     helpIconSize = Math.max(playAreaWidth * 0.04, 25); // 4% of play area width, minimum 25px
     
-    // Check if mouse is over the icon
-    isHelpIconHovered = dist(mouseX, mouseY, helpIconX, helpIconY) < helpIconSize/2;
+    // Set helpIconX to be the final circle position
+    helpIconX = finalCircleX;
+    helpIconY = playAreaY; // 0% of play area height (flush with top)
     
-    // Draw the icon circle with transparent fill and green outline
+    // Update animation progress if animating
+    if (helpButtonAnimating) {
+      helpButtonAnimationProgress += 1 / helpButtonAnimationDuration;
+      if (helpButtonAnimationProgress >= 1) {
+        helpButtonAnimationProgress = 1;
+        helpButtonAnimating = false;
+      }
+    }
+    
+    // Calculate interpolated values for animation
+    const progress = helpButtonAnimationProgress;
+    
+    // Define dimensions for rectangular button mode
+    const rectWidth = Math.max(playAreaWidth * 0.15, 90); // Width for "How to Play" text
+    const rectHeight = helpIconSize; // Same height as circle
+    const cornerRadius = rectHeight / 2;
+    
+    // Calculate the position for the circle
+    const circleX = finalCircleX; // Circle is always at the 90% mark
+    
+    // Calculate the rectangle center position
+    // For right edges to align: rectangle's right edge (rectX + rectWidth/2) = circle's right edge (circleX + circleSize/2)
+    // So rectX = circleX + circleSize/2 - rectWidth/2
+    const rectX = circleX + helpIconSize/2 - rectWidth/2;
+    
+    // Calculate interpolated width based on animation progress
+    const currentWidth = rectWidth - (rectWidth - helpIconSize) * progress;
+    
+    // Calculate current center X position (transitions from rectangle center to circle center)
+    const currentCenterX = rectX + (circleX - rectX) * progress;
+    
+    // Check if mouse is over the button - different hit detection based on shape
+    if (progress < 0.5) {
+      // More rectangular - use rectangle hit detection
+      isHelpIconHovered = (
+        mouseX > currentCenterX - currentWidth/2 &&
+        mouseX < currentCenterX + currentWidth/2 &&
+        mouseY > helpIconY - rectHeight/2 &&
+        mouseY < helpIconY + rectHeight/2
+      );
+    } else {
+      // More circular - use circle hit detection
+      isHelpIconHovered = dist(mouseX, mouseY, circleX, helpIconY) < helpIconSize/2;
+    }
+    
+    // Get the appropriate color (green normally, red when hovered)
+    const buttonColor = isHelpIconHovered ? COLORS.secondary : COLORS.primary;
+    
+    // Draw the button shape
     noFill();
     strokeWeight(2);
-    stroke(isHelpIconHovered ? COLORS.secondary : COLORS.primary); // Green normally, red when hovered
-    circle(helpIconX, helpIconY, helpIconSize);
+    stroke(buttonColor);
     
-    // Draw the "?" letter - positioned lower and with normal weight instead of bold
-    fill(isHelpIconHovered ? COLORS.secondary : COLORS.primary); // Green normally, red when hovered
-    textAlign(CENTER, CENTER);
-    textSize(helpIconSize * 0.6);
-    textStyle(NORMAL); // Changed from BOLD to NORMAL for thinner text
-    text("?", helpIconX, helpIconY + helpIconSize * 0.05); // Moved down (from -0.05 to +0.05)
+    if (progress < 0.001) {
+      // Fully rectangular button
+      rectMode(CENTER);
+      rect(rectX, helpIconY, currentWidth, rectHeight, cornerRadius);
+    } else if (progress > 0.999) {
+      // Fully circular button
+      circle(circleX, helpIconY, helpIconSize);
+    } else {
+      // Transitioning - draw rounded rectangle with animated width and position
+      rectMode(CENTER);
+      rect(currentCenterX, helpIconY, currentWidth, rectHeight, cornerRadius);
+    }
+    
+    // Draw the text with proper fade effect - no outline for better legibility
+    if (progress < 0.5) {
+      // Show "How to Play" text with fadeout
+      const textOpacity = 1 - (progress * 2); // Fade out from 1 to 0 during first half
+      fill(red(buttonColor), green(buttonColor), blue(buttonColor), 255 * textOpacity);
+      noStroke(); // Remove outline for better legibility
+      textAlign(CENTER, CENTER);
+      textSize(Math.max(helpIconSize * 0.3, 12)); // Smaller text size for "How to Play"
+      textStyle(NORMAL);
+      text("How to Play", currentCenterX, helpIconY);
+    } 
+    
+    if (progress > 0.5) {
+      // Show "?" with fadein
+      const textOpacity = (progress - 0.5) * 2; // Fade in from 0 to 1 during second half
+      fill(red(buttonColor), green(buttonColor), blue(buttonColor), 255 * textOpacity);
+      noStroke(); // Remove outline for better legibility
+      textAlign(CENTER, CENTER);
+      textSize(helpIconSize * 0.6);
+      textStyle(NORMAL);
+      text("?", circleX, helpIconY + helpIconSize * 0.05);
+    }
     
     // Reset text style
     textStyle(NORMAL);
     
-    // Change cursor when hovering over the icon
+    // Change cursor when hovering over the button
     if (isHelpIconHovered) {
       cursor(HAND);
     }
@@ -2957,6 +3097,54 @@ let intermediate_combinations = [
     vessel.textScale = 0.66;
     
     return vessel;
+  }
+  
+  function drawTitle() {
+    // Set text properties
+    textAlign(CENTER, CENTER);
+    
+    // Calculate title size relative to play area width
+    const titleSize = Math.max(playAreaWidth * 0.055, 30); // 5.5% of play area width, min 30px
+    textSize(titleSize);
+    
+    // Use a bold sans-serif font
+    textStyle(BOLD);
+    textFont('Arial, Helvetica, sans-serif');
+    
+    // Title text
+    const title = "COMBO MEAL";
+    
+    // Calculate the total width of the title to center each letter
+    let totalWidth = 0;
+    let letterWidths = [];
+    
+    // First calculate individual letter widths
+    for (let i = 0; i < title.length; i++) {
+      let letterWidth = textWidth(title[i]);
+      letterWidths.push(letterWidth);
+      totalWidth += letterWidth;
+    }
+    
+    // Add kerning (50% increase in spacing)
+    const kerningFactor = 0.5; // 50% extra space
+    let totalKerning = 0;
+    
+    // Calculate total kerning space (only between letters, not at the ends)
+    for (let i = 0; i < title.length - 1; i++) {
+      totalKerning += letterWidths[i] * kerningFactor;
+    }
+    
+    // Starting x position (centered with kerning)
+    let x = playAreaX + playAreaWidth/2 - (totalWidth + totalKerning)/2;
+    
+    // Bubble Pop effect parameters
+    const outlineWeight = 2; // Thinner outline for bubble style
+    const bounceAmount = 2 * Math.sin(frameCount * 0.05); // Subtle bounce animation
+    
+    // Position title at 5% from top of play area (instead of fixed 40px)
+    const titleY = playAreaY + (playAreaHeight * 0.05);
+    
+    // Draw each letter with alternating colors
   }
   
   

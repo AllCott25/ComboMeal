@@ -755,8 +755,20 @@ function drawWinMoveHistory(x, y, width, height) {
     }
     
     if (!gameStarted) {
-      // Draw start screen with animated demo
-      drawStartScreen();
+      // Only draw the start screen with stats if recipe data is loaded
+      if (typeof recipeDataLoadedForStats !== 'undefined' && recipeDataLoadedForStats) {
+        // Draw start screen with animated demo and recipe stats
+        drawStartScreen();
+      } else {
+        // Show a loading message while waiting for recipe data
+        textAlign(CENTER, CENTER);
+        textSize(24);
+        fill('#333');
+        text("Loading recipe information...", width/2, height/2);
+        
+        // Draw the help icon even during loading
+        drawHelpIcon();
+      }
     } else if (gameWon) {
       // Draw win screen
       drawWinScreen();
@@ -893,7 +905,7 @@ function drawWinMoveHistory(x, y, width, height) {
     updateCursor();
     
     // Draw the help icon if in gameplay state
-    if (gameStarted && !gameWon) {
+    if (!gameWon) {
       drawHelpIcon();
     }
     
@@ -913,7 +925,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textAlign(CENTER, CENTER);
     
     // Calculate title size relative to play area width
-    const titleSize = Math.max(playAreaWidth * 0.055, 30); // 5.5% of play area width, min 30px
+    // Increased by 15% from the original value
+    const titleSize = Math.max(playAreaWidth * 0.063, 35); // Increased from 0.055 to 0.063, min from 30 to 35
     textSize(titleSize);
     
     // Use a bold sans-serif font
@@ -950,6 +963,13 @@ function drawWinMoveHistory(x, y, width, height) {
     const outlineWeight = 2; // Thinner outline for bubble style
     const bounceAmount = 2 * Math.sin(frameCount * 0.05); // Subtle bounce animation
     
+    // Calculate title Y position based on game state
+    // For title screen: positioned at 35% of play area height (changed from 40%)
+    // For game screen: positioned at 6.5% of play area height (original position)
+    const titleY = gameStarted ? 
+      playAreaY + (playAreaHeight * 0.065) : // Game screen position (6.5%)
+      playAreaY + (playAreaHeight * 0.35);   // Title screen position (changed from 0.40 to 0.35)
+    
     // Draw each letter with alternating colors
     for (let i = 0; i < title.length; i++) {
       // Choose color based on position (cycle through green, yellow, red)
@@ -970,7 +990,7 @@ function drawWinMoveHistory(x, y, width, height) {
       // Even and odd letters bounce in opposite directions for playful effect
       let offsetY = (i % 2 === 0) ? bounceAmount : -bounceAmount;
       let letterX = x + letterWidths[i]/2;
-      let letterY = playAreaY + 40 + offsetY;
+      let letterY = titleY + offsetY;
       
       // Draw black outline - thinner for bubble style
       fill('black');
@@ -997,8 +1017,33 @@ function drawWinMoveHistory(x, y, width, height) {
     // Reset text style
     textStyle(NORMAL);
     
-    // Draw the byline
-    drawByline();
+    // Add placeholder text for title screen if game hasn't started
+    if (!gameStarted) {
+      // Calculate position below title - adjusted to 42% from the top (changed from 48%)
+      const placeholderY = playAreaY + (playAreaHeight * 0.42); // Changed from 0.48 to 0.42
+      
+      // Calculate placeholder text size to match byline
+      const placeholderSize = Math.max(playAreaWidth * 0.035, 14);
+      
+      // Format the placeholder text with same style as byline
+      textAlign(CENTER, CENTER);
+      textSize(placeholderSize);
+      textStyle(BOLD);
+      textFont('Arial, Helvetica, sans-serif');
+      fill(51, 51, 51, 255); // #333 fully opaque
+      
+      // Draw the placeholder text with quotation marks
+      const placeholderLine1 = "\"Drag & drop ingredients to combine them";
+      const placeholderLine2 = "step-by-step into a mystery recipe.\"";
+      
+      text(placeholderLine1, playAreaX + playAreaWidth/2, placeholderY);
+      text(placeholderLine2, playAreaX + playAreaWidth/2, placeholderY + placeholderSize * 1.3);
+    }
+    
+    // Draw the byline (only during gameplay)
+    if (gameStarted && !gameWon) {
+      drawByline();
+    }
   }
   
   // Function to draw the byline - APlasker
@@ -1028,78 +1073,60 @@ function drawWinMoveHistory(x, y, width, height) {
     textStyle(NORMAL);
   }
   
+  // New function to draw recipe statistics on the title screen
+  function drawRecipeStats() {
+    // Position at 75% from top of play area, aligned with left edge
+    const statsX = playAreaX + 20; // Add a small padding from left edge
+    const statsY = playAreaY + (playAreaHeight * 0.75); // Changed from 0.5 to 0.75
+    
+    // Get recipe data from loaded recipe
+    const recipeNumber = typeof recipe !== 'undefined' && recipe.day_number ? recipe.day_number : "###";
+    const recipeDate = typeof recipe !== 'undefined' && recipe.date ? recipe.date : "###";
+    
+    // Format the date from YYYY-MM-DD to MM/DD/YYYY if possible
+    let formattedDate = "###";
+    if (recipeDate !== "###") {
+      try {
+        const dateParts = recipeDate.split('-');
+        if (dateParts.length === 3) {
+          formattedDate = `${dateParts[1]}/${dateParts[2]}/${dateParts[0]}`;
+        } else {
+          formattedDate = recipeDate;
+        }
+      } catch (e) {
+        formattedDate = recipeDate;
+      }
+    }
+    
+    const recipeAuthor = typeof recipe !== 'undefined' && recipe.author ? recipe.author : "###";
+    
+    // Count ingredients (base ingredients from the recipe)
+    const ingredientCount = typeof base_ingredients !== 'undefined' ? base_ingredients.length : "###";
+    
+    // Count combos (intermediate combinations + final combination)
+    const comboCount = typeof intermediate_combinations !== 'undefined' ? 
+      intermediate_combinations.length + 1 : "###"; // +1 for final combo
+    
+    // Use the same styling as vessel ingredients
+    push();
+    textAlign(LEFT, CENTER);
+    textSize(12); // Changed from 16 to 12
+    fill('black');
+    textFont('Arial, Helvetica, sans-serif');
+    
+    // Draw each line of stats
+    let lineHeight = 18; // Changed from 25 to 18
+    text(`Recipe No. ${recipeNumber}, ${formattedDate}`, statsX, statsY);
+    text(`Adapted from ${recipeAuthor}`, statsX, statsY + lineHeight);
+    text(`Ingredients: ${ingredientCount}`, statsX, statsY + lineHeight * 2);
+    text(`Combos: ${comboCount}`, statsX, statsY + lineHeight * 3);
+    
+    pop();
+  }
+  
   function drawStartScreen() {
     // Isolate drawing context for start screen
     push();
-    
-    // Calculate header and description sizes based on play area dimensions
-    const headerSize = Math.max(playAreaWidth * 0.07, 20); // Increased from 0.055 to 0.07, min 20px
-    const descriptionSize = Math.max(playAreaWidth * 0.035, 14); // Increased from 0.028 to 0.035, min 14px
-    
-    // Calculate a maximum width for tutorial text that ensures it fits within the play area
-    const maxTutorialTextWidth = min(playAreaWidth * 0.85, 300);
-    const titleTextWidth = min(playAreaWidth * 0.9, 320); // 90% width for title text
-    
-    // Apply correction factor to compensate for rightward shift
-    // This compensates for the 25% rightward offset observed in the tutorial text
-    const xCorrectionFactor = playAreaWidth * 0.37; // 25% of play area width
-    const correctedCenterX = playAreaX + playAreaWidth/2 - xCorrectionFactor;
-    
-    // Set default text properties for consistent rendering
-    textFont(bodyFont);
-    textAlign(CENTER, CENTER);
-    textStyle(NORMAL);
-    
-    // Draw main instruction with same size as other text but bold
-    textSize(descriptionSize);
-    textStyle(BOLD);
-    textWrap(WORD);
-    fill('#333');
-    text("Decode the dish by assembling all ingredients into recipe-based combos!", 
-         correctedCenterX, playAreaY + playAreaHeight * 0.11, titleTextWidth);
-    
-    // Reset text style to normal for other text
-    textStyle(NORMAL);
-    
-    // Updated first instruction - increased space from title text
-    textSize(descriptionSize);
-    textWrap(WORD);
-    text("Drag & drop to combine ingredients into new components.", 
-         correctedCenterX, playAreaY + playAreaHeight * 0.20, maxTutorialTextWidth);
-    
-    // First equation - adjust vertical position to accommodate larger vessels
-    drawTutorialEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
-                        "", // Empty description as we're using the text above
-                        playAreaY + playAreaHeight * 0.28, false, descriptionSize);
-    
-    // Updated second instruction with non-breaking space - adjust vertical position
-    textSize(descriptionSize);
-    text("Yellow combos are partially complete. Add\u00A0more!", 
-         correctedCenterX, playAreaY + playAreaHeight * 0.38, maxTutorialTextWidth);
-    
-    // Second equation - adjust vertical position to accommodate larger vessels
-    drawTutorialEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
-                        "", // Empty description
-                        playAreaY + playAreaHeight * 0.46, false, descriptionSize);
-    
-    // Third instruction - adjust vertical position
-    textSize(descriptionSize);
-    text("Complete the recipe with the fewest mistakes to make the grade.", 
-         correctedCenterX, playAreaY + playAreaHeight * 0.56, maxTutorialTextWidth);
-    
-    // Third equation - adjust vertical position to accommodate larger vessels
-    drawTutorialEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
-                        "", // Empty description
-                        playAreaY + playAreaHeight * 0.64, true, descriptionSize);
-    
-    // Final instruction - changed text and made bold - adjust vertical position
-    textSize(descriptionSize);
-    textStyle(BOLD);
-    text("New Recipe Daily", 
-         correctedCenterX, playAreaY + playAreaHeight * 0.76, maxTutorialTextWidth);
-    
-    // Reset text style to normal
-    textStyle(NORMAL);
     
     // Calculate button sizes relative to play area
     const buttonWidth = Math.max(playAreaWidth * 0.3, 120);
@@ -1109,13 +1136,16 @@ function drawWinMoveHistory(x, y, width, height) {
     startButton.w = buttonWidth;
     startButton.h = buttonHeight;
     
-    // Position start button relative to play area - move down to accommodate larger vessels
+    // Center the start button in the play area
     startButton.x = playAreaX + playAreaWidth/2;
-    startButton.y = playAreaY + playAreaHeight * 0.88;
+    startButton.y = playAreaY + playAreaHeight * 0.9; // Positioned at 90% of play area height
     startButton.draw();
     startButton.checkHover(mouseX, mouseY);
     
-    // Draw version number and Say hi link at the very bottom - use the original center X position
+    // Draw recipe statistics
+    drawRecipeStats();
+    
+    // Draw version number and Say hi link at the bottom of the play area
     push();
     const versionTextSize = Math.max(playAreaWidth * 0.016, 8); // 1.6% of width, min 8px
     textSize(versionTextSize);
@@ -1134,18 +1164,18 @@ function drawWinMoveHistory(x, y, width, height) {
     const startX = playAreaX + playAreaWidth/2 - totalWidth/2;
     
     // Draw version number
-    text(versionText, startX + versionWidth/2, playAreaY + playAreaHeight - 10);
+    text(versionText, startX + versionWidth/2, playAreaY + playAreaHeight * 0.98);
     
     // Draw separator
-    text(separatorText, startX + versionWidth + separatorWidth/2, playAreaY + playAreaHeight - 10);
+    text(separatorText, startX + versionWidth + separatorWidth/2, playAreaY + playAreaHeight * 0.98);
     
     // Draw Say hi link (in green)
     fill(COLORS.primary); // Green color for the link
-    text(sayHiText, startX + versionWidth + separatorWidth + sayHiWidth/2, playAreaY + playAreaHeight - 10);
+    text(sayHiText, startX + versionWidth + separatorWidth + sayHiWidth/2, playAreaY + playAreaHeight * 0.98);
     
     // Store position and dimensions of Say hi link for hit detection
     tutorialSayHiLinkX = startX + versionWidth + separatorWidth + sayHiWidth/2;
-    tutorialSayHiLinkY = playAreaY + playAreaHeight - 10;
+    tutorialSayHiLinkY = playAreaY + playAreaHeight * 0.98;
     tutorialSayHiLinkWidth = sayHiWidth * 1.2; // Add some padding
     tutorialSayHiLinkHeight = textAscent() + textDescent();
     
@@ -1155,103 +1185,6 @@ function drawWinMoveHistory(x, y, width, height) {
     pop();
   }
   
-  // Function to draw tutorial equations
-  function drawTutorialEquation(equationNum, leftName, leftColor, rightName, rightColor, resultName, resultColor, description, yPosition, showStarburst = false, descriptionSize = 16) {
-    // Isolate drawing context for the tutorial equation
-    push();
-    
-    // Explicitly set all context properties for consistent behavior
-    textAlign(CENTER, CENTER);
-    textFont(bodyFont);
-    textStyle(NORMAL);
-    rectMode(CENTER); // Ensure rectMode is CENTER for vessel positioning
-    
-    // Calculate vessel sizes based on play area dimensions with minimum sizes
-    // Double the size of vessels compared to previous implementation
-    const vesselWidth = Math.max(playAreaWidth * 0.34, 120); // Doubled from 0.17/60 to 0.34/120
-    const vesselHeight = vesselWidth * 0.6; // Maintain aspect ratio
-    
-    // Calculate operator size relative to play area with minimum size
-    // Increase operator size to match larger vessels
-    const operatorSize = Math.max(playAreaWidth * 0.06, 24); // Increased from 0.04/16 to 0.06/24
-    
-    // Dynamic description text size based on play area width
-    // Increase description text size to match larger vessels
-    const descriptionFontSize = Math.max(playAreaWidth * 0.03, 18); // Increased from 0.022/14 to 0.03/18
-    
-    // Calculate positions relative to play area, but spread them out more for larger vessels
-    // Keep the same proportional positioning, but with more space between vessels
-    const leftX = playAreaX + playAreaWidth * 0.2; // Moved from 0.25 to 0.2
-    const rightX = playAreaX + playAreaWidth * 0.5; // Keep at center
-    const resultX = playAreaX + playAreaWidth * 0.8; // Moved from 0.75 to 0.8
-    
-    // Operator positions
-    const operatorX1 = (leftX + rightX) / 2;
-    const operatorX2 = (rightX + resultX) / 2;
-    
-    // Adjust y position for green vessels (raise them slightly)
-    let adjustedY = yPosition;
-    if (leftColor === "green" || rightColor === "green" || resultColor === "green") {
-        adjustedY = yPosition - vesselHeight * 0.15; // 15% of vessel height instead of fixed 12px
-    }
-    
-    // Create tutorial vessels using the new createTutorialVessel function
-    const leftVessel = createTutorialVessel(leftName, leftColor, leftX, adjustedY, vesselWidth, vesselHeight);
-    const rightVessel = createTutorialVessel(rightName, rightColor, rightX, adjustedY, vesselWidth, vesselHeight);
-    const resultVessel = createTutorialVessel(resultName, resultColor, resultX, adjustedY, vesselWidth, vesselHeight);
-    
-    // Draw starburst behind the result vessel if requested
-    if (showStarburst) {
-      // Double the size of the starburst to match larger vessels
-      drawStarburst(resultX, adjustedY, true);
-    }
-    
-    // Draw the vessels
-    leftVessel.draw();
-    
-    // Draw plus sign between vessels
-    push();
-    textAlign(CENTER, CENTER);
-    textSize(operatorSize);
-    fill('#333');
-    noStroke();
-    text("+", operatorX1, adjustedY);
-    pop();
-    
-    // Draw right vessel
-    rightVessel.draw();
-    
-    // Draw equals sign
-    push();
-    textAlign(CENTER, CENTER);
-    textSize(operatorSize);
-    fill('#333');
-    noStroke();
-    text("=", operatorX2, adjustedY);
-    pop();
-    
-    // Draw result vessel
-    resultVessel.draw();
-    
-    // Draw description text below the equation if provided
-    if (description && description.trim() !== "") {
-      push();
-      fill('#333');
-      textAlign(CENTER, CENTER);
-      textSize(descriptionFontSize);
-      textStyle(NORMAL);
-      // Position description further below the equation to account for larger vessels
-      text(description, playAreaX + playAreaWidth/2, yPosition + vesselHeight * 0.9);
-      pop();
-    }
-    
-    // Restore drawing context
-    pop();
-  }
-  
-  // We can keep the original drawTutorialVessel function for reference or remove it
-  // if we're confident the new approach works perfectly
-
   // New function to draw starburst behind final vessel
   function drawStarburst(x, y, doubleSize = false) {
     push();
