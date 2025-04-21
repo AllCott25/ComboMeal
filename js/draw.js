@@ -1033,11 +1033,7 @@ function drawWinMoveHistory(x, y, width, height) {
       fill(51, 51, 51, 255); // #333 fully opaque
       
       // Draw the placeholder text with quotation marks
-      const placeholderLine1 = "\"Drag & drop ingredients to combine them";
-      const placeholderLine2 = "step-by-step into a mystery recipe.\"";
-      
-      text(placeholderLine1, playAreaX + playAreaWidth/2, placeholderY);
-      text(placeholderLine2, playAreaX + playAreaWidth/2, placeholderY + placeholderSize * 1.3);
+      text("\"A daily recipe puzzle game\"", playAreaX + playAreaWidth/2, placeholderY);
     }
     
     // Draw the byline (only during gameplay)
@@ -1128,6 +1124,9 @@ function drawWinMoveHistory(x, y, width, height) {
     // Isolate drawing context for start screen
     push();
     
+    // Define margin to match the same relative calculation used elsewhere
+    const margin = Math.max(playAreaWidth * 0.0125, 3); // 1.25% of play area width, min 3px
+    
     // Calculate button sizes relative to play area
     const buttonWidth = Math.max(playAreaWidth * 0.3, 120);
     const buttonHeight = Math.max(playAreaHeight * 0.08, 40);
@@ -1145,41 +1144,39 @@ function drawWinMoveHistory(x, y, width, height) {
     // Draw recipe statistics
     drawRecipeStats();
     
-    // Draw version number and Say hi link at the bottom of the play area
-    push();
+    // Draw version at bottom
+    textAlign(CENTER, CENTER);
     const versionTextSize = Math.max(playAreaWidth * 0.016, 8); // 1.6% of width, min 8px
     textSize(versionTextSize);
-    fill(100, 100, 100, 180); // Semi-transparent gray
+    fill(100); // Gray color for version text
     
-    // Calculate the width of the version text and separator
-    const versionText = "v0.0605.1345 - APlasker";
-    const separatorText = " | ";
-    const sayHiText = "Say hi!";
+    // ENHANCEMENT - APlasker - Update version to reflect addition of "Say hi" link to title screen
+    const versionText = "v20250420.2134 - APlasker";
     
-    const versionWidth = textWidth(versionText);
-    const separatorWidth = textWidth(separatorText);
-    const sayHiWidth = textWidth(sayHiText);
+    // Center the version text at the bottom of the play area
+    text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
     
-    const totalWidth = versionWidth + separatorWidth + sayHiWidth;
-    const startX = playAreaX + playAreaWidth/2 - totalWidth/2;
-    
-    // Draw version number
-    text(versionText, startX + versionWidth/2, playAreaY + playAreaHeight * 0.98);
-    
-    // Draw separator
-    text(separatorText, startX + versionWidth + separatorWidth/2, playAreaY + playAreaHeight * 0.98);
-    
-    // Draw Say hi link (in green)
+    // Add "Say hi!" link below the version text
+    textSize(min(max(playAreaWidth * 0.022, 9), 12)); // Slightly smaller than win screen
     fill(COLORS.primary); // Green color for the link
-    text(sayHiText, startX + versionWidth + separatorWidth + sayHiWidth/2, playAreaY + playAreaHeight * 0.98);
+    text("Say hi!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.993); // Positioned even lower, near the bottom edge
     
-    // Store position and dimensions of Say hi link for hit detection
-    tutorialSayHiLinkX = startX + versionWidth + separatorWidth + sayHiWidth/2;
-    tutorialSayHiLinkY = playAreaY + playAreaHeight * 0.98;
-    tutorialSayHiLinkWidth = sayHiWidth * 1.2; // Add some padding
+    // Store position and dimensions for hit detection (in global variables)
+    tutorialSayHiLinkX = playAreaX + playAreaWidth/2;
+    tutorialSayHiLinkY = playAreaY + playAreaHeight * 0.993;
+    tutorialSayHiLinkWidth = textWidth("Say hi!") * 1.2; // Add some padding
     tutorialSayHiLinkHeight = textAscent() + textDescent();
     
-    pop();
+    // Check if mouse is over the Say hi link in tutorial screen
+    isTutorialMouseOverSayHi = mouseX > tutorialSayHiLinkX - tutorialSayHiLinkWidth/2 && 
+                       mouseX < tutorialSayHiLinkX + tutorialSayHiLinkWidth/2 && 
+                       mouseY > tutorialSayHiLinkY - tutorialSayHiLinkHeight/2 && 
+                       mouseY < tutorialSayHiLinkY + tutorialSayHiLinkHeight/2;
+    
+    // Change cursor to pointer if over the link
+    if (isTutorialMouseOverSayHi) {
+      cursor(HAND);
+    }
     
     // Restore drawing context
     pop();

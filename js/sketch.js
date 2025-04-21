@@ -586,6 +586,28 @@ let intermediate_combinations = [
       this.required = [...combo.required];
       this.collected = [];
       
+      // ENHANCEMENT - APlasker - Separate base ingredients from combinations
+      // These arrays will help us track what's still needed
+      this.baseRequired = [];
+      this.comboRequired = [];
+      
+      // Determine which required items are base ingredients vs combinations
+      for (const item of this.required) {
+        // Check if this item is the name of an intermediate combination
+        // Add safety check to ensure intermediate_combinations exists
+        const isCombo = typeof intermediate_combinations !== 'undefined' && 
+                       intermediate_combinations ? 
+                       intermediate_combinations.some(c => c.name === item) : 
+                       false;
+        if (isCombo) {
+          this.comboRequired.push(item);
+        } else {
+          this.baseRequired.push(item);
+        }
+      }
+      
+      console.log(`HintVessel for ${this.name} - Base ingredients: ${this.baseRequired.length}, Combinations: ${this.comboRequired.length}`);
+      
       // Position the hint vessel at the same position as the hint button
       this.x = width * 0.5; // Center horizontally
       
@@ -701,15 +723,27 @@ let intermediate_combinations = [
     }
     
     addIngredient(ingredient) {
+      // Check if the ingredient is a required ingredient or combination and not already collected
       if (this.required.includes(ingredient) && !this.collected.includes(ingredient)) {
         this.collected.push(ingredient);
         this.pulse();
+        
+        // Update our tracking of what's still required
+        if (this.baseRequired && this.baseRequired.includes(ingredient)) {
+          // Remove from baseRequired if it's a base ingredient
+          this.baseRequired = this.baseRequired.filter(item => item !== ingredient);
+        } else if (this.comboRequired && this.comboRequired.includes(ingredient)) {
+          // Remove from comboRequired if it's a combination
+          this.comboRequired = this.comboRequired.filter(item => item !== ingredient);
+        }
+        
         return true;
       }
       return false;
     }
     
     isComplete() {
+      // Check that we've collected all required items (base ingredients AND combinations)
       return this.collected.length === this.required.length && 
              this.required.every(ing => this.collected.includes(ing));
     }
@@ -1350,6 +1384,11 @@ let intermediate_combinations = [
     if (!gameStarted) {
       // Check start button
       if (startButton.isInside(mouseX, mouseY)) {
+        overInteractive = true;
+      }
+      
+      // Check tutorial Say hi link
+      if (typeof isTutorialMouseOverSayHi !== 'undefined' && isTutorialMouseOverSayHi) {
         overInteractive = true;
       }
     } else if (gameWon) {

@@ -1,7 +1,7 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: April 10, 2025 (14:20 EDT)
+ * Last Updated: April 20, 2025 (19:10 EDT)
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
@@ -17,9 +17,8 @@ function showHelpModal() {
     active: true,
     x: playAreaX + playAreaWidth / 2,
     y: playAreaY + playAreaHeight / 2,
-    width: playAreaWidth * 0.85,  // Increased from 0.8 to 0.85 (5% wider)
+    width: playAreaWidth * 0.85,  // 85% of play area width
     height: playAreaHeight * 0.8, // 80% of play area height
-    htmlElements: [], // Array to store HTML elements
     
     draw: function() {
       if (!this.active) return;
@@ -54,103 +53,86 @@ function showHelpModal() {
       line(xPosX - xSize/2, xPosY - xSize/2, xPosX + xSize/2, xPosY + xSize/2);
       line(xPosX - xSize/2, xPosY + xSize/2, xPosX + xSize/2, xPosY - xSize/2);
       
-      // "How to Play" title
+      // "How to Play" title - LOWERED BY ADDITIONAL 5px (total 15px from original)
       fill(0); // Black text
       noStroke();
       textAlign(CENTER, TOP);
       textSize(this.width * 0.05); // 5% of modal width
       textStyle(BOLD);
-      text("How to Play", this.x, this.y - this.height/2 + 20);
+      text("How to Play", this.x, this.y - this.height/2 + 35); // Changed from 30 to 35
       
-      // Calculate sizes for tutorial elements
+      // Calculate vertical shift for content (2% of modal height up)
+      const contentShift = this.height * 0.02;
+      
+      // Define vessel and text properties - RAISED BY 2% OF MODAL HEIGHT
       const contentWidth = this.width * 0.9; // 90% of modal width
-      const contentArea = this.height - 80; // Height minus title and padding
-      const sectionHeight = contentArea / 3; // Divide remaining area into 3 sections
+      const contentHeight = this.height * 0.85; // 85% of modal height
+      const contentTop = this.y - this.height/2 + 70 - contentShift; // Raised by contentShift
       
-      // Calculate positions for the three description sentences
-      const y1 = this.y - this.height/2 + 70; // 70px from top for first instruction
-      const y2 = y1 + sectionHeight;
-      const y3 = y2 + sectionHeight;
+      // Calculate column widths
+      const vesselColumnWidth = contentWidth * 0.30; // 30% of content width
+      const textColumnWidth = contentWidth * 0.60; // 60% of content width
       
-      // Draw equations
-      drawHelpEquation(1, "Grapes", "white", "Sugar", "white", "Jelly", "green", 
-                     this.x, y1 + 50, contentWidth * 0.8, sectionHeight * 0.5);
+      // Calculate x-positions for columns
+      const vesselColumnX = this.x - contentWidth/2 + vesselColumnWidth/2; // Left column
+      const textColumnX = this.x + contentWidth/2 - textColumnWidth/2; // Right column
       
-      drawHelpEquation(2, "Jelly", "green", "Peanut Butter", "white", "Jelly + Peanut Butter", "yellow", 
-                     this.x, y2 + 50, contentWidth * 0.8, sectionHeight * 0.5);
+      // Calculate vessel sizes
+      const vesselWidth = vesselColumnWidth * 1.7; // 170% of column width
+      const vesselHeight = vesselWidth * 0.6; // Maintain aspect ratio
       
-      drawHelpEquation(3, "Jelly + Peanut Butter", "yellow", "Potato Bread", "green", "PB&J Sandwich", "green", 
-                     this.x, y3 + 50, contentWidth * 0.8, sectionHeight * 0.5, true);
+      // Calculate spacing between rows
+      const rowCount = 5; // Five rows of content including star row
+      const rowSpacing = (contentHeight / rowCount) * 0.5; // Half spacing
       
-      pop();
+      // Calculate vertical offset for Column 1 (1% of modal height)
+      const column1VerticalOffset = this.height * 0.01;
       
-      // Create or update HTML elements for the three description sentences
-      this.updateHTMLElements(y1, y2, y3);
-    },
-    
-    updateHTMLElements: function(y1, y2, y3) {
-      // Remove existing HTML elements
-      this.removeHTMLElements();
-      
-      // Create container for HTML elements
-      const container = document.createElement('div');
-      container.id = 'help-modal-text';
-      container.style.position = 'absolute';
-      container.style.left = '0';
-      container.style.top = '0';
-      container.style.width = '100%';
-      container.style.height = '100%';
-      container.style.pointerEvents = 'none'; // Allow clicks to pass through to canvas
-      container.style.zIndex = '1000'; // Ensure it's above the canvas
-      document.body.appendChild(container);
-      this.htmlElements.push(container);
-      
-      // Common text style
-      const textStyle = {
-        position: 'absolute',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        color: 'black',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: `${this.width * 0.03}px`,
-        textAlign: 'center',
-        width: `${this.width * 0.8}px`,
-        pointerEvents: 'none',
-        zIndex: '1000'
-      };
-      
-      // Create HTML elements for the three description sentences
-      const texts = [
-        "Drag & drop to combine ingredients into new components.",
-        "Yellow combos are partially complete. Add more!",
-        "Complete the recipe with the fewest mistakes to make the grade."
+      // Vessel configurations
+      const vesselConfig = [
+        { name: "Carrots", color: "white", text: "Drag & drop ingredients to combine them step-by-step into a mystery recipe." },
+        { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow combos need more ingredients. The Combos icons near the bottom provide clues to how many more." },
+        { name: "Carrot Sheet Cake", color: "green", text: "Combos turn green & transform when you reach the next step. Keep combining until you've made the final dish!" },
+        { name: "Cream Cheese Frosting", color: "red", text: "Use Hints to discover what to make next to help complete the dish." },
+        { type: "star", text: "Combine everything together with as few mistakes as possible to make the grade!" }
       ];
       
-      const yPositions = [y1, y2, y3];
-      
-      texts.forEach((text, index) => {
-        const element = document.createElement('div');
-        element.textContent = text;
-        Object.assign(element.style, textStyle);
-        element.style.top = `${yPositions[index]}px`;
-        container.appendChild(element);
-        this.htmlElements.push(element);
-      });
-    },
-    
-    removeHTMLElements: function() {
-      // Remove all HTML elements
-      this.htmlElements.forEach(element => {
-        if (element.parentNode) {
-          element.parentNode.removeChild(element);
+      // Draw each row
+      for (let i = 0; i < vesselConfig.length; i++) {
+        const config = vesselConfig[i];
+        // Calculate row Y positions with tighter spacing
+        const rowY = contentTop + (rowSpacing * 2 * i) + rowSpacing;
+        
+        if (config.type === "star") {
+          // Draw star icon for the 5th row - add vertical offset to Column 1
+          drawStarIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.5);
+        } else {
+          // Draw vessel for regular rows - add vertical offset to Column 1
+          const vessel = createTutorialVessel(config.name, config.color, vesselColumnX, rowY + column1VerticalOffset, vesselWidth, vesselHeight);
+          vessel.draw();
         }
-      });
-      this.htmlElements = [];
+        
+        // Draw explanation text - kept at original position (no offset for Column 2)
+        fill(0); // Black text
+        noStroke();
+        textAlign(LEFT, CENTER);
+        textSize(this.width * 0.035); // 3.5% of modal width
+        textStyle(NORMAL);
+        
+        // Draw text with word wrapping
+        const wrappedText = wrapTextToWidth(config.text, textColumnWidth);
+        let lineHeight = this.width * 0.04; // 4% of modal width
+        
+        for (let j = 0; j < wrappedText.length; j++) {
+          text(wrappedText[j], textColumnX - textColumnWidth/2, rowY - (wrappedText.length - 1) * lineHeight/2 + j * lineHeight);
+        }
+      }
+      
+      pop();
     },
     
     hide: function() {
       this.active = false;
-      this.removeHTMLElements();
     },
     
     checkClick: function(x, y) {
@@ -165,16 +147,43 @@ function showHelpModal() {
       // If click is on the X button, close the modal
       if (distanceToX < xSize) {
         this.active = false;
-        this.removeHTMLElements();
         return true;
       }
       
       // Close the modal when clicking anywhere on the screen
       this.active = false;
-      this.removeHTMLElements();
       return true;
     }
   };
+}
+
+// Function to draw a 5-pointed star icon in mustard yellow with black outline
+function drawStarIcon(x, y, size) {
+  push();
+  
+  // Use COLORS.tertiary for mustard yellow
+  fill(COLORS.tertiary);
+  
+  // Add black outline with same visual weight as vessels
+  stroke(0);
+  strokeWeight(2);
+  
+  // Set parameters for a 5-pointed star
+  const outerRadius = size / 2;
+  const innerRadius = outerRadius * 0.4;
+  
+  // Draw the star
+  beginShape();
+  for (let i = 0; i < 10; i++) {
+    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+    const angle = TWO_PI * i / 10 - HALF_PI;
+    const sx = x + cos(angle) * radius;
+    const sy = y + sin(angle) * radius;
+    vertex(sx, sy);
+  }
+  endShape(CLOSE);
+  
+  pop();
 }
 
 // Function to hide the help modal
@@ -184,91 +193,34 @@ function hideHelpModal() {
   }
 }
 
-// Ensure showHelpModal is available globally
-window.showHelpModal = showHelpModal;
-
-// Helper function to draw tutorial equations within the help modal
-function drawHelpEquation(equationNum, leftName, leftColor, rightName, rightColor, resultName, resultColor, x, y, width, height, showStarburst = false) {
-  // Isolate drawing context for the entire equation
-  push();
+// Helper function to wrap text to a specified width
+function wrapTextToWidth(text, maxWidth) {
+  // Split the original text by words
+  const words = text.split(' ');
+  let lines = [];
+  let currentLine = '';
   
-  // Explicitly set text alignment at the beginning to ensure consistent behavior
-  textAlign(CENTER, CENTER);
-  textFont(bodyFont);
-  textStyle(NORMAL);
-  
-  // Calculate vessel sizes based on modal width (doubled for larger vessels) - APlasker
-  const vesselWidth = width * 0.56; // Doubled from 0.28 to 0.56
-  const vesselHeight = vesselWidth * 0.6; // Maintain aspect ratio
-  
-  // Calculate spacing between vessels - increased to accommodate larger vessels
-  const spacing = width * 0.48; // Increased from 0.32 to 0.48 (50% more)
-  
-  // Calculate positions for left, right, and result vessels
-  // With rectMode(CENTER), these are the centers of each vessel
-  const leftX = x - spacing;
-  const rightX = x;
-  const resultX = x + spacing;
-  
-  // Ensure rectMode is set to CENTER for consistent vessel positioning
-  rectMode(CENTER);
-  
-  // Create vessels using the createTutorialVessel function for consistency with tutorial - APlasker
-  const leftVessel = createTutorialVessel(leftName, leftColor, leftX, y, vesselWidth, vesselHeight);
-  const rightVessel = createTutorialVessel(rightName, rightColor, rightX, y, vesselWidth, vesselHeight);
-  const resultVessel = createTutorialVessel(resultName, resultColor, resultX, y, vesselWidth, vesselHeight);
-  
-  // Ensure vessel scaling for help modal matches tutorial vessels - APlasker
-  leftVessel.bodyScale = 0.66;   // Reduced back to 0.66 to match tutorial vessels
-  leftVessel.textScale = 0.66;   // Reduced back to 0.66 to match tutorial vessels
-  rightVessel.bodyScale = 0.66;  // Reduced back to 0.66 to match tutorial vessels
-  rightVessel.textScale = 0.66;  // Reduced back to 0.66 to match tutorial vessels
-  resultVessel.bodyScale = 0.66; // Reduced back to 0.66 to match tutorial vessels
-  resultVessel.textScale = 0.66; // Reduced back to 0.66 to match tutorial vessels
-  
-  // Draw starburst behind the result vessel if requested
-  if (showStarburst) {
-    push();
-    // Scale down the starburst to fit in the modal
-    const scaleFactor = vesselWidth / 100;
-    translate(resultX, y);
-    scale(scaleFactor);
-    drawStarburst(0, 0);
-    pop();
+  // Manually wrap text based on calculated width
+  for (let i = 0; i < words.length; i++) {
+    const testLine = currentLine.length === 0 ? words[i] : currentLine + ' ' + words[i];
+    const testWidth = textWidth(testLine);
+    
+    if (testWidth <= maxWidth) {
+      currentLine = testLine;
+    } else {
+      // If we can't fit the current word on the line, push the current line and start a new one
+      lines.push(currentLine);
+      currentLine = words[i];
+    }
   }
   
-  // Draw the vessels
-  leftVessel.draw();
+  // Push the last line
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
   
-  // Draw plus sign - use push/pop to isolate text context
-  push();
-  textAlign(CENTER, CENTER);
-  // Larger operator size for bigger vessels - APlasker
-  textSize(vesselHeight * 0.4);
-  fill(0);
-  // Operators centered at the same height as vessels - APlasker
-  text("+", (leftX + rightX) / 2, y);
-  pop();
-  
-  // Draw right vessel
-  rightVessel.draw();
-  
-  // Draw equals sign - use push/pop to isolate text context
-  push();
-  textAlign(CENTER, CENTER);
-  // Larger operator size for bigger vessels - APlasker
-  textSize(vesselHeight * 0.4);
-  fill(0);
-  // Operators centered at the same height as vessels - APlasker
-  text("=", (rightX + resultX) / 2, y);
-  pop();
-  
-  // Draw result vessel
-  resultVessel.draw();
-  
-  // Restore drawing context - ensures all settings are properly reset
-  pop();
+  return lines;
 }
 
-// The drawHelpVessel function has been removed as we now use createTutorialVessel
-// from sketch.js for consistency with the tutorial vessels - APlasker 
+// Ensure showHelpModal is available globally
+window.showHelpModal = showHelpModal; 

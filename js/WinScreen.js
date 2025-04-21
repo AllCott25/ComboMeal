@@ -31,6 +31,9 @@ function drawWinScreen() {
     const cardX = playAreaX + playAreaWidth / 2;
     let cardY = playAreaY + playAreaHeight * 0.10 + cardHeight / 2;
     
+    // RESET TEXT ALIGNMENT FOR REWARD MESSAGE - Ensure consistent centered text
+    textAlign(CENTER, CENTER);
+    
     // Draw reward message with multicolor treatment (like COMBO MEAL)
     const rewardMessage = "YOU MADE IT!";
     const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36); // Changed from width to playAreaWidth with adjusted coefficient
@@ -142,13 +145,37 @@ function drawWinScreen() {
     drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
     drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
     
-    // Draw recipe name
+    // RESET TEXT ALIGNMENT FOR RECIPE NAME - Ensure centered text
+    textAlign(CENTER, CENTER);
+    
+    // Draw recipe name with scaling to fit within 70% of card width
     const recipeNameSize = min(max(playAreaWidth * 0.06, 18), 28); // Changed from width to playAreaWidth with adjusted coefficient
+    const maxTitleWidth = cardWidth * 0.7; // Limit title to 70% of card width
+    
+    // Measure the title width at the default font size
     textSize(recipeNameSize);
     fill(COLORS.secondary);
     textStyle(BOLD);
+    
+    // Calculate how wide the title would be at the default size
+    const titleWidth = textWidth(final_combination.name);
+    
+    // Calculate a scaling factor if the title exceeds max width
+    let scaleFactor = 1.0;
+    if (titleWidth > maxTitleWidth) {
+      scaleFactor = maxTitleWidth / titleWidth;
+      
+      // Apply the calculated scale factor to the font size
+      const scaledFontSize = recipeNameSize * scaleFactor;
+      textSize(scaledFontSize);
+    }
+    
+    // Now draw the title with appropriate scaling
     text(final_combination.name, cardX, cardY - cardHeight/2 + cardHeight * 0.09); // Adjusted to 9% of card height from top
     textStyle(NORMAL);
+    
+    // RESET TEXT ALIGNMENT FOR AUTHOR - Ensure centered text
+    textAlign(CENTER, CENTER);
     
     // Add author information if it exists
     if (recipeAuthor && recipeAuthor.trim() !== "") {
@@ -170,6 +197,7 @@ function drawWinScreen() {
     // Set modes specifically for image rendering
     rectMode(CENTER);
     imageMode(CENTER);
+    // RESET TEXT ALIGNMENT FOR IMAGE PLACEHOLDER - Ensure centered text
     textAlign(CENTER, CENTER);
     
     // Only draw the placeholder if there's no image to display
@@ -234,7 +262,8 @@ function drawWinScreen() {
     pop();
     
     // Draw recipe description - increased to 45% of card width
-    const descriptionX = cardX - cardWidth/2 + cardWidth * 0.55; // Changed from 0.75 to 0.55 to position correctly with LEFT alignment
+    // Move description right by 20% card width
+    const descriptionX = cardX - cardWidth/2 + cardWidth * 0.75; // Changed from 0.55 to 0.75 (increased by 20% card width)
     const descriptionWidth = cardWidth * 0.40; // 45% of card width
     
     // Update description Y position to align with the top of the recipe image
@@ -242,11 +271,13 @@ function drawWinScreen() {
     const imageTopEdge = (cardY - cardHeight/2 + cardHeight * 0.53) - (imageHeight/2);
     // Add one line of text height worth of spacing (approximately one textSize worth)
     const textLineHeight = min(max(playAreaWidth * 0.02, 8), 12); // Same size used for description text
-    const descriptionY = imageTopEdge + textLineHeight; // Add one line of spacing
+    // Move description down by 20% card height
+    const descriptionY = imageTopEdge + textLineHeight + cardHeight * 0.2; // Added cardHeight * 0.2 to move down by 20% card height
     
     // Isolate text context for description - APlasker
     push();
     fill(0);
+    // RESET TEXT ALIGNMENT FOR DESCRIPTION - Ensure left-aligned text
     textAlign(LEFT, TOP);
     textSize(min(max(playAreaWidth * 0.02, 8), 12)); // Changed from width to playAreaWidth with adjusted coefficient
     fill('#666');
@@ -256,17 +287,24 @@ function drawWinScreen() {
     
     // Position ingredients - align with description's left edge and adjust spacing
     const ingredientsY = descriptionY + cardHeight * 0.2; // Use a fixed percentage of card height for spacing below description
-    const ingredientsX = descriptionX; // Match description's left alignment
+    // Move ingredient header right by 20% card width
+    const ingredientsX = descriptionX + cardWidth * 0.2; // Move right by 20% card width from description position
+    
+    // UPDATED POSITION - Move ingredients 20% card width left and 10% card height up
+    const adjustedIngredientsX = ingredientsX - cardWidth * 0.2; // Move left by 20% card width
+    const adjustedIngredientsY = ingredientsY - cardHeight * 0.1; // Move up by 10% card height
     
     // Isolate text context for ingredients section - APlasker
     push();
+    
+    // RESET TEXT ALIGNMENT FOR INGREDIENTS HEADER - Ensure left-aligned text
+    textAlign(LEFT, TOP);
     
     // Draw "Ingredients:" header
     textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
     textStyle(BOLD);
     fill('#444');
-    textAlign(LEFT, TOP);
-    text("Ingredients:", ingredientsX, ingredientsY, descriptionWidth); // Added width parameter to match description width
+    text("Ingredients:", adjustedIngredientsX, adjustedIngredientsY, descriptionWidth); // Use adjusted position
     textStyle(NORMAL);
     
     // Sort ingredients by length (shortest to longest)
@@ -326,25 +364,28 @@ function drawWinScreen() {
     const ingredientSpacing = useVerticalLayout ? 2 : 3;
     
     // Max available height for ingredients
-    const maxAvailableHeight = cardY + cardHeight/2 - ingredientsY - 20;
+    const maxAvailableHeight = cardY + cardHeight/2 - adjustedIngredientsY - 20; // Use adjusted Y position
     
     // Flag to track if we should show all ingredients or only a subset
     let showAllIngredients = true;
     
-    // Explicitly maintain LEFT alignment for ingredients - APlasker
+    // RESET TEXT ALIGNMENT FOR INGREDIENTS COLUMNS - Ensure left-aligned text
     textAlign(LEFT, TOP);
     
+    // Move ingredients list right by 7% card width
+    const ingredientsListX = adjustedIngredientsX - cardWidth * 0.13; // Use adjusted X position
+    
     // Draw left column
-    let leftYOffset = ingredientsY + 20; // Increased from 15 to 20 to add more space below the header
+    let leftYOffset = adjustedIngredientsY + 20; // Use adjusted Y position
     for (let i = 0; i < leftColumnProcessed.length; i++) {
       // Check if we've run out of space
-      if (!showAllIngredients && leftYOffset + leftColumnProcessed[i].lines.length * lineHeight > ingredientsY + maxAvailableHeight) {
+      if (!showAllIngredients && leftYOffset + leftColumnProcessed[i].lines.length * lineHeight > adjustedIngredientsY + maxAvailableHeight) {
         break;
       }
       
       const lines = leftColumnProcessed[i].lines;
       // Properly calculate left column x position - no need for negative offset with LEFT alignment
-      const x = ingredientsX; // Removed negative offset that was compensating for CENTER alignment
+      const x = ingredientsListX; // Use adjusted position for ingredients list
       
       // Draw each line of this ingredient
       for (let j = 0; j < lines.length; j++) {
@@ -362,17 +403,20 @@ function drawWinScreen() {
       leftYOffset += ingredientSpacing;
     }
     
+    // RESET TEXT ALIGNMENT FOR RIGHT COLUMN - Ensure left-aligned text
+    textAlign(LEFT, TOP);
+    
     // Draw right column
-    let rightYOffset = ingredientsY + 20; // Increased from 15 to 20 to add more space below the header
+    let rightYOffset = adjustedIngredientsY + 20; // Use adjusted Y position
     for (let i = 0; i < rightColumnProcessed.length; i++) {
       // Check if we've run out of space
-      if (!showAllIngredients && rightYOffset + rightColumnProcessed[i].lines.length * lineHeight > ingredientsY + maxAvailableHeight) {
+      if (!showAllIngredients && rightYOffset + rightColumnProcessed[i].lines.length * lineHeight > adjustedIngredientsY + maxAvailableHeight) {
         break;
       }
       
       const lines = rightColumnProcessed[i].lines;
       // Properly calculate right column x position based on the LEFT alignment
-      const x = ingredientsX + columnWidth * 1.15; // Set spacing between columns to 15% of column width
+      const x = ingredientsListX + columnWidth * 1.15; // Use adjusted position for ingredients list with column spacing
       
       // Draw each line of this ingredient
       for (let j = 0; j < lines.length; j++) {
@@ -394,6 +438,7 @@ function drawWinScreen() {
     
     // Add "View Full Recipe" text at the bottom of the card
     push(); // Isolate text context for View Full Recipe
+    // RESET TEXT ALIGNMENT FOR RECIPE DETAILS LINK - Ensure centered text
     textAlign(CENTER, CENTER);
     textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
     if (isMouseOverCard) {
@@ -405,6 +450,9 @@ function drawWinScreen() {
     pop(); // End View Full Recipe context
     
     // ===== SCORE SECTION =====
+    
+    // RESET TEXT ALIGNMENT FOR SCORE SECTION - Ensure centered text
+    textAlign(CENTER, CENTER);
     
     // Calculate responsive position for score section - 52% of screen height (adjusted)
     const scoreCardPositionY = playAreaY + playAreaHeight * 0.52;

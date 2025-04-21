@@ -34,6 +34,7 @@ const easterEggForm = document.getElementById('easter-egg-form');
 const easterEggsList = document.getElementById('easter-eggs-list');
 const recipeTree = document.getElementById('recipe-tree');
 const messageArea = document.getElementById('message-area');
+const recipeContainer = document.getElementById('recipe-container');
 
 // Current recipe data
 let currentRecipe = null;
@@ -157,21 +158,133 @@ async function loadRecipes() {
         
         if (error) throw error;
         
-        // Clear existing options except the first one
+        // Clear existing recipe list
         while (recipeSelect.options.length > 1) {
             recipeSelect.remove(1);
         }
         
-        // Add recipes to dropdown
-        recipes.forEach(recipe => {
-            const option = document.createElement('option');
-            option.value = recipe.rec_id;
-            option.textContent = `${recipe.name} (${recipe.date})`;
-            recipeSelect.appendChild(option);
-        });
+        // Create a recipe list with delete buttons
+        if (recipes.length > 0) {
+            recipes.forEach(recipe => {
+                const option = document.createElement('option');
+                option.value = recipe.rec_id;
+                option.textContent = `${recipe.name} (${recipe.date})`;
+                recipeSelect.appendChild(option);
+            });
+            
+            // Create a separate container for recipe list with delete buttons
+            let recipeListHtml = '<ul class="recipe-list">';
+            recipes.forEach(recipe => {
+                recipeListHtml += `
+                    <li>
+                        <span class="recipe-name" data-id="${recipe.rec_id}">${recipe.name} (${recipe.date})</span>
+                        <button class="delete-recipe-btn" data-id="${recipe.rec_id}">Delete</button>
+                    </li>
+                `;
+            });
+            recipeListHtml += '</ul>';
+            
+            // Display the recipe list
+            if (!recipeContainer) {
+                const container = document.createElement('div');
+                container.id = 'recipe-container';
+                container.innerHTML = recipeListHtml;
+                recipeSelect.parentNode.appendChild(container);
+            } else {
+                recipeContainer.innerHTML = recipeListHtml;
+            }
+            
+            // Add event listeners for recipe selection and deletion
+            document.querySelectorAll('.recipe-name').forEach(span => {
+                span.addEventListener('click', () => {
+                    const recipeId = span.getAttribute('data-id');
+                    recipeSelect.value = recipeId;
+                    loadRecipeData(recipeId);
+                    playtestRecipeBtn.style.display = 'inline-block';
+                });
+            });
+            
+            document.querySelectorAll('.delete-recipe-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const recipeId = btn.getAttribute('data-id');
+                    if (confirm('Are you sure you want to delete this recipe? This will also delete all its combinations, ingredients, and easter eggs.')) {
+                        await deleteRecipe(recipeId);
+                    }
+                });
+            });
+        }
     } catch (error) {
         showMessage(`Error loading recipes: ${error.message}`, 'error');
         console.error('Error loading recipes:', error);
+    }
+}
+
+// Delete Recipe
+async function deleteRecipe(recipeId) {
+    try {
+        // Delete easter eggs associated with this recipe
+        const { error: eggsError } = await supabase
+            .from('eastereggs')
+            .delete()
+            .eq('rec_id', recipeId);
+        
+        if (eggsError) throw eggsError;
+        
+        // Get all combinations for this recipe
+        const { data: combos, error: combosQueryError } = await supabase
+            .from('combinations')
+            .select('combo_id')
+            .eq('rec_id', recipeId);
+        
+        if (combosQueryError) throw combosQueryError;
+        
+        if (combos && combos.length > 0) {
+            // Extract combo IDs
+            const comboIds = combos.map(c => c.combo_id);
+            
+            // Delete all ingredients associated with these combinations
+            const { error: ingredientsError } = await supabase
+                .from('ingredients')
+                .delete()
+                .in('combo_id', comboIds);
+            
+            if (ingredientsError) throw ingredientsError;
+            
+            // Delete all combinations for this recipe
+            const { error: deleteCombosError } = await supabase
+                .from('combinations')
+                .delete()
+                .eq('rec_id', recipeId);
+            
+            if (deleteCombosError) throw deleteCombosError;
+        }
+        
+        // Finally delete the recipe itself
+        const { error: recipeError } = await supabase
+            .from('recipes')
+            .delete()
+            .eq('rec_id', recipeId);
+        
+        if (recipeError) throw recipeError;
+        
+        showMessage('Recipe and all associated data deleted successfully!', 'success');
+        
+        // Reload recipes list
+        await loadRecipes();
+        
+        // Clear the recipe tree
+        recipeTree.innerHTML = '<p>Select a recipe to view its combination tree.</p>';
+        playtestRecipeBtn.style.display = 'none';
+        
+        // Reset current recipe
+        currentRecipe = null;
+        currentCombinations = [];
+        currentIngredients = [];
+        currentEasterEggs = [];
+    } catch (error) {
+        showMessage(`Error deleting recipe: ${error.message}`, 'error');
+        console.error('Error deleting recipe:', error);
     }
 }
 
@@ -185,12 +298,21 @@ async function handleRecipeSubmit(e) {
     const author = document.getElementById('recipe-author').value;
     const url = document.getElementById('recipe-url').value;
     const imgUrl = document.getElementById('recipe-img-url').value;
+    const dayNumber = document.getElementById('recipe-day-number').value;
     
     try {
         const { data, error } = await supabase
             .from('recipes')
             .insert([
-                { name, date: date, description, author, recipe_url: url, img_url: imgUrl }
+                { 
+                    name, 
+                    date: date, 
+                    description, 
+                    author, 
+                    recipe_url: url, 
+                    img_url: imgUrl, 
+                    day_number: dayNumber ? parseInt(dayNumber) : null 
+                }
             ])
             .select();
         
@@ -376,6 +498,9 @@ function renderRecipeTree() {
         return;
     }
     
+    // Get ingredients directly for final combination
+    const finalIngredients = currentIngredients.filter(ing => ing.combo_id === finalCombo.combo_id);
+    
     // Start building the tree with the final combination as the root
     let html = `
         <h3>${currentRecipe.name} Recipe Tree 
@@ -388,25 +513,60 @@ function renderRecipeTree() {
                 <div class="tree-node-actions">
                     <button class="edit-combo-btn edit-btn" data-combo="${finalCombo.combo_id}">Edit</button>
                     <button class="add-child-btn" data-parent="${finalCombo.combo_id}">Add Child Combination</button>
+                    <button class="add-ingredient-btn" data-combo="${finalCombo.combo_id}">Add Base Ingredients</button>
                 </div>
             </div>
             <div class="node-details">
                 <p><strong>Verb:</strong> ${finalCombo.verb || 'N/A'}</p>
             </div>
-            <div class="add-child-form" id="form-${finalCombo.combo_id}">
-                <form class="child-combo-form" data-parent="${finalCombo.combo_id}">
-                    <div class="form-group">
-                        <label for="child-name-${finalCombo.combo_id}">Combination Name:</label>
-                        <input type="text" id="child-name-${finalCombo.combo_id}" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="child-verb-${finalCombo.combo_id}">Verb:</label>
-                        <input type="text" id="child-verb-${finalCombo.combo_id}" placeholder="e.g., mix, bake">
-                    </div>
-                    <button type="submit">Add Combination</button>
-                    <button type="button" class="cancel-btn" data-parent="${finalCombo.combo_id}">Cancel</button>
-                </form>
-            </div>
+    `;
+    
+    // Add ingredients section for final combination
+    if (finalIngredients.length > 0) {
+        html += '<div class="node-ingredients"><strong>Direct Ingredients:</strong> ';
+        finalIngredients.forEach(ing => {
+            html += `<span class="ingredient-item ${ing.is_base ? 'base' : ''}" data-ing-id="${ing.ing_id}">${ing.name} 
+                    <button class="edit-ing-btn" data-ing-id="${ing.ing_id}">✎</button>
+                    <button class="delete-ing-btn" data-ing-id="${ing.ing_id}">×</button>
+                    </span>`;
+        });
+        html += '</div>';
+    }
+    
+    // Add form for adding base ingredients to final combination
+    html += `
+        <div class="add-child-form" id="ing-form-${finalCombo.combo_id}">
+            <form class="ingredient-form" data-combo="${finalCombo.combo_id}">
+                <div class="form-group">
+                    <label for="ing-names-${finalCombo.combo_id}">Base Ingredient Names (one per line):</label>
+                    <textarea id="ing-names-${finalCombo.combo_id}" rows="5" required placeholder="Enter one ingredient name per line"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="ing-is-base-${finalCombo.combo_id}">Are Base Ingredients:</label>
+                    <input type="checkbox" id="ing-is-base-${finalCombo.combo_id}" checked>
+                </div>
+                <button type="submit">Add Ingredients</button>
+                <button type="button" class="cancel-ing-btn" data-combo="${finalCombo.combo_id}">Cancel</button>
+            </form>
+        </div>
+    `;
+    
+    // Add form for adding child combinations
+    html += `
+        <div class="add-child-form" id="form-${finalCombo.combo_id}">
+            <form class="child-combo-form" data-parent="${finalCombo.combo_id}">
+                <div class="form-group">
+                    <label for="child-name-${finalCombo.combo_id}">Combination Name:</label>
+                    <input type="text" id="child-name-${finalCombo.combo_id}" required>
+                </div>
+                <div class="form-group">
+                    <label for="child-verb-${finalCombo.combo_id}">Verb:</label>
+                    <input type="text" id="child-verb-${finalCombo.combo_id}" placeholder="e.g., mix, bake">
+                </div>
+                <button type="submit">Add Combination</button>
+                <button type="button" class="cancel-btn" data-parent="${finalCombo.combo_id}">Cancel</button>
+            </form>
+        </div>
     `;
     
     // Find direct children of the final combination
@@ -503,6 +663,26 @@ function renderRecipeTree() {
             }
         });
     });
+    
+    // Add event listeners for delete combination buttons
+    document.querySelectorAll('.delete-combo-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const comboId = this.getAttribute('data-combo');
+            if (confirm('Are you sure you want to delete this combination? This will also delete all its ingredients and child combinations.')) {
+                deleteCombination(comboId);
+            }
+        });
+    });
+    
+    // Add event listeners for delete ingredient buttons
+    document.querySelectorAll('.delete-ing-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const ingId = this.getAttribute('data-ing-id');
+            if (confirm('Are you sure you want to delete this ingredient?')) {
+                deleteIngredient(ingId);
+            }
+        });
+    });
 }
 
 // Build a combination node for the tree
@@ -519,6 +699,7 @@ function buildComboNode(combo) {
                 <h4>${combo.name}</h4>
                 <div class="tree-node-actions">
                     <button class="edit-combo-btn edit-btn" data-combo="${combo.combo_id}">Edit</button>
+                    <button class="delete-combo-btn delete-btn" data-combo="${combo.combo_id}">Delete</button>
                     <button class="add-child-btn" data-parent="${combo.combo_id}">Add Child</button>
                     <button class="add-ingredient-btn" data-combo="${combo.combo_id}">Add Ingredients</button>
                 </div>
@@ -532,7 +713,10 @@ function buildComboNode(combo) {
     if (comboIngredients.length > 0) {
         html += '<div class="node-ingredients"><strong>Ingredients:</strong> ';
         comboIngredients.forEach(ing => {
-            html += `<span class="ingredient-item ${ing.is_base ? 'base' : ''}" data-ing-id="${ing.ing_id}">${ing.name} <button class="edit-ing-btn" data-ing-id="${ing.ing_id}">✎</button></span>`;
+            html += `<span class="ingredient-item ${ing.is_base ? 'base' : ''}" data-ing-id="${ing.ing_id}">${ing.name} 
+                    <button class="edit-ing-btn" data-ing-id="${ing.ing_id}">✎</button>
+                    <button class="delete-ing-btn" data-ing-id="${ing.ing_id}">×</button>
+                    </span>`;
         });
         html += '</div>';
     } else {
@@ -762,6 +946,7 @@ function showEditRecipeForm(recipe) {
     document.getElementById('edit-recipe-author').value = recipe.author || '';
     document.getElementById('edit-recipe-url').value = recipe.recipe_url || '';
     document.getElementById('edit-recipe-img-url').value = recipe.img_url || '';
+    document.getElementById('edit-recipe-day-number').value = recipe.day_number || '';
     
     editRecipeForm.style.display = 'block';
 }
@@ -777,13 +962,22 @@ async function handleEditRecipeSubmit(e) {
     const author = document.getElementById('edit-recipe-author').value;
     const url = document.getElementById('edit-recipe-url').value;
     const imgUrl = document.getElementById('edit-recipe-img-url').value;
+    const dayNumber = document.getElementById('edit-recipe-day-number').value;
     
-    console.log("Attempting to update recipe:", { recId, name, date, description, author, url, imgUrl });
+    console.log("Attempting to update recipe:", { recId, name, date, description, author, url, imgUrl, dayNumber });
     
     try {
         const { data, error } = await supabase
             .from('recipes')
-            .update({ name, date, description, author, recipe_url: url, img_url: imgUrl })
+            .update({ 
+                name, 
+                date, 
+                description, 
+                author, 
+                recipe_url: url, 
+                img_url: imgUrl,
+                day_number: dayNumber ? parseInt(dayNumber) : null 
+            })
             .eq('rec_id', recId)
             .select();
         
@@ -1311,5 +1505,84 @@ async function testSupabasePermissions() {
         console.log("Permission tests completed.");
     } catch (error) {
         console.error("Error testing permissions:", error);
+    }
+}
+
+// Delete Combination
+async function deleteCombination(comboId) {
+    try {
+        // First, recursively delete all child combinations
+        await deleteChildCombinations(comboId);
+        
+        // Delete all ingredients for this combination
+        const { error: ingredientError } = await supabase
+            .from('ingredients')
+            .delete()
+            .eq('combo_id', comboId);
+        
+        if (ingredientError) throw ingredientError;
+        
+        // Delete the combination itself
+        const { error: comboError } = await supabase
+            .from('combinations')
+            .delete()
+            .eq('combo_id', comboId);
+        
+        if (comboError) throw comboError;
+        
+        showMessage('Combination deleted successfully!', 'success');
+        
+        // Reload recipe data
+        await loadRecipeData(currentRecipe.rec_id);
+    } catch (error) {
+        showMessage(`Error deleting combination: ${error.message}`, 'error');
+        console.error('Error deleting combination:', error);
+    }
+}
+
+// Recursively delete child combinations
+async function deleteChildCombinations(parentComboId) {
+    // Find all direct child combinations
+    const childCombos = currentCombinations.filter(c => c.parent_combo === parentComboId);
+    
+    // Recursively delete each child combination
+    for (const child of childCombos) {
+        await deleteChildCombinations(child.combo_id);
+        
+        // Delete all ingredients for this child combination
+        const { error: ingredientError } = await supabase
+            .from('ingredients')
+            .delete()
+            .eq('combo_id', child.combo_id);
+        
+        if (ingredientError) throw ingredientError;
+        
+        // Delete the child combination itself
+        const { error: comboError } = await supabase
+            .from('combinations')
+            .delete()
+            .eq('combo_id', child.combo_id);
+        
+        if (comboError) throw comboError;
+    }
+}
+
+// Delete Ingredient
+async function deleteIngredient(ingId) {
+    try {
+        const { error } = await supabase
+            .from('ingredients')
+            .delete()
+            .eq('ing_id', ingId);
+        
+        if (error) throw error;
+        
+        showMessage('Ingredient deleted successfully!', 'success');
+        
+        // Reload recipe data
+        await loadRecipeData(currentRecipe.rec_id);
+    } catch (error) {
+        showMessage(`Error deleting ingredient: ${error.message}`, 'error');
+        console.error('Error deleting ingredient:', error);
     }
 } 

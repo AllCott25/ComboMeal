@@ -391,20 +391,32 @@ function combineVessels(v1, v2) {
       if (!validCombination) {
         // Check each intermediate combination
         for (let combo of intermediate_combinations) {
-          // Check if the base ingredients are part of this recipe
-          if (baseIngredients.every(ing => combo.required.includes(ing))) {
-            // Check if any of the completed combinations are also part of this recipe
-            // This is a special case where a completed combination might be a component of another recipe
-            if (completedCombos.some(c => {
-              // Find the intermediate combination with this name
-              let matchingCombo = intermediate_combinations.find(ic => ic.name === c);
-              // Check if all ingredients of this combination are part of the target recipe
-              return matchingCombo && matchingCombo.required.every(ing => combo.required.includes(ing));
-            })) {
-              validCombination = true;
-              targetRecipe = combo;
-              break;
-            }
+          // ENHANCEMENT - APlasker - Check if the completed combination itself is directly listed 
+          // as a required ingredient in the target recipe (addressing nested combinations like BBQ Chicken in Pizza Toppings)
+          if (baseIngredients.every(ing => combo.required.includes(ing)) &&
+              completedCombos.some(c => combo.required.includes(c))) {
+            console.log(`Found direct match: ${completedCombos.join(', ')} is required in ${combo.name}`);
+            validCombination = true;
+            targetRecipe = combo;
+            break;
+          }
+          
+          // Original check (as fallback) - Check if all ingredients of the completed combination 
+          // are part of the target recipe's required ingredients
+          else if (baseIngredients.every(ing => combo.required.includes(ing)) &&
+              completedCombos.some(c => {
+                // Find the intermediate combination with this name
+                let matchingCombo = intermediate_combinations.find(ic => ic.name === c);
+                // Check if all ingredients of this combination are part of the target recipe
+                let result = matchingCombo && matchingCombo.required.every(ing => combo.required.includes(ing));
+                if (result) {
+                  console.log(`Fallback match: All ingredients of ${c} are included in ${combo.name}`);
+                }
+                return result;
+              })) {
+            validCombination = true;
+            targetRecipe = combo;
+            break;
           }
         }
       }
@@ -418,24 +430,34 @@ function combineVessels(v1, v2) {
         if (targetRecipe === final_combination) {
           allComponents = [...baseIngredients, ...completedCombos];
         } else {
-          // For intermediate recipes, we need to extract the ingredients
-          let allIngredients = [...baseIngredients];
+          // ENHANCEMENT - APlasker - Check if any completed combinations are directly listed
+          // as required ingredients in the target recipe (for nested combinations like BBQ Chicken in Pizza Toppings)
+          const directlyRequiredCombos = completedCombos.filter(c => targetRecipe.required.includes(c));
           
-          // Add ingredients from completed combinations
-          for (let combo of completedCombos) {
-            let matchingCombo = intermediate_combinations.find(ic => ic.name === combo);
-            if (matchingCombo) {
-              allIngredients = [...allIngredients, ...matchingCombo.required];
+          if (directlyRequiredCombos.length > 0) {
+            // If we have directly required combinations, preserve their names
+            console.log(`Preserving named combinations in partial vessel: ${directlyRequiredCombos.join(', ')}`);
+            allComponents = [...baseIngredients, ...directlyRequiredCombos];
+          } else {
+            // Original logic - For intermediate recipes, extract all ingredients
+            let allIngredients = [...baseIngredients];
+            
+            // Add ingredients from completed combinations
+            for (let combo of completedCombos) {
+              let matchingCombo = intermediate_combinations.find(ic => ic.name === combo);
+              if (matchingCombo) {
+                allIngredients = [...allIngredients, ...matchingCombo.required];
+              }
             }
+            
+            // Remove duplicates
+            allIngredients = [...new Set(allIngredients)];
+            
+            // Only keep ingredients that are part of the target recipe
+            allIngredients = allIngredients.filter(ing => targetRecipe.required.includes(ing));
+            
+            allComponents = allIngredients;
           }
-          
-          // Remove duplicates
-          allIngredients = [...new Set(allIngredients)];
-          
-          // Only keep ingredients that are part of the target recipe
-          allIngredients = allIngredients.filter(ing => targetRecipe.required.includes(ing));
-          
-          allComponents = allIngredients;
         }
         
         // Create a yellow vessel for the partial combination
@@ -671,7 +693,10 @@ function combineVessels(v1, v2) {
         for (let i = 0; i < vessels.length; i++) {
           let v = vessels[i];
           
-          // Only consider yellow vessels (partial combinations)
+          // ENHANCEMENT - APlasker - Check for both yellow vessels (partial combinations) 
+          // AND named vessels that match a required combination
+          
+          // Case 1: Check if this is a yellow vessel with base ingredients needed for the hint
           if (v.color === COLORS.vesselYellow && v.ingredients.length > 0) {
             // Find which ingredients in this vessel are part of the hint
             let matchingIngredients = v.ingredients.filter(ing => 
@@ -684,16 +709,28 @@ function combineVessels(v1, v2) {
               vesselsToAbsorb.push({
                 vessel: v,
                 index: i,
-                matchingIngredients: matchingIngredients
+                matchingIngredients: matchingIngredients,
+                isCombo: false
               });
             }
+          }
+          
+          // Case 2: Check if this is a vessel that represents a combination required by the hint
+          if (v.name && hintVessel.comboRequired && hintVessel.comboRequired.includes(v.name) && !hintVessel.collected.includes(v.name)) {
+            console.log(`Found vessel representing required combination: ${v.name}`);
+            vesselsToAbsorb.push({
+              vessel: v,
+              index: i,
+              matchingIngredients: [v.name], // The name of the combo is the "ingredient" to add
+              isCombo: true
+            });
           }
         }
         
         // Sort vessels by number of matching ingredients (descending)
         vesselsToAbsorb.sort((a, b) => b.matchingIngredients.length - a.matchingIngredients.length);
         
-        console.log(`Found ${vesselsToAbsorb.length} partial combinations with matching ingredients`);
+        console.log(`Found ${vesselsToAbsorb.length} vessels with matching ingredients or combinations`);
         
         // Now absorb the vessels
         let absorbedVessels = [];
@@ -705,7 +742,11 @@ function combineVessels(v1, v2) {
           // Skip vessels that have already been absorbed
           if (absorbedVessels.includes(v)) continue;
           
-          console.log("Absorbing partial combination with ingredients:", vesselInfo.matchingIngredients.join(', '));
+          if (vesselInfo.isCombo) {
+            console.log(`Absorbing vessel representing combination: ${v.name}`);
+          } else {
+            console.log("Absorbing partial combination with ingredients:", vesselInfo.matchingIngredients.join(', '));
+          }
           
           // Add matching ingredients to the hint vessel
           let ingredientsAdded = 0;
@@ -725,13 +766,6 @@ function combineVessels(v1, v2) {
             
             // Mark for removal since all ingredients were absorbed
             v.markedForRemoval = true;
-            
-            // Add moves to history for each absorbed ingredient
-            // Red counters have been removed
-            // for (let j = 0; j < ingredientsAdded; j++) {
-            //   // Use the string '#FF5252' instead of COLORS.vesselHint to ensure compatibility with drawMoveHistory
-            //   moveHistory.push('#FF5252');
-            // }
             
             // Increment turn counter for each absorbed ingredient
             turnCounter += ingredientsAdded;
@@ -803,14 +837,12 @@ function combineVessels(v1, v2) {
   function checkForMatchingVessels() {
     if (!hintVessel) return;
     
-    // Look for yellow vessels that match required ingredients for the hint
+    // Look for vessels that match required ingredients or combinations for the hint
     for (let i = vessels.length - 1; i >= 0; i--) {
       let v = vessels[i];
       
-      // Check if it's a yellow vessel with ingredients that match the hint
-      if (v.color === 'yellow' && v.ingredients.length > 0) {
-        let matchesHint = false;
-        
+      // Case 1: Check for yellow vessels with base ingredients that match the hint
+      if (v.color === COLORS.vesselYellow && v.ingredients.length > 0) {
         // Check if all ingredients in this vessel are required for the hint
         if (v.ingredients.every(ing => hintVessel.required.includes(ing))) {
           // Check if we can add all ingredients to the hint
@@ -823,7 +855,6 @@ function combineVessels(v1, v2) {
           }
           
           if (canAddAll) {
-            matchesHint = true;
             console.log("Adding ingredients to hint: " + v.ingredients.join(', '));
             
             // Add all ingredients to the hint vessel
@@ -837,24 +868,29 @@ function combineVessels(v1, v2) {
             // Remove the vessel
             vessels.splice(i, 1);
             
-            // Add red moves to history - one for each ingredient (or at least two if it was a combination)
-            // This ensures we count the proper number of turns when adding multiple ingredients at once
-            let numIngredientsAdded = Math.max(2, v.ingredients.length);
-            // Red counters have been removed
-            // for (let j = 0; j < numIngredientsAdded; j++) {
-            //   moveHistory.push('#FF5252');
-            // }
-            
-            // Increment turn counter - add one more turn since the first turn was already counted
-            // when the vessel was created in mouseReleased
-            turnCounter += (numIngredientsAdded - 1);
+            // Increment turn counter for each absorbed ingredient
+            turnCounter += v.ingredients.length;
           }
         }
       }
+      
+      // Case 2: Check for vessels that represent combinations required by the hint
+      else if (v.name && hintVessel.comboRequired && hintVessel.comboRequired.includes(v.name) && !hintVessel.collected.includes(v.name)) {
+        console.log(`Found vessel representing required combination: ${v.name}`);
+        
+        // Add the combination to the hint vessel
+        hintVessel.addIngredient(v.name);
+        
+        // Create animation
+        createCombineAnimation(v.x, v.y, COLORS.vesselHint, hintVessel.x, hintVessel.y);
+        
+        // Remove the vessel
+        vessels.splice(i, 1);
+        
+        // Increment turn counter
+        turnCounter += 1;
+      }
     }
-    
-    // Re-arrange vessels after potential removals
-    arrangeVessels();
     
     // Check if hint is complete
     if (hintVessel && hintVessel.isComplete()) {
@@ -863,16 +899,21 @@ function combineVessels(v1, v2) {
       vessels.push(newVessel);
       
       // Debug log to verify flow before assigning preferred row
-      console.log("CHECK MATCHING VESSELS: About to assign preferred row to new vessel");
+      console.log("CHECK MATCHING: About to assign preferred row to new vessel");
       
       // Assign the same row as the hint vessel was in
       assignPreferredRow(newVessel, hintVessel.y);
       
-      // First arrange vessels to ensure they're in their final positions
       arrangeVessels();
       
-      // Use the centralized helper to create the verb animation after positioning
-      createVerbAnimationForVessel(newVessel);
+      // Create verb animation for this vessel if it has one
+      if (newVessel.verb) {
+        console.log("Creating verb animation for completed hint vessel:", newVessel.verb);
+        animations.push(new VerbAnimation(newVessel.verb, newVessel.x, newVessel.y, newVessel));
+        
+        // Set verbDisplayTime to prevent duplicate animations
+        newVessel.verbDisplayTime = 119;
+      }
       
       // Reset hint
       hintVessel = null;
