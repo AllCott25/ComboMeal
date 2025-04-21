@@ -229,7 +229,7 @@ let intermediate_combinations = [
       this.targetX = targetX;
       this.targetY = targetY;
       this.progress = 0;
-      this.duration = 30; // 1 second at 30fps (reduced from 60)
+      this.duration = 20; // 0.67 seconds at 30fps (reduced from 30)
       this.active = true;
       this.completed = false;
       
@@ -294,7 +294,7 @@ let intermediate_combinations = [
       this.x = this.startX; // Current position
       this.y = this.startY;
       this.progress = 0;
-      this.duration = 60; // 2 seconds at 30fps (reduced from 120)
+      this.duration = 45; // 1.5 seconds at 30fps (reduced from 60)
       this.maxSize = playAreaWidth * 0.9; // 90% of play area width
       this.active = true;
       this.opacity = 255; // Track opacity separately 
@@ -2913,12 +2913,12 @@ let intermediate_combinations = [
     // Calculate the 90% horizontal position in the play area
     const finalCircleX = playAreaX + (playAreaWidth * 0.9);
     
-    // Position vertically at 1.5% of play area height from the top (instead of 0%)
+    // Position vertically at 2.25% of play area height from the top (updated from 1.5%)
     helpIconSize = Math.max(playAreaWidth * 0.04, 25); // 4% of play area width, minimum 25px
     
     // Set helpIconX to be the final circle position
     helpIconX = finalCircleX;
-    helpIconY = playAreaY + (playAreaHeight * 0.015); // 1.5% of play area height from the top
+    helpIconY = playAreaY + (playAreaHeight * 0.0225); // 2.25% of play area height from the top (updated from 1.5%)
     
     // Update animation progress if animating
     if (helpButtonAnimating) {
@@ -2933,7 +2933,7 @@ let intermediate_combinations = [
     const progress = helpButtonAnimationProgress;
     
     // Define dimensions for rectangular button mode
-    const rectWidth = Math.max(playAreaWidth * 0.15, 90); // Width for "How to Play" text
+    const rectWidth = Math.max(playAreaWidth * 0.18, 90); // Width for "How to Play" text (updated from 15% to 18%)
     const rectHeight = helpIconSize; // Same height as circle
     const cornerRadius = rectHeight / 2;
     

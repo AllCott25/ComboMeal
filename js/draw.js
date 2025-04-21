@@ -312,14 +312,60 @@ function drawWinMoveHistory(x, y, width, height) {
     }
     
     // Add final combination
+    // Find base ingredients that are directly required in the final combination
+    let finalBaseIngsCount = 0;
+    
+    // Modification by APlasker - count base ingredients in final combination
+    // We'll examine the recipe_data structure to get the final base ingredients
+    if (recipe_data && recipe_data.finalCombination) {
+      // Get the combo_id from the final combination
+      const finalComboId = recipe_data.finalCombination.combo_id;
+      
+      // Look for direct base ingredients in the supabase.js processed data
+      if (typeof recipe_data._processingData !== 'undefined' && 
+          recipe_data._processingData.ingredientsByCombo && 
+          recipe_data._processingData.ingredientsByCombo[finalComboId]) {
+        
+        // Count how many of the ingredients are base ingredients
+        finalBaseIngsCount = recipe_data._processingData.ingredientsByCombo[finalComboId]
+          .filter(ing => ing.isBase).length;
+          
+      } else {
+        // Fallback: Check if we have direct data about final base ingredients
+        if (Array.isArray(recipe_data.finalBaseIngredients)) {
+          finalBaseIngsCount = recipe_data.finalBaseIngredients.length;
+        }
+      }
+    }
+    
+    // If we still can't find it, log a debug message and use a simpler approach
+    if (finalBaseIngsCount === 0) {
+      // Simple fallback: Count any base ingredients that aren't part of any intermediate combinations
+      const allIntermediateIngredients = new Set();
+      intermediate_combinations.forEach(combo => {
+        combo.required.forEach(ing => allIntermediateIngredients.add(ing));
+      });
+      
+      // Now count base ingredients not used in any intermediate combinations
+      const unusedBaseIngredients = base_ingredients.filter(ing => !allIntermediateIngredients.has(ing));
+      finalBaseIngsCount = unusedBaseIngredients.length;
+      
+      // Add debugging information if needed
+      console.log("[APlasker Debug] Final combination counter using fallback method");
+      console.log("[APlasker Debug] Estimated direct base ingredients:", finalBaseIngsCount);
+    }
+    
+    // Calculate the total required count - include both combinations and direct base ingredients
+    const totalFinalRequired = final_combination.required.length + finalBaseIngsCount;
+    
     comboInfo.push({
       name: final_combination.name,
-      requiredCount: final_combination.required.length,
+      requiredCount: totalFinalRequired, // Include both intermediate combinations and base ingredients
       isCompleted: completedGreenVessels.some(v => v.name === final_combination.name),
       isHint: completedGreenVessels.some(v => v.name === final_combination.name && v.isHint),
       isBaseIngredientsOnly: false,
-      baseIngredientCount: 0,
-      baseIngredientPercentage: 0,
+      baseIngredientCount: finalBaseIngsCount, // Store the count of base ingredients
+      baseIngredientPercentage: totalFinalRequired > 0 ? finalBaseIngsCount / totalFinalRequired : 0,
       isFinalCombo: true
     });
     
@@ -448,8 +494,8 @@ function drawWinMoveHistory(x, y, width, height) {
           line(x + circleSize/3, y - circleSize/3 + offsetY, x - circleSize/3, y + circleSize/3 + offsetY);
         }
       } else {
-        // Empty error placeholder - 50% opacity black - APlasker
-        fill('rgba(0, 0, 0, 0.5)');
+        // Empty error placeholder - 25% opacity black (reduced from 50%) - APlasker
+        fill('rgba(0, 0, 0, 0.25)');
         stroke('black');
         strokeWeight(1);
         circle(x, y, circleSize);
@@ -815,7 +861,7 @@ function drawWinMoveHistory(x, y, width, height) {
           console.log("STARTING AUTO FINAL COMBINATION SEQUENCE");
           autoFinalCombination = true;
           autoFinalCombinationStarted = true;
-          autoFinalCombinationTimer = 60; // Wait 1 second before starting the sequence
+          autoFinalCombinationTimer = 12; // Wait 0.4 seconds before starting the sequence (reduced from 60)
           // Initialize state machine
           autoFinalCombinationState = "WAITING";
           // Reset vessels array to ensure clean state
@@ -965,9 +1011,9 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Calculate title Y position based on game state
     // For title screen: positioned at 35% of play area height (changed from 40%)
-    // For game screen: positioned at 6.5% of play area height (original position)
+    // For game screen: positioned at 8% of play area height (increased from 6.5%)
     const titleY = gameStarted ? 
-      playAreaY + (playAreaHeight * 0.065) : // Game screen position (6.5%)
+      playAreaY + (playAreaHeight * 0.08) : // Game screen position (increased from 6.5% to 8%)
       playAreaY + (playAreaHeight * 0.35);   // Title screen position (changed from 0.40 to 0.35)
     
     // Draw each letter with alternating colors
@@ -1047,8 +1093,8 @@ function drawWinMoveHistory(x, y, width, height) {
     // Only draw byline on game screen (not tutorial or win screens)
     if (!gameStarted || gameWon) return;
     
-    // Position byline below the title
-    const bylineY = playAreaY + 70; // Position below title
+    // Position byline at 13% of play area height from the top
+    const bylineY = playAreaY + (playAreaHeight * 0.13); // Changed from 12% to 13% of play area height
     
     // Calculate byline size based on play area dimensions - match tutorial text
     const bylineSize = Math.max(playAreaWidth * 0.035, 14); // Same as description size in tutorial
@@ -1071,8 +1117,7 @@ function drawWinMoveHistory(x, y, width, height) {
   
   // New function to draw recipe statistics on the title screen
   function drawRecipeStats() {
-    // Position at 70% from top of play area, aligned with left edge
-    const statsX = playAreaX + 20; // Add a small padding from left edge
+    // Position at 70% from top of play area, centered horizontally
     const statsY = playAreaY + (playAreaHeight * 0.70); // Changed from 0.75 to 0.70
     
     // Get recipe data from loaded recipe
@@ -1105,7 +1150,7 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Use styling that matches the "How to Play" button style
     push();
-    textAlign(LEFT, CENTER);
+    textAlign(CENTER, CENTER);
     // Use the same text size as "How to Play" button text
     textSize(Math.max(helpIconSize * 0.3, 12));
     textFont('Arial, Helvetica, sans-serif');
@@ -1113,6 +1158,9 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Use COLORS.primary (green) to match the help button color
     fill(COLORS.primary);
+    
+    // Center the text horizontally in the play area
+    const statsX = playAreaX + playAreaWidth / 2;
     
     // Draw each line of stats
     let lineHeight = 22; // Increased from 18 to 22 for better spacing with the new size
@@ -1154,8 +1202,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // ENHANCEMENT - APlasker - Update version to reflect win screen header text update
-    const versionText = "v20250421.1014 - APlasker";
+    // ENHANCEMENT - APlasker - Update version to reflect animation speed improvements- SIGNATURE VERSION
+    const versionText = "v20250421.1322 - Playsker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);

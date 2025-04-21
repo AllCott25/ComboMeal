@@ -1113,7 +1113,7 @@ function combineVessels(v1, v2) {
     ];
 
     // Calculate the starting Y position
-    let startY = playAreaY + playAreaHeight * 0.2;
+    let startY = playAreaY + playAreaHeight * 0.22; // Updated from 25% to 22%
     
     // ENHANCEMENT: First identify which vessels have preferred positions
     // Find vessels with preferredRow (vessels that have been positioned by user)
@@ -1737,7 +1737,7 @@ function combineVessels(v1, v2) {
         // This is the initial state - wait for the animations to settle
         console.log("AUTO COMBINATION STATE: WAITING");
         autoFinalCombinationState = "PENULTIMATE";
-        autoFinalCombinationTimer = 1; // Half second delay before starting
+        autoFinalCombinationTimer = 0; // No delay before starting (reduced from 1)
         break;
         
       case "PENULTIMATE":
@@ -1801,7 +1801,7 @@ function combineVessels(v1, v2) {
             }
             
             // Wait for the verb animation plus a little extra time before the next step
-            autoFinalCombinationTimer = 30; // 1 second at 30fps (reduced from 60)
+            autoFinalCombinationTimer = 15; // 0.5 seconds at 30fps (reduced from 30)
           } else {
             // If combination failed (shouldn't happen), move to next state
             console.error("Auto combination failed during penultimate phase");

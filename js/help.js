@@ -16,7 +16,7 @@ function showHelpModal() {
   window.helpModal = {
     active: true,
     x: playAreaX + playAreaWidth / 2,
-    y: playAreaY + playAreaHeight / 2,
+    y: playAreaY + playAreaHeight / 2, // Center vertically in play area
     width: playAreaWidth * 0.85,  // 85% of play area width
     height: playAreaHeight * 0.8, // 80% of play area height
     
