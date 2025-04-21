@@ -83,7 +83,7 @@ function showHelpModal() {
       
       // Calculate spacing between rows
       const rowCount = 5; // Five rows of content including star row
-      const rowSpacing = (contentHeight / rowCount) * 0.5; // Half spacing
+      const rowSpacing = (contentHeight / rowCount)*.5; // Changed from (contentHeight / rowCount) * 0.5 to fix overlapping rows
       
       // Calculate vertical offset for Column 1 (1% of modal height)
       const column1VerticalOffset = this.height * 0.01;

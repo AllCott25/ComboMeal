@@ -60,8 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Login Form
     loginForm.addEventListener('submit', handleLogin);
     
-    // Recipe Selection
-    loadRecipeBtn.addEventListener('click', () => loadRecipeData(recipeSelect.value));
+    // Remove the load recipe button event listener since we're auto-loading
     
     // Add event listener for recipe dropdown change
     recipeSelect.addEventListener('change', function() {
@@ -88,26 +87,26 @@ document.addEventListener('DOMContentLoaded', () => {
     
     recipeForm.addEventListener('submit', handleRecipeSubmit);
     
-    // Edit Recipe
+    // Edit Recipe - don't hide other sections when canceling
     editRecipeFormElement.addEventListener('submit', handleEditRecipeSubmit);
     
     cancelEditRecipeBtn.addEventListener('click', () => {
         editRecipeForm.style.display = 'none';
     });
     
-    // Edit Combination Form
+    // Edit Combination Form - don't hide other sections when canceling
     editComboFormElement.addEventListener('submit', handleEditComboSubmit);
     cancelEditComboBtn.addEventListener('click', () => {
         editComboForm.style.display = 'none';
     });
     
-    // Edit Ingredient Form
+    // Edit Ingredient Form - don't hide other sections when canceling
     editIngredientFormElement.addEventListener('submit', handleEditIngredientSubmit);
     cancelEditIngredientBtn.addEventListener('click', () => {
         editIngredientForm.style.display = 'none';
     });
     
-    // Edit Easter Egg Form
+    // Edit Easter Egg Form - don't hide other sections when canceling
     editEasterEggFormElement.addEventListener('submit', handleEditEasterEggSubmit);
     cancelEditEasterEggBtn.addEventListener('click', () => {
         editEasterEggForm.style.display = 'none';
@@ -163,55 +162,13 @@ async function loadRecipes() {
             recipeSelect.remove(1);
         }
         
-        // Create a recipe list with delete buttons
+        // Populate dropdown only
         if (recipes.length > 0) {
             recipes.forEach(recipe => {
                 const option = document.createElement('option');
                 option.value = recipe.rec_id;
                 option.textContent = `${recipe.name} (${recipe.date})`;
                 recipeSelect.appendChild(option);
-            });
-            
-            // Create a separate container for recipe list with delete buttons
-            let recipeListHtml = '<ul class="recipe-list">';
-            recipes.forEach(recipe => {
-                recipeListHtml += `
-                    <li>
-                        <span class="recipe-name" data-id="${recipe.rec_id}">${recipe.name} (${recipe.date})</span>
-                        <button class="delete-recipe-btn" data-id="${recipe.rec_id}">Delete</button>
-                    </li>
-                `;
-            });
-            recipeListHtml += '</ul>';
-            
-            // Display the recipe list
-            if (!recipeContainer) {
-                const container = document.createElement('div');
-                container.id = 'recipe-container';
-                container.innerHTML = recipeListHtml;
-                recipeSelect.parentNode.appendChild(container);
-            } else {
-                recipeContainer.innerHTML = recipeListHtml;
-            }
-            
-            // Add event listeners for recipe selection and deletion
-            document.querySelectorAll('.recipe-name').forEach(span => {
-                span.addEventListener('click', () => {
-                    const recipeId = span.getAttribute('data-id');
-                    recipeSelect.value = recipeId;
-                    loadRecipeData(recipeId);
-                    playtestRecipeBtn.style.display = 'inline-block';
-                });
-            });
-            
-            document.querySelectorAll('.delete-recipe-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const recipeId = btn.getAttribute('data-id');
-                    if (confirm('Are you sure you want to delete this recipe? This will also delete all its combinations, ingredients, and easter eggs.')) {
-                        await deleteRecipe(recipeId);
-                    }
-                });
             });
         }
     } catch (error) {
@@ -404,6 +361,9 @@ async function loadRecipeData(recipeId) {
             currentCombinations = [];
             currentIngredients = [];
             
+            // Automatically show the edit recipe form
+            showEditRecipeForm(recipe);
+            
             return;
         }
         
@@ -458,6 +418,10 @@ async function loadRecipeData(recipeId) {
         
         // Build and render the tree
         renderRecipeTree();
+        
+        // Automatically show the edit recipe form and easter eggs section
+        showEditRecipeForm(recipe);
+        showEasterEggsSection();
     } catch (error) {
         console.error('Error in loadRecipeData:', error);
         recipeTree.innerHTML = `<p>Error loading recipe data: ${error.message}</p>`;
@@ -503,10 +467,7 @@ function renderRecipeTree() {
     
     // Start building the tree with the final combination as the root
     let html = `
-        <h3>${currentRecipe.name} Recipe Tree 
-            <button id="edit-recipe-btn" class="edit-btn">Edit Recipe</button>
-            <button id="easter-eggs-btn" class="edit-btn">Easter Eggs</button>
-        </h3>
+        <h3>${currentRecipe.name} Recipe Tree</h3>
         <div class="tree-node final" data-id="${finalCombo.combo_id}">
             <div class="tree-node-header">
                 <h4>${finalCombo.name} (Final Combination)</h4>
@@ -585,16 +546,6 @@ function renderRecipeTree() {
     html += '</div>';
     
     recipeTree.innerHTML = html;
-    
-    // Add event listener for edit recipe button
-    document.getElementById('edit-recipe-btn').addEventListener('click', () => {
-        showEditRecipeForm(currentRecipe);
-    });
-    
-    // Add event listener for Easter Eggs button
-    document.getElementById('easter-eggs-btn').addEventListener('click', () => {
-        showEasterEggsSection();
-    });
     
     // Add event listeners for the add child buttons
     document.querySelectorAll('.add-child-btn').forEach(btn => {
@@ -948,6 +899,26 @@ function showEditRecipeForm(recipe) {
     document.getElementById('edit-recipe-img-url').value = recipe.img_url || '';
     document.getElementById('edit-recipe-day-number').value = recipe.day_number || '';
     
+    // Add delete button event listener if it doesn't exist yet
+    let deleteRecipeBtn = document.getElementById('delete-recipe-btn');
+    if (!deleteRecipeBtn) {
+        // Create delete button if it doesn't exist
+        const submitButton = editRecipeFormElement.querySelector('button[type="submit"]');
+        deleteRecipeBtn = document.createElement('button');
+        deleteRecipeBtn.id = 'delete-recipe-btn';
+        deleteRecipeBtn.className = 'delete-btn';
+        deleteRecipeBtn.type = 'button';
+        deleteRecipeBtn.textContent = 'Delete Recipe';
+        submitButton.insertAdjacentElement('afterend', deleteRecipeBtn);
+        
+        // Add event listener for delete button
+        deleteRecipeBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to delete this recipe? This will also delete all its combinations, ingredients, and easter eggs.')) {
+                deleteRecipe(recipe.rec_id);
+            }
+        });
+    }
+    
     editRecipeForm.style.display = 'block';
 }
 
@@ -1000,8 +971,7 @@ async function handleEditRecipeSubmit(e) {
 
 // Show Easter Eggs Section
 function showEasterEggsSection() {
-    // Hide other forms
-    editRecipeForm.style.display = 'none';
+    // Don't hide the edit recipe form anymore
     
     // Update Easter Eggs section
     document.getElementById('easter-eggs-recipe-name').textContent = currentRecipe.name;
@@ -1125,11 +1095,9 @@ async function handleEasterEggSubmit(e) {
 
 // Show Edit Combo Form
 function showEditComboForm(combo) {
-    // Hide other forms
-    editRecipeForm.style.display = 'none';
+    // Only hide other editing forms, not the main edit recipe or easter eggs
     editIngredientForm.style.display = 'none';
     editEasterEggForm.style.display = 'none';
-    easterEggsSection.style.display = 'none';
     
     // Populate form fields
     document.getElementById('edit-combo-id').value = combo.combo_id;
@@ -1199,11 +1167,9 @@ async function handleEditComboSubmit(e) {
 
 // Show Edit Ingredient Form
 function showEditIngredientForm(ingredient) {
-    // Hide other forms
-    editRecipeForm.style.display = 'none';
+    // Only hide other editing forms, not the main edit recipe or easter eggs
     editComboForm.style.display = 'none';
     editEasterEggForm.style.display = 'none';
-    easterEggsSection.style.display = 'none';
     
     // Populate form fields
     document.getElementById('edit-ingredient-id').value = ingredient.ing_id;
@@ -1283,8 +1249,7 @@ async function handleEditIngredientSubmit(e) {
 
 // Show Edit Easter Egg Form
 function showEditEasterEggForm(easterEgg) {
-    // Hide other forms
-    editRecipeForm.style.display = 'none';
+    // Only hide other editing forms, not the main edit recipe
     editComboForm.style.display = 'none';
     editIngredientForm.style.display = 'none';
     

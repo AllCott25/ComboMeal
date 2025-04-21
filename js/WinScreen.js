@@ -35,7 +35,7 @@ function drawWinScreen() {
     textAlign(CENTER, CENTER);
     
     // Draw reward message with multicolor treatment (like COMBO MEAL)
-    const rewardMessage = "YOU MADE IT!";
+    const rewardMessage = "WOW DELICIOUS!";
     const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36); // Changed from width to playAreaWidth with adjusted coefficient
     textSize(rewardMessageSize);
     textStyle(BOLD);
@@ -852,7 +852,7 @@ function drawWinScreen() {
     textSize(min(max(playAreaWidth * 0.04, 14), 18)); // Changed from width to playAreaWidth with adjusted coefficient
     fill('#333');
     textStyle(BOLD);
-    text("New Recipe Daily", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.95);
+    text("NEW RECIPE DAILY – COME BACK SOON!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.95);
     textStyle(NORMAL);
     
     // Add "Say hi!" link text below the main text
@@ -929,8 +929,12 @@ function drawWinScreen() {
       // More robust recipe number retrieval with fallbacks
       let recipeNumber = '?';
       
-      // Try getting rec_id from final_combination first
-      if (final_combination && final_combination.rec_id) {
+      // First try getting day_number from the recipe object (used in the title screen stats)
+      if (typeof recipe !== 'undefined' && recipe && recipe.day_number) {
+        recipeNumber = recipe.day_number;
+      }
+      // Then try getting rec_id from final_combination
+      else if (final_combination && final_combination.rec_id) {
         recipeNumber = final_combination.rec_id;
       } 
       // Then try getting it from recipe_data
@@ -1282,8 +1286,8 @@ function drawWinScreen() {
   }
   // Function to check if a point is within the random recipe hotspot area
   function isInRandomRecipeHotspot(x, y) {
-    // Calculate the position of the "!" in "YOU MADE IT!"
-    const rewardMessage = "YOU MADE IT!";
+    // Calculate the position of the "!" in "WOW DELICIOUS!"
+    const rewardMessage = "WOW DELICIOUS!";
     const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36);
     textSize(rewardMessageSize);
     textStyle(BOLD);

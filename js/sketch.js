@@ -2913,12 +2913,12 @@ let intermediate_combinations = [
     // Calculate the 90% horizontal position in the play area
     const finalCircleX = playAreaX + (playAreaWidth * 0.9);
     
-    // Position vertically at 2% of play area height from the top (reduced from 5%)
+    // Position vertically at 1.5% of play area height from the top (instead of 0%)
     helpIconSize = Math.max(playAreaWidth * 0.04, 25); // 4% of play area width, minimum 25px
     
     // Set helpIconX to be the final circle position
     helpIconX = finalCircleX;
-    helpIconY = playAreaY; // 0% of play area height (flush with top)
+    helpIconY = playAreaY + (playAreaHeight * 0.015); // 1.5% of play area height from the top
     
     // Update animation progress if animating
     if (helpButtonAnimating) {

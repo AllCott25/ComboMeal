@@ -1028,12 +1028,12 @@ function drawWinMoveHistory(x, y, width, height) {
       // Format the placeholder text with same style as byline
       textAlign(CENTER, CENTER);
       textSize(placeholderSize);
-      textStyle(BOLD);
+      textStyle(ITALIC); // Changed from BOLD to ITALIC
       textFont('Arial, Helvetica, sans-serif');
       fill(51, 51, 51, 255); // #333 fully opaque
       
       // Draw the placeholder text with quotation marks
-      text("\"A daily recipe puzzle game\"", playAreaX + playAreaWidth/2, placeholderY);
+      text("\"A daily recipe-building puzzle game\"", playAreaX + playAreaWidth/2, placeholderY);
     }
     
     // Draw the byline (only during gameplay)
@@ -1071,9 +1071,9 @@ function drawWinMoveHistory(x, y, width, height) {
   
   // New function to draw recipe statistics on the title screen
   function drawRecipeStats() {
-    // Position at 75% from top of play area, aligned with left edge
+    // Position at 70% from top of play area, aligned with left edge
     const statsX = playAreaX + 20; // Add a small padding from left edge
-    const statsY = playAreaY + (playAreaHeight * 0.75); // Changed from 0.5 to 0.75
+    const statsY = playAreaY + (playAreaHeight * 0.70); // Changed from 0.75 to 0.70
     
     // Get recipe data from loaded recipe
     const recipeNumber = typeof recipe !== 'undefined' && recipe.day_number ? recipe.day_number : "###";
@@ -1103,16 +1103,20 @@ function drawWinMoveHistory(x, y, width, height) {
     const comboCount = typeof intermediate_combinations !== 'undefined' ? 
       intermediate_combinations.length + 1 : "###"; // +1 for final combo
     
-    // Use the same styling as vessel ingredients
+    // Use styling that matches the "How to Play" button style
     push();
     textAlign(LEFT, CENTER);
-    textSize(12); // Changed from 16 to 12
-    fill('black');
+    // Use the same text size as "How to Play" button text
+    textSize(Math.max(helpIconSize * 0.3, 12));
     textFont('Arial, Helvetica, sans-serif');
+    textStyle(NORMAL);
+    
+    // Use COLORS.primary (green) to match the help button color
+    fill(COLORS.primary);
     
     // Draw each line of stats
-    let lineHeight = 18; // Changed from 25 to 18
-    text(`Recipe No. ${recipeNumber}, ${formattedDate}`, statsX, statsY);
+    let lineHeight = 22; // Increased from 18 to 22 for better spacing with the new size
+    text(`Recipe No.${recipeNumber} (${formattedDate})`, statsX, statsY);
     text(`Adapted from ${recipeAuthor}`, statsX, statsY + lineHeight);
     text(`Ingredients: ${ingredientCount}`, statsX, statsY + lineHeight * 2);
     text(`Combos: ${comboCount}`, statsX, statsY + lineHeight * 3);
@@ -1149,10 +1153,10 @@ function drawWinMoveHistory(x, y, width, height) {
     const versionTextSize = Math.max(playAreaWidth * 0.016, 8); // 1.6% of width, min 8px
     textSize(versionTextSize);
     fill(100); // Gray color for version text
-    
-    // ENHANCEMENT - APlasker - Update version to reflect addition of "Say hi" link to title screen
-    const versionText = "v20250420.2134 - APlasker";
-    
+
+    // ENHANCEMENT - APlasker - Update version to reflect win screen header text update
+    const versionText = "v20250421.1014 - APlasker";
+
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
     

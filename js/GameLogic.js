@@ -1090,7 +1090,7 @@ function combineVessels(v1, v2) {
     // We need to fit 3 vessels plus margins in the play area width
     // Convert fixed margins to relative values based on play area dimensions
     let margin = playAreaWidth * 0.0125; // 1.25% of play area width (was 10px)
-    let vertical_margin = playAreaHeight * 0.008; // 0.8% of play area height (was 5px)
+    let vertical_margin = playAreaHeight * 0.0001; // 0.8% of play area height (was 5px)
     
     // Ensure minimum values for very small screens
     margin = Math.max(margin, 3); // Minimum 3px margin
