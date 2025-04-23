@@ -36,6 +36,9 @@ const recipeTree = document.getElementById('recipe-tree');
 const messageArea = document.getElementById('message-area');
 const recipeContainer = document.getElementById('recipe-container');
 
+// Character limit constants
+const DESCRIPTION_MAX_LENGTH = 120;
+
 // Current recipe data
 let currentRecipe = null;
 let currentCombinations = [];
@@ -78,11 +81,30 @@ document.addEventListener('DOMContentLoaded', () => {
     // New Recipe
     newRecipeBtn.addEventListener('click', () => {
         newRecipeForm.style.display = 'block';
+        
+        // Initialize character counter for new recipe description
+        const descriptionField = document.getElementById('recipe-description');
+        const counterElement = document.createElement('div');
+        counterElement.className = 'char-counter';
+        counterElement.id = 'new-recipe-char-counter';
+        counterElement.textContent = `0/${DESCRIPTION_MAX_LENGTH} characters`;
+        descriptionField.parentNode.insertBefore(counterElement, descriptionField.nextSibling);
+        
+        // Set max length attribute
+        descriptionField.setAttribute('maxlength', DESCRIPTION_MAX_LENGTH);
+        
+        // Add input event listener to update counter
+        descriptionField.addEventListener('input', () => {
+            updateCharCounter(descriptionField, counterElement);
+        });
     });
     
     cancelRecipeBtn.addEventListener('click', () => {
         newRecipeForm.style.display = 'none';
         recipeForm.reset();
+        // Remove character counter
+        const counter = document.getElementById('new-recipe-char-counter');
+        if (counter) counter.remove();
     });
     
     recipeForm.addEventListener('submit', handleRecipeSubmit);
@@ -92,6 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     cancelEditRecipeBtn.addEventListener('click', () => {
         editRecipeForm.style.display = 'none';
+        // Remove character counter
+        const counter = document.getElementById('edit-recipe-char-counter');
+        if (counter) counter.remove();
     });
     
     // Edit Combination Form - don't hide other sections when canceling
@@ -118,6 +143,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add this line to the existing DOMContentLoaded event listener
     setTimeout(testSupabasePermissions, 2000); // Wait 2 seconds to ensure login is complete
 });
+
+// Helper function to update character counter and provide visual feedback
+function updateCharCounter(inputField, counterElement) {
+    const currentLength = inputField.value.length;
+    counterElement.textContent = `${currentLength}/${DESCRIPTION_MAX_LENGTH} characters`;
+    
+    // Add visual feedback for approaching/exceeding limit
+    if (currentLength >= DESCRIPTION_MAX_LENGTH) {
+        counterElement.className = 'char-counter limit-reached';
+    } else if (currentLength >= DESCRIPTION_MAX_LENGTH * 0.8) {
+        counterElement.className = 'char-counter limit-warning';
+    } else {
+        counterElement.className = 'char-counter';
+    }
+}
 
 // Handle Login
 async function handleLogin(e) {
@@ -257,6 +297,12 @@ async function handleRecipeSubmit(e) {
     const imgUrl = document.getElementById('recipe-img-url').value;
     const dayNumber = document.getElementById('recipe-day-number').value;
     
+    // Validate description length
+    if (description.length > DESCRIPTION_MAX_LENGTH) {
+        showMessage(`Description exceeds the ${DESCRIPTION_MAX_LENGTH} character limit.`, 'error');
+        return;
+    }
+    
     try {
         const { data, error } = await supabase
             .from('recipes')
@@ -278,6 +324,11 @@ async function handleRecipeSubmit(e) {
         showMessage('Recipe created successfully!', 'success');
         recipeForm.reset();
         newRecipeForm.style.display = 'none';
+        
+        // Remove character counter
+        const counter = document.getElementById('new-recipe-char-counter');
+        if (counter) counter.remove();
+        
         await loadRecipes();
         
         // Select the newly created recipe
@@ -893,7 +944,30 @@ function showEditRecipeForm(recipe) {
     document.getElementById('edit-recipe-id').value = recipe.rec_id;
     document.getElementById('edit-recipe-name').value = recipe.name;
     document.getElementById('edit-recipe-date').value = recipe.date;
-    document.getElementById('edit-recipe-description').value = recipe.description || '';
+    
+    const descriptionField = document.getElementById('edit-recipe-description');
+    descriptionField.value = recipe.description || '';
+    
+    // Set max length attribute
+    descriptionField.setAttribute('maxlength', DESCRIPTION_MAX_LENGTH);
+    
+    // Create or update character counter
+    let counterElement = document.getElementById('edit-recipe-char-counter');
+    if (!counterElement) {
+        counterElement = document.createElement('div');
+        counterElement.className = 'char-counter';
+        counterElement.id = 'edit-recipe-char-counter';
+        descriptionField.parentNode.insertBefore(counterElement, descriptionField.nextSibling);
+        
+        // Add input event listener to update counter
+        descriptionField.addEventListener('input', () => {
+            updateCharCounter(descriptionField, counterElement);
+        });
+    }
+    
+    // Update the counter with current length
+    updateCharCounter(descriptionField, counterElement);
+    
     document.getElementById('edit-recipe-author').value = recipe.author || '';
     document.getElementById('edit-recipe-url').value = recipe.recipe_url || '';
     document.getElementById('edit-recipe-img-url').value = recipe.img_url || '';
@@ -934,6 +1008,12 @@ async function handleEditRecipeSubmit(e) {
     const url = document.getElementById('edit-recipe-url').value;
     const imgUrl = document.getElementById('edit-recipe-img-url').value;
     const dayNumber = document.getElementById('edit-recipe-day-number').value;
+    
+    // Validate description length
+    if (description.length > DESCRIPTION_MAX_LENGTH) {
+        showMessage(`Description exceeds the ${DESCRIPTION_MAX_LENGTH} character limit.`, 'error');
+        return;
+    }
     
     console.log("Attempting to update recipe:", { recId, name, date, description, author, url, imgUrl, dayNumber });
     

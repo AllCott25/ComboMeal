@@ -1421,6 +1421,13 @@ let intermediate_combinations = [
   }
   
   function mousePressed() {
+    // Add safety check for initialization state
+    if (vessels.length === 0 && !isLoadingRecipe) {
+      console.log("Initialization issue detected - reinitializing game");
+      initializeGame();
+      return false;
+    }
+    
     // Check if a modal is active - selectively allow interactions with modal elements
     if (modalActive) {
       // Use helper function to check if interacting with a modal element
@@ -1747,6 +1754,15 @@ let intermediate_combinations = [
           draggedVessel.x = draggedVessel.originalX;
           draggedVessel.y = draggedVessel.originalY;
           draggedVessel.shake();
+          
+          // BUGFIX - APlasker - Add black counter to move history for invalid hint combination
+          moveHistory.push('black');
+          turnCounter++; // Increment turn counter for invalid move
+          
+          // Display a random error message for invalid combination
+          showRandomErrorMessage();
+          
+          console.log("Invalid combination with hint vessel!");
         }
       }
       else if (overVessel) {
@@ -1960,6 +1976,12 @@ let intermediate_combinations = [
   }
   
   function startGame() {
+    // Ensure all necessary initialization has happened before starting game
+    if (vessels.length === 0 || isLoadingRecipe) {
+      console.log("Cannot start game yet - initialization incomplete");
+      return;
+    }
+    
     gameStarted = true;
     
     // Trigger help button animation from rectangular to circular
@@ -1983,6 +2005,10 @@ let intermediate_combinations = [
     // Reset byline to default - APlasker
     currentByline = "Drag & drop to combine ingredients!";
     bylineTimer = 0;
+    
+    // Force a re-arrangement of vessels to ensure proper positioning
+    console.log("Ensuring vessels are properly arranged");
+    arrangeVessels();
   }
   
   function triggerHapticFeedback(type) {
@@ -2000,6 +2026,13 @@ let intermediate_combinations = [
   
   // Add touch support for mobile devices
   function touchStarted() {
+    // Add safety check for initialization state
+    if (vessels.length === 0 && !isLoadingRecipe) {
+      console.log("Initialization issue detected - reinitializing game");
+      initializeGame();
+      return false;
+    }
+    
     // Check if a modal is active - selectively allow interactions with modal elements
     if (modalActive) {
       // Use helper function to check if interacting with a modal element
@@ -3184,6 +3217,76 @@ let intermediate_combinations = [
     const titleY = playAreaY + (playAreaHeight * 0.05);
     
     // Draw each letter with alternating colors
+  }
+  
+  function draw() {
+    // Set background color
+    background(COLORS.background);
+    
+    // Draw floral pattern border if there's space
+    drawFloralBorder();
+    
+    // Draw top and bottom flowers on narrow screens
+    drawTopBottomFlowers();
+    
+    // Ensure no stroke for all text elements
+    noStroke();
+    
+    // Check if we're still loading recipe data
+    if (isLoadingRecipe) {
+      // Draw loading screen
+      textAlign(CENTER, CENTER);
+      textSize(24);
+      fill('#333');
+      text("Loading today's recipe...", width/2, height/2);
+      
+      // Show current EST time for debugging
+      textSize(14);
+      const estTime = getCurrentESTTime();
+      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
+      
+      return;
+    }
+    
+    // Check if there was an error loading recipe data
+    if (loadingError) {
+      // ... existing loading error code ...
+      return;
+    }
+    
+    // Add a check for properly initialized vessels and force reinitialization if needed
+    if (vessels.length === 0 && !isLoadingRecipe) {
+      console.log("No vessels found, initializing game");
+      initializeGame();
+      return;
+    }
+    
+    // Verify vessel initialization is correct
+    if (gameStarted && vessels.some(v => !v.isInside || typeof v.isInside !== 'function')) {
+      console.log("Found improperly initialized vessels, resetting game");
+      resetGame();
+      return;
+    }
+    
+    // Remaining draw function code ...
+  }
+  
+  // Add a reset function to handle initialization issues
+  function resetGame() {
+    console.log("Resetting game due to initialization issues");
+    // Clear current state
+    vessels = [];
+    animations = [];
+    draggedVessel = null;
+    gameStarted = false;
+    gameWon = false;
+    
+    // Reset game flags
+    isLoadingRecipe = false;
+    loadingError = false;
+    
+    // Reinitialize
+    initializeGame();
   }
   
   

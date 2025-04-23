@@ -404,11 +404,11 @@ function drawWinMoveHistory(x, y, width, height) {
         // Completed combo: 100% opacity circle with white checkmark
         fill(combo.isHint ? COLORS.vesselHint : COLORS.green);
         stroke('black');
-        strokeWeight(1.5);
+        strokeWeight(2); // Increase to 2px to match vessel outline
         circle(x, y, circleSize);
         
-        // Draw white checkmark (scaled relative to circle size)
-        stroke('white');
+        // Draw black checkmark (changed from white) (scaled relative to circle size)
+        stroke('black');
         strokeWeight(Math.max(circleSize * 0.1, 2)); // Relative stroke weight, min 2px
         line(x - circleSize * 0.3, y, x - circleSize * 0.1, y + circleSize * 0.3);
         line(x - circleSize * 0.1, y + circleSize * 0.3, x + circleSize * 0.4, y - circleSize * 0.3);
@@ -422,27 +422,31 @@ function drawWinMoveHistory(x, y, width, height) {
         // Determine the appropriate fill color:
         // 1. Red for hinted combinations (highest priority)
         // 2. Yellow for partial combinations
-        // 3. Semi-transparent green for others
+        // 3. White for others (changed from semi-transparent green)
         let fillColor;
         if (isHinted) {
           fillColor = COLORS.vesselHint; // Red for hinted combinations
         } else if (isPartial) {
           fillColor = COLORS.vesselYellow; // Yellow for partial combinations
         } else {
-          fillColor = COLORS.green + '80'; // 50% opacity green for others
+          fillColor = 'white'; // Changed from COLORS.green + '80' to white
         }
         
-        // Use yellow for partial combinations, semi-transparent green for others
+        // Use yellow for partial combinations, white for others (changed from semi-transparent green)
         fill(fillColor);
         stroke('black');
-        strokeWeight(1);
+        strokeWeight(2); // Increase to 2px to match vessel outline
         circle(x, y, circleSize);
         
-        // Draw ingredient count
-        fill('white');
+        // Draw ingredient count in black (changed from white)
+        fill('black');
         noStroke();
         textAlign(CENTER, CENTER);
-        textSize(Math.max(circleSize * 0.8, 14)); // Increased from 0.5 to 0.8 (80% of circle size), minimum 14px
+        
+        // Use vessel-like text sizing - match with ingredient text in vessels
+        const fontSize = Math.max(circleSize * 0.45, 13); // Adjusted to match vessel text size
+        textSize(fontSize);
+        
         textStyle(BOLD);
         // Add a small vertical offset (approx 5% of circle size) to visually center the text
         const textOffsetY = circleSize * 0.05; // Reduced from 0.1 to 0.05 (split the difference)
@@ -481,7 +485,7 @@ function drawWinMoveHistory(x, y, width, height) {
         // Filled error counter (black)
         fill('black');
         stroke('black');
-        strokeWeight(1.5);
+        strokeWeight(2); // Increased to 2px to match vessel outline
         circle(x, y, circleSize);
         
         // If there are 5+ wrongos, add red X's to wrongo counters - APlasker
@@ -497,7 +501,7 @@ function drawWinMoveHistory(x, y, width, height) {
         // Empty error placeholder - 25% opacity black (reduced from 50%) - APlasker
         fill('rgba(0, 0, 0, 0.25)');
         stroke('black');
-        strokeWeight(1);
+        strokeWeight(2); // Increased to 2px to match vessel outline
         circle(x, y, circleSize);
       }
     }
@@ -721,7 +725,22 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Check if we need to initialize the game after loading data
     if (vessels.length === 0) {
+      console.log("No vessels initialized yet, calling initializeGame()");
       initializeGame();
+      return;
+    }
+    
+    // Add safety check for vessel initialization - APlasker
+    try {
+      // Verify vessel initialization is correct
+      if (gameStarted && vessels.some(v => !v.isInside || typeof v.isInside !== 'function')) {
+        console.log("Found improperly initialized vessels, resetting game");
+        resetGame();
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking vessel initialization:", error);
+      resetGame();
       return;
     }
     
@@ -1203,7 +1222,7 @@ function drawWinMoveHistory(x, y, width, height) {
     fill(100); // Gray color for version text
 
     // ENHANCEMENT - APlasker - Update version to reflect animation speed improvements- SIGNATURE VERSION
-    const versionText = "v20250421.1322 - Playsker";
+    const versionText = "v20250421.1752 - Playsker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
@@ -1261,6 +1280,28 @@ function drawWinMoveHistory(x, y, width, height) {
     endShape(CLOSE);
     
     pop();
+  }
+  
+  // Add a reset function to handle initialization issues - APlasker
+  function resetGame() {
+    console.log("Resetting game due to initialization issues");
+    // Clear current state
+    vessels = [];
+    animations = [];
+    draggedVessel = null;
+    gameStarted = false;
+    gameWon = false;
+    
+    // Reset game flags
+    isLoadingRecipe = false;
+    loadingError = false;
+    
+    // Force a delay before reinitializing
+    setTimeout(() => {
+      // Reinitialize
+      console.log("Reinitializing game after reset");
+      initializeGame();
+    }, 100); // Short delay to ensure clean state
   }
   
   
