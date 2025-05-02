@@ -1,10 +1,15 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: April 20, 2025 (19:10 EDT)
+ * Last Updated: April 24, 2025 (APlasker)
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
+ * 
+ * Changes:
+ * - Updated row 1 text to clarify dragging one ingredient onto another
+ * - Updated row 2 text to reference the recipe card instead of combo icons
+ * - Replaced red hint vessel with circular hint button to match current UI
  */
 
 // Global variable to track help modal state
@@ -19,6 +24,7 @@ function showHelpModal() {
     y: playAreaY + playAreaHeight / 2, // Center vertically in play area
     width: playAreaWidth * 0.85,  // 85% of play area width
     height: playAreaHeight * 0.8, // 80% of play area height
+    htmlElements: [], // Initialize as an empty array
     
     draw: function() {
       if (!this.active) return;
@@ -90,10 +96,10 @@ function showHelpModal() {
       
       // Vessel configurations
       const vesselConfig = [
-        { name: "Carrots", color: "white", text: "Drag & drop ingredients to combine them step-by-step into a mystery recipe." },
-        { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow combos need more ingredients. The Combos icons near the bottom provide clues to how many more." },
+        { name: "Carrots", color: "white", text: "Drag & drop one ingredient on to another to combine them step-by-step into a mystery recipe." },
+        { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow combos need more ingredients. Check the recipe card to see how much more to add." },
         { name: "Carrot Sheet Cake", color: "green", text: "Combos turn green & transform when you reach the next step. Keep combining until you've made the final dish!" },
-        { name: "Cream Cheese Frosting", color: "red", text: "Use Hints to discover what to make next to help complete the dish." },
+        { type: "hintButton", text: "Use Hints to discover what to make next to help complete the dish." },
         { type: "star", text: "Combine everything together with as few mistakes as possible to make the grade!" }
       ];
       
@@ -106,6 +112,9 @@ function showHelpModal() {
         if (config.type === "star") {
           // Draw star icon for the 5th row - add vertical offset to Column 1
           drawStarIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.5);
+        } else if (config.type === "hintButton") {
+          // Draw circular hint button for the 4th row - add vertical offset to Column 1
+          drawHintButtonIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.4);
         } else {
           // Draw vessel for regular rows - add vertical offset to Column 1
           const vessel = createTutorialVessel(config.name, config.color, vesselColumnX, rowY + column1VerticalOffset, vesselWidth, vesselHeight);
@@ -153,6 +162,11 @@ function showHelpModal() {
       // Close the modal when clicking anywhere on the screen
       this.active = false;
       return true;
+    },
+    
+    removeHTMLElements: function() {
+      // Implementation to remove HTML elements
+      this.htmlElements = [];
     }
   };
 }
@@ -182,6 +196,34 @@ function drawStarIcon(x, y, size) {
     vertex(sx, sy);
   }
   endShape(CLOSE);
+  
+  pop();
+}
+
+// Function to draw a circular hint button icon like the one in the game
+function drawHintButtonIcon(x, y, size) {
+  push();
+  
+  // Use COLORS.vesselHint for the hint button color (red)
+  fill(COLORS.vesselHint);
+  
+  // Add black outline to match in-game button
+  stroke('black');
+  strokeWeight(2);
+  
+  // Draw the circular button
+  circle(x, y, size);
+  
+  // Draw the "Hint" text in white (matching the in-game button)
+  fill('white');
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(size * 0.25); // Size the text proportionally to fit in the button
+  textStyle(BOLD);
+  text("Hint", x, y); // Center the text in the button
+  
+  // Reset text style
+  textStyle(NORMAL);
   
   pop();
 }

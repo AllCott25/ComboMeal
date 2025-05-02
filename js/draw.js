@@ -14,6 +14,10 @@ function drawWinMoveHistory(x, y, width, height) {
     };
   }
   
+  // Declare the firstInactivityMessageShown variable as external reference - APlasker
+  // This is defined in sketch.js but referenced here
+  let firstInactivityMessageShown = false;
+  
   // Keep the regular move history for during gameplay
   function drawMoveHistory() {
     // Isolate drawing context for move history
@@ -204,85 +208,97 @@ function drawWinMoveHistory(x, y, width, height) {
     endShape(CLOSE);
   }
   
-  // Combined function to draw both combo counter and move history in a single row - APlasker
+  // Add a global variable to store the calculated smallest font size
+  let recipeCardFontSize = null; 
+  
+  // Combined function to draw combo counter only - APlasker
   function drawGameCounters() {
     // Isolate drawing context for game counters
     push();
     
-    // Position counters lower in the play area - move up by 5% of screen height
-    const counterY = playAreaY + playAreaHeight * 0.87; // Moved up from 0.92 (5% of play area height)
+    // Position counters at 89% from the top of the play area (updated from 87%)
+    const counterY = playAreaY + playAreaHeight * 0.89;
     
-    // Center of the play area for overall positioning
+    // Position card horizontally at the center of the screen
     const centerX = playAreaX + playAreaWidth / 2;
     
     // Get the total number of possible combinations (including final combination)
     const totalCombos = intermediate_combinations.length + 1;
     
-    // --- WRONGO COUNTER SECTION ---
-    const totalErrorSlots = 4; // Show 4 slots for wrongos - APlasker
-    
-    // Filter moveHistory to only include error markers (black only) - APlasker
-    const filteredMoveHistory = moveHistory.filter(move => 
-      move === 'black' || move === '#333333');
-    
-    // Limit the number of counters to display
-    const displayCount = Math.min(filteredMoveHistory.length, totalErrorSlots);
-    
     // --- CALCULATE RESPONSIVE SIZING BASED ON AVAILABLE SPACE - APlasker ---
     // Use playAreaWidth to calculate responsive sizes
-    // First determine the maximum possible size based on container width and element count
     
-    // Calculate minimum width needed for all elements with default spacing
-    const minLabelWidth = Math.max(playAreaWidth * 0.04, 50); // Min 50px for label width
-    const minDividerWidth = Math.max(playAreaWidth * 0.025, 30); // Min 30px for divider
-    const minWrongoLabelWidth = Math.max(playAreaWidth * 0.06, 70); // Increased from 0.05/60px to prevent overlap
+    // Calculate card dimensions (updated height)
+    const cardPadding = Math.max(playAreaWidth * 0.03, 15); // Padding inside card (3% of play area width, min 15px)
+    const cardWidth = Math.max(playAreaWidth * 0.85, 200); // 85% of play area width, min 200px
+    const cardHeight = playAreaHeight * 0.23; // 23% of play area height as requested
     
-    // Calculate available width for circles
-    const labelsAndDividerWidth = minLabelWidth + minDividerWidth + minWrongoLabelWidth;
-    const availableWidthForCircles = playAreaWidth * 0.95 - labelsAndDividerWidth; // Use 95% of play area width
+    // Position card (centered horizontally and at 89% from top vertically)
+    const cardX = centerX;
+    const cardY = counterY;
     
-    // Calculate how many circles we need to fit (combo counters + error slots)
-    const totalCircles = totalCombos + totalErrorSlots;
-    
-    // Calculate responsive circle size and spacing based on available width
-    // Maximum circle size is 30px, minimum is 15px
-    const circleSize = Math.min(Math.max(availableWidthForCircles / (totalCircles * 1.4), 15), 30);
-    
-    // Circle spacing is 1.4x circle size
-    const comboSpacing = circleSize * 1.4;
-    const errorSpacing = comboSpacing;
-    
-    // Scale label widths based on available space
-    const labelWidth = Math.max(minLabelWidth, playAreaWidth * 0.05);
-    const wrongoLabelWidth = Math.max(minWrongoLabelWidth, playAreaWidth * 0.07); // Increased from 0.06 to create more space
-    const dividerWidth = minDividerWidth;
-    
-    // Calculate total width needed for combo counters
-    const comboWidth = (totalCombos * comboSpacing) + labelWidth;
-    
-    // Calculate width needed for wrongo counters
-    const errorWidth = (totalErrorSlots * errorSpacing) + wrongoLabelWidth;
-    
-    // Calculate starting positions to center the entire counter display
-    const totalWidth = comboWidth + dividerWidth + errorWidth;
-    const startX = centerX - (totalWidth / 2);
-    
-    // --- RESET ALL TEXT PROPERTIES FOR CONSISTENCY - APlasker ---
-    textFont(bodyFont);
-    textStyle(NORMAL);
-    
-    // --- DRAW COMBO COUNTERS ---
-    // Draw "Combos:" label
-    fill('black');
+    // --- DRAW RECIPE CARD BACKGROUND ---
+    // Draw card drop shadow
+    rectMode(CENTER);
+    fill(0, 0, 0, 30); // Translucent black shadow (30% opacity)
     noStroke();
-    textAlign(RIGHT, CENTER);
-    textSize(Math.max(circleSize * 0.5, 12)); // Relative text size based on circle size, min 12px
-    textStyle(BOLD);
-    const comboLabelX = startX + labelWidth; // Position for "Combos:" text
-    text("Combos:", comboLabelX, counterY);
+    rect(cardX + 5, cardY + 5, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px radius
+    
+    // Draw card background
+    fill(255); // White background
+    stroke(220); // Light gray border
+    strokeWeight(1);
+    rect(cardX, cardY, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px radius
+    
+    // Draw flowers in the corners of the recipe card
+    const flowerSize = max(cardWidth * 0.01, 2); // 1% of card width, min 2px
+    const cornerOffset = cardWidth * 0.04; // 4% of card width
+    
+    // Draw flowers in each corner
+    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
+    drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
+    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
+    drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
     
     // Create an array of combo information objects with ingredient counts
     const comboInfo = [];
+    
+    // --- MOVE HINT BUTTON TO NEW POSITION ON TOP OF RECIPE CARD AND CHANGE TO CIRCLE ---
+    if (hintButton) {
+      // Calculate circular hint button size - 66% of the recipe card height
+      const hintButtonDiameter = cardHeight * 0.66 * 0.8; // Reduced to 80% of original size
+      
+      // Position hint button on top of the recipe card
+      // Positioned 55% from the top edge and 80% from the left edge of the card
+      const newHintButtonX = cardX - cardWidth/2 + (cardWidth * 0.80); // 80% from the left edge of the card
+      const newHintButtonY = cardY - cardHeight/2 + (cardHeight * 0.55); // 55% from the top edge of the card
+      
+      // Update hint button position
+      hintButton.x = newHintButtonX;
+      hintButton.y = newHintButtonY;
+    
+      // Update hint button size and shape
+      hintButton.w = hintButtonDiameter;
+      hintButton.h = hintButtonDiameter;
+      // Set isCircular flag to true for circle shape
+      hintButton.isCircular = true;
+      
+      // Change hint button color to match hint vessel color (red) and text to white
+      hintButton.color = COLORS.vesselHint;
+      hintButton.textColor = 'white';
+      
+      // Reduce hint text size to 50% of current size
+      hintButton.textSizeMultiplier = 0.5;
+      
+      // Update global hintButtonY variable for other references
+      hintButtonY = newHintButtonY;
+      // Also update initialHintButtonY for the HintVessel positioning
+      initialHintButtonY = newHintButtonY;
+    
+      // Update hint button styling
+      hintButton.borderColor = 'black';
+      hintButton.textBold = true;
+    }
     
     // Add intermediate combinations
     for (let i = 0; i < intermediate_combinations.length; i++) {
@@ -307,7 +323,8 @@ function drawWinMoveHistory(x, y, width, height) {
         isHint: completedGreenVessels.some(v => v.name === combo.name && v.isHint),
         isBaseIngredientsOnly,
         baseIngredientCount,
-        baseIngredientPercentage
+        baseIngredientPercentage,
+        isPartialCombo: partialCombinations.includes(combo.name) // Add tracking for partial combos
       });
     }
     
@@ -366,7 +383,8 @@ function drawWinMoveHistory(x, y, width, height) {
       isBaseIngredientsOnly: false,
       baseIngredientCount: finalBaseIngsCount, // Store the count of base ingredients
       baseIngredientPercentage: totalFinalRequired > 0 ? finalBaseIngsCount / totalFinalRequired : 0,
-      isFinalCombo: true
+      isFinalCombo: true,
+      isPartialCombo: partialCombinations.includes(final_combination.name) // Add tracking for final combo as well
     });
     
     // --- IMPLEMENT SORTING LOGIC FOR COMBOS - APlasker ---
@@ -392,106 +410,416 @@ function drawWinMoveHistory(x, y, width, height) {
       return a.baseIngredientPercentage - b.baseIngredientPercentage;
     });
     
-    // Draw combo circles with ingredient counts or checkmarks
+    // --- SETUP VERTICAL LAYOUT FOR COMBOS ---
+    // Calculate the vertical spacing within the card
+    const verticalMargin = cardHeight * 0.05; // 5% top and bottom margins
+    const availableHeight = cardHeight - (verticalMargin * 2); // Available height after margins
+    const totalLines = comboInfo.length + 1; // +1 for the "Recipe" header
+    const lineHeight = Math.max(availableHeight / totalLines, 20); // Minimum line height of 20px
+    
+    // Default font size based on line height
+    const defaultFontSize = Math.min(lineHeight * 0.4, 14);
+    
+    // --- CALCULATE SMALLEST NECESSARY FONT SIZE FOR ALL POSSIBLE COMBOS ---
+    // Only calculate this once during the game session
+    if (recipeCardFontSize === null) {
+      console.log("Calculating smallest necessary font size for all possible combinations");
+      
+      // Start with the default font size
+      let smallestFontSize = defaultFontSize;
+      const maxTextWidth = cardWidth * 0.55;
+      
+      // Check all possible combinations, not just visible ones
+      const allPossibleCombos = [...intermediate_combinations, final_combination];
+      
+      // First pass: Check all possible combinations with their maximum possible text length
+      for (let combo of allPossibleCombos) {
+        // Find the verb
+        let verb = combo.verb || "Mix"; // Use combo's verb or default to "Mix"
+        let name = combo.name;
+        
+        // Format with the longest possible text (verb + the + name + max progress)
+        const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
+        
+        // Create text in the format with the progress counter (largest possible format)
+        const fullText = `${capitalizedVerb} the ${name} (${combo.required.length})`;
+        
+        // Set the font size for measurement
+        textSize(defaultFontSize);
+        
+        // Check if this text would be too long with default font size
+        if (textWidth(fullText) > maxTextWidth) {
+          // Calculate reduced font size with lower minimum (8px instead of 10px)
+          const reducedFontSize = Math.max(defaultFontSize * 0.8, 8); // Changed from 10 to 8
+          
+          // Update smallest font size if this is smaller
+          if (reducedFontSize < smallestFontSize) {
+            smallestFontSize = reducedFontSize;
+          }
+        }
+      }
+      
+      // Store the calculated smallest font size for the entire game session
+      recipeCardFontSize = smallestFontSize;
+      console.log(`Smallest necessary font size for all combinations: ${recipeCardFontSize}px`);
+    }
+    
+    // Calculate starting Y position (top margin + half line height for vertical centering)
+    const startY = cardY - cardHeight/2 + verticalMargin + lineHeight/2;
+    
+    // Calculate left margin for text (6% from left edge of card)
+    const textLeftMargin = cardX - cardWidth/2 + (cardWidth * 0.06); // Changed from 0.1 to 0.06
+    
+    // --- RESET ALL TEXT PROPERTIES FOR CONSISTENCY - APlasker ---
+    textFont(bodyFont);
+    textStyle(NORMAL);
+    
+    // --- DRAW HEADER ---
+    // Draw "Recipe" label at the top line - centered
+    fill('black');
+    noStroke();
+    textAlign(CENTER, CENTER); // Center alignment for title
+    textSize(Math.min(lineHeight * 0.6, 18)); // Text size scaled to line height, max 18px
+    textStyle(BOLD);
+    text("Recipe", cardX, startY); // Position at card center for centered text
+    
+    // Draw underline below "Recipe" text - also centered
+    const recipeTextWidth = textWidth("Recipe");
+    stroke('black');
+    strokeWeight(1);
+    line(cardX - recipeTextWidth/2, startY + lineHeight/4, cardX + recipeTextWidth/2, startY + lineHeight/4);
+    
+    // --- DRAW COMBO ITEMS VERTICALLY ---
+    // Array of circled number emojis for combo numbering
+    const numberedCircles = ["❶", "❷", "❸", "❹", "❺"];
+    
+    // Reset alignment for the list items
+    textAlign(LEFT, CENTER);
+    
+    // Apply the pre-calculated smallest font size to all combos
+    textSize(recipeCardFontSize);
+    
     for (let i = 0; i < comboInfo.length; i++) {
-      const x = comboLabelX + 15 + (i * comboSpacing);
-      const y = counterY;
+      // Calculate y position for this combo (each on its own line)
+      const y = startY + ((i + 1) * lineHeight);
       
       // Get combo information
       const combo = comboInfo[i];
       
+      // Determine text content
+      let comboText;
+      
       if (combo.isCompleted) {
-        // Completed combo: 100% opacity circle with white checkmark
-        fill(combo.isHint ? COLORS.vesselHint : COLORS.green);
-        stroke('black');
-        strokeWeight(2); // Increase to 2px to match vessel outline
-        circle(x, y, circleSize);
+        // For completed combos, find the verb and name
+        let verb = "Mix"; // Default fallback verb
+        let name = combo.name;
         
-        // Draw black checkmark (changed from white) (scaled relative to circle size)
-        stroke('black');
-        strokeWeight(Math.max(circleSize * 0.1, 2)); // Relative stroke weight, min 2px
-        line(x - circleSize * 0.3, y, x - circleSize * 0.1, y + circleSize * 0.3);
-        line(x - circleSize * 0.1, y + circleSize * 0.3, x + circleSize * 0.4, y - circleSize * 0.3);
-      } else {
-        // Check if this is a partial combination
-        const isPartial = partialCombinations.includes(combo.name);
-        
-        // Check if this is the hinted combination
-        const isHinted = hintedCombo === combo.name;
-        
-        // Determine the appropriate fill color:
-        // 1. Red for hinted combinations (highest priority)
-        // 2. Yellow for partial combinations
-        // 3. White for others (changed from semi-transparent green)
-        let fillColor;
-        if (isHinted) {
-          fillColor = COLORS.vesselHint; // Red for hinted combinations
-        } else if (isPartial) {
-          fillColor = COLORS.vesselYellow; // Yellow for partial combinations
+        // Find the verb for this combination
+        if (combo.isFinalCombo && final_combination.verb) {
+          verb = final_combination.verb;
         } else {
-          fillColor = 'white'; // Changed from COLORS.green + '80' to white
+          // Search for the verb in intermediate combinations
+          for (let c of intermediate_combinations) {
+            if (c.name === combo.name && c.verb) {
+              verb = c.verb;
+              break;
+            }
+          }
         }
         
-        // Use yellow for partial combinations, white for others (changed from semi-transparent green)
-        fill(fillColor);
-        stroke('black');
-        strokeWeight(2); // Increase to 2px to match vessel outline
-        circle(x, y, circleSize);
+        // Format as "Verb the Name" - capitalize first letter of verb
+        const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
+        comboText = `${capitalizedVerb} the ${name}`;
         
-        // Draw ingredient count in black (changed from white)
-        fill('black');
+        // Check if text is too long and needs truncation with the smallest font size
+        const maxTextWidth = cardWidth * 0.55;
+        
+        if (textWidth(comboText) > maxTextWidth) {
+          // Text is too long, remove "the" instead of using ellipsis
+          comboText = `${capitalizedVerb} ${name}`;
+          
+          // If it's still too long, then truncate the name
+          if (textWidth(comboText) > maxTextWidth) {
+            // Calculate how many characters we can fit
+            let charIndex = 0;
+            
+            while (textWidth(`${capitalizedVerb} ${name.slice(0, charIndex)}`) < maxTextWidth && charIndex < name.length) {
+              charIndex++;
+            }
+            
+            // Go back one character to ensure we're under the limit
+            charIndex = Math.max(0, charIndex - 1);
+            comboText = `${capitalizedVerb} ${name.slice(0, charIndex)}`;
+          }
+        }
+      } else if (hintedCombos.includes(combo.name)) {
+        // For hinted combos, show verb, name and progress counter with animation
+        let verb = "Mix"; // Default fallback verb
+        let name = combo.name;
+        
+        // Find the combination object to get the verb and track progress
+        let comboObject;
+        if (combo.isFinalCombo) {
+          comboObject = final_combination;
+          if (final_combination.verb) verb = final_combination.verb;
+        } else {
+          // Search in intermediate combinations
+          for (let c of intermediate_combinations) {
+            if (c.name === combo.name) {
+              comboObject = c;
+              if (c.verb) verb = c.verb;
+              break;
+            }
+          }
+        }
+        
+        // Calculate progress if we have the combo object
+        let progressText = "(0/?)";
+        if (comboObject) {
+          const totalIngredients = comboObject.required.length;
+          // Simplified to just show total required ingredients
+          progressText = `(${totalIngredients})`;
+        }
+        
+        // Format as "Verb the Name (N)" - capitalize first letter of verb
+        const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
+        
+        // Prepare the full text (what it will be when the animation completes)
+        const fullText = `${capitalizedVerb} the ${name} ${progressText}`;
+        
+        // We already know the smallest font size, so just check for truncation
+        const maxTextWidth = cardWidth * 0.55;
+        let truncatedText = fullText;
+        
+        if (textWidth(fullText) > maxTextWidth) {
+          // First try removing "the" instead of using ellipsis
+          truncatedText = `${capitalizedVerb} ${name} ${progressText}`;
+          
+          // If still too long, truncate the name
+          if (textWidth(truncatedText) > maxTextWidth) {
+            // Calculate how many characters of the name we can show
+            let charIndex = 0;
+            
+            while (textWidth(`${capitalizedVerb} ${name.slice(0, charIndex)} ${progressText}`) < maxTextWidth && charIndex < name.length) {
+              charIndex++;
+            }
+            
+            // Go back one character to ensure we're under the limit
+            charIndex = Math.max(0, charIndex - 1);
+            truncatedText = `${capitalizedVerb} ${name.slice(0, charIndex)} ${progressText}`;
+          }
+        }
+        
+        // Check if this combo should be animated
+        const isAnimationTarget = combo.name === hintAnimationTarget && hintAnimationActive;
+        
+        if (isAnimationTarget) {
+          // Calculate how much of the text to show based on animation progress
+          let textRevealProgress = Math.min(1, hintAnimationProgress / hintAnimationTextRevealDuration);
+          let textLength = Math.floor(truncatedText.length * textRevealProgress);
+          
+          // Set the comboText based on animation progress
+          comboText = truncatedText.substring(0, textLength);
+          
+          // Add cursor during typing animation
+          if (textRevealProgress < 1) {
+            comboText += "|"; // Add cursor character during typing
+          } else if (hintAnimationProgress < 1) {
+            // If text reveal is complete but color transition isn't, show full text with a cursor
+            comboText = truncatedText + "|";
+          } else {
+            // Animation complete, show full text
+            comboText = truncatedText;
+          }
+        } else {
+          // No animation for this combo, show full text
+          comboText = truncatedText;
+        }
+      } else {
+        // For incomplete combos, show ingredient count
+        comboText = `${combo.requiredCount} ingredient${combo.requiredCount !== 1 ? 's' : ''}`;
+        // No need to set font size here as we're using the global smallest font size
+      }
+      
+      // Add numbered circle prefix
+      const numberPrefix = numberedCircles[i] || `${i+1}.`; // Fallback to regular numbers if we exceed available circle emojis
+      const fullComboText = `${numberPrefix} ${comboText}`;
+      
+      // Calculate number prefix width to position highlight correctly (avoiding the number)
+      textAlign(LEFT, CENTER);
+      const numberPrefixWidth = textWidth(`${numberPrefix} `);
+      
+      // Draw the parallelogram highlight for partial combos (but not for completed ones)
+      if (combo.isPartialCombo && !combo.isCompleted) {
+        // Calculate the width of the main text (without number prefix)
+        const mainTextWidth = textWidth(comboText);
+        
+        // Draw parallelogram highlight using mustard yellow with 100% opacity
         noStroke();
-        textAlign(CENTER, CENTER);
+        fill(COLORS.tertiary); // Mustard yellow with 100% opacity (removed the '40' alpha value)
         
-        // Use vessel-like text sizing - match with ingredient text in vessels
-        const fontSize = Math.max(circleSize * 0.45, 13); // Adjusted to match vessel text size
-        textSize(fontSize);
+        // Draw parallelogram shape - skewed to the right
+        const skew = 6; // Amount of skew for parallelogram
+        const highlightHeight = lineHeight * 0.8; // 80% of line height
+        const highlightY = y - highlightHeight/2;
         
+        beginShape();
+        vertex(textLeftMargin + numberPrefixWidth, highlightY); // Top left
+        vertex(textLeftMargin + numberPrefixWidth + mainTextWidth + skew, highlightY); // Top right
+        vertex(textLeftMargin + numberPrefixWidth + mainTextWidth, highlightY + highlightHeight); // Bottom right
+        vertex(textLeftMargin + numberPrefixWidth - skew, highlightY + highlightHeight); // Bottom left
+        endShape(CLOSE);
+      }
+      
+      if (combo.isCompleted) {
+        // For completed combos, show green checkmark to the left of text
+        const checkmarkX = textLeftMargin - 15; // Position checkmark to the left of text
+        
+        // Draw green checkmark for completed combos
+        stroke(COLORS.green);
+        strokeWeight(Math.max(lineHeight * 0.1, 2)); // Relative stroke weight, min 2px
+        line(checkmarkX - 5, y, checkmarkX, y + 5);
+        line(checkmarkX, y + 5, checkmarkX + 8, y - 5);
+        
+        // Draw text in bold when completed
+        noStroke();
         textStyle(BOLD);
-        // Add a small vertical offset (approx 5% of circle size) to visually center the text
-        const textOffsetY = circleSize * 0.05; // Reduced from 0.1 to 0.05 (split the difference)
-        text(combo.requiredCount, x, y + textOffsetY);
+        fill('black');
+        text(fullComboText, textLeftMargin, y);
+      } else if (hintedCombos.includes(combo.name)) {
+        // For hinted combos, use hint color (red) and bold text with potential animation
+        noStroke();
+        textStyle(BOLD);
+        
+        // Check if this combo should be animated
+        const isAnimationTarget = combo.name === hintAnimationTarget && hintAnimationActive;
+        // Check if this combo has completed animation
+        const hasCompletedAnimation = completedAnimations.includes(combo.name);
+        
+        if (isAnimationTarget) {
+          // If animation is active and this is the target combo, handle color transition
+          if (hintAnimationProgress > hintAnimationTextRevealDuration) {
+            // Calculate color blend from red to black after text reveal is complete
+            const colorTransitionProgress = (hintAnimationProgress - hintAnimationTextRevealDuration) / (1 - hintAnimationTextRevealDuration);
+            const r = lerp(255, 0, colorTransitionProgress);  // Red from 255 to 0
+            const g = lerp(82, 0, colorTransitionProgress);   // Green from 82 to 0
+            const b = lerp(82, 0, colorTransitionProgress);   // Blue from 82 to 0
+            
+            // Create blended color
+            fill(r, g, b);
+          } else {
+            // During text reveal, use hint color (red)
+            fill(COLORS.vesselHint);
+          }
+        } else if (hasCompletedAnimation) {
+          // For combos that have completed animation, use black
+          fill(0);
+        } else {
+          // For non-animated hinted combos that haven't been through animation, use hint color (red)
+          fill(COLORS.vesselHint);
+        }
+        
+        text(fullComboText, textLeftMargin, y);
+      } else {
+        // For incomplete combos, just show the ingredient count
+        fill('#333333'); // Darker gray for incomplete
+        noStroke();
+        textStyle(NORMAL);
+        text(fullComboText, textLeftMargin, y);
       }
     }
     
-    // --- DRAW DIVIDER ---
-    const dividerX = startX + comboWidth + (dividerWidth / 2);
+    // Restore drawing context
+    pop();
+  }
+
+  // Helper function to calculate text width based on different conditions
+  function calculateTextWidth(text) {
+    return textWidth(text);
+  }
+
+  // New separate function for drawing mistake counters - APlasker
+  function drawMistakeCounters() {
+    // Isolate drawing context for mistake counters
+    push();
+    
+    // Position mistake counters at 75% from the top of the play area
+    const counterY = playAreaY + playAreaHeight * 0.75;
+    
+    // Center of the play area for overall positioning
+    const centerX = playAreaX + playAreaWidth / 2;
+    
+    // --- WRONGO COUNTER SECTION ---
+    const totalErrorSlots = 4; // Show 4 slots for wrongos - APlasker
+    
+    // Filter moveHistory to only include error markers (black only) - APlasker
+    const filteredMoveHistory = moveHistory.filter(move => 
+      move === 'black' || move === '#333333');
+    
+    // Limit the number of counters to display
+    const displayCount = Math.min(filteredMoveHistory.length, totalErrorSlots);
+    
+    // Update circle sizing parameters to match requested specs - APlasker
+    // Reduced to 75% of original size
+    // Original: Minimum size: 18px for small screens
+    // Now: Minimum size: 13.5px for small screens
+    const circleSize = Math.min(Math.max(width * 0.015, 13.5), 16.5); // 75% of original values
+    
+    // Update element spacing to match requested specs - APlasker
+    // Reduced to 75% of original size
+    const elementSpacing = Math.min(Math.max(width * 0.0075, 3.75), 7.5); // 75% of original values
+    
+    // Double the spacing between text and first counter
+    const textToFirstCounterSpacing = elementSpacing * 2;
+    
+    // Calculate the total width of all elements with consistent spacing
+    const totalWidth = (circleSize * totalErrorSlots) + (elementSpacing * (totalErrorSlots - 1)) + textToFirstCounterSpacing;
+    
+    // Calculate label width based on available space - fixed proportion
+    const labelFontSize = Math.max(circleSize * 0.6, 10.5); // Text size for "Mistakes:" (75% of original)
+    textFont(bodyFont);
+    textStyle(BOLD);
+    textSize(labelFontSize); // Set the font size before measuring text width
+    const labelWidth = textWidth("Mistakes:") + textToFirstCounterSpacing; // Use the doubled spacing after colon
+    
+    // Calculate total width needed for the entire mistake counter group
+    const groupWidth = labelWidth + (circleSize * totalErrorSlots) + (elementSpacing * (totalErrorSlots - 1));
+    
+    // Calculate starting position to center the entire group
+    const groupStartX = centerX - (groupWidth / 2);
+    
+    // --- RESET ALL TEXT PROPERTIES FOR CONSISTENCY - APlasker ---
+    textFont(bodyFont);
+    textStyle(NORMAL);
+    
+    // Draw "Mistakes:" label
+    textAlign(LEFT, CENTER); // Changed back to LEFT align for consistent spacing
+    textSize(labelFontSize);
+    textStyle(BOLD);
     fill('black');
     noStroke();
-    textAlign(CENTER, CENTER);
-    // Increase emoji size to better match counter size
-    textSize(Math.max(circleSize * 0.8, 16)); // Increased from 0.6 to 0.8 for larger emoji, min 16px
-    textStyle(NORMAL); // Reset text style for divider - APlasker
-    text("🍴", dividerX, counterY);
+    text("Mistakes:", groupStartX, counterY);
     
-    // --- DRAW WRONGO COUNTERS ---
-    // Reset text properties before drawing wrongo counters - APlasker
-    textFont(bodyFont);
-    textSize(Math.max(circleSize * 0.5, 12)); // Relative text size, min 12px
-    textStyle(BOLD);
-    
-    // Draw "Wrongos:" label -- now called "Mistakes:"
-    textAlign(LEFT, CENTER);
-    const errorLabelX = dividerX + (dividerWidth / 2);
-    text("Mistakes:", errorLabelX, counterY);
+    // Calculate starting position of first counter after label with doubled spacing
+    const firstCounterX = groupStartX + textWidth("Mistakes:") + textToFirstCounterSpacing;
     
     // Draw error circles - both filled and empty placeholders
     for (let i = 0; i < totalErrorSlots; i++) {
-      // Fixed spacing using the wider wrongoLabelWidth to prevent overlap - APlasker
-      const x = errorLabelX + wrongoLabelWidth + (i * errorSpacing);
+      // Position circles with consistent spacing
+      const x = firstCounterX + (i * (circleSize + elementSpacing));
       const y = counterY;
       
       if (i < displayCount) {
         // Filled error counter (black)
         fill('black');
         stroke('black');
-        strokeWeight(2); // Increased to 2px to match vessel outline
+        strokeWeight(1.5); // Reduced from 2px (75% of original)
         circle(x, y, circleSize);
         
         // If there are 5+ wrongos, add red X's to wrongo counters - APlasker
         if (filteredMoveHistory.length >= 5) {
           stroke(COLORS.vesselHint); // Changed to burnt orange hint color - APlasker
-          strokeWeight(Math.max(circleSize * 0.1, 2)); // Relative stroke weight, min 2px
+          strokeWeight(Math.max(circleSize * 0.1, 1.5)); // Relative stroke weight, min 1.5px (75% of original)
           // Draw X with the same vertical adjustment as the combo numbers
           const offsetY = circleSize * 0.05; // Reduced from 0.1 to 0.05 (split the difference)
           line(x - circleSize/3, y - circleSize/3 + offsetY, x + circleSize/3, y + circleSize/3 + offsetY);
@@ -501,25 +829,9 @@ function drawWinMoveHistory(x, y, width, height) {
         // Empty error placeholder - 25% opacity black (reduced from 50%) - APlasker
         fill('rgba(0, 0, 0, 0.25)');
         stroke('black');
-        strokeWeight(2); // Increased to 2px to match vessel outline
+        strokeWeight(1.5); // Reduced from 2px (75% of original)
         circle(x, y, circleSize);
       }
-    }
-    
-    // --- UPDATE HINT BUTTON POSITION TO APPEAR BELOW COUNTERS - APlasker ---
-    if (hintButton) {
-      // Position hint button below counters with more spacing from bottom of screen
-      const newHintButtonY = counterY + circleSize + Math.max(playAreaHeight * 0.05, 30); // Increased from fixed 20px to 5% of play area height (min 30px)
-      hintButton.y = newHintButtonY;
-      
-      // Update global hintButtonY variable for other references
-      hintButtonY = newHintButtonY;
-      // Also update initialHintButtonY for the HintVessel positioning
-      initialHintButtonY = newHintButtonY;
-      
-      // Update hint button styling - make border black and text bold
-      hintButton.borderColor = 'black'; // Add black border
-      hintButton.textBold = true; // Make text bold
     }
     
     // Restore drawing context
@@ -671,10 +983,64 @@ function drawWinMoveHistory(x, y, width, height) {
     ellipse(x, y, petalSize, petalSize);
   }
 
+  // New function to draw loading animation with color-changing flowers
+  function drawLoadingAnimation() {
+    // Calculate the center of the play area
+    const centerX = width / 2;
+    const centerY = height / 2;
+    
+    // Calculate responsive flower size based on screen dimensions
+    const flowerSize = min(max(playAreaWidth * 0.02, 8), 12);
+    
+    // Define the circle of flowers parameters
+    const numFlowers = 8; // Number of flowers in the circle
+    const circleRadius = min(playAreaWidth * 0.15, 80); // Size of the circle
+    
+    // Array of colors to cycle through
+    const colorArray = [
+      COLORS.primary,   // Green
+      COLORS.secondary, // Orange
+      COLORS.tertiary   // Yellow
+    ];
+    
+    // Draw flowers in a circle
+    for (let i = 0; i < numFlowers; i++) {
+      // Calculate position around the circle
+      const angle = (TWO_PI / numFlowers) * i;
+      const x = centerX + cos(angle) * circleRadius;
+      const y = centerY + sin(angle) * circleRadius;
+      
+      // Determine flower color by shifting based on frameCount
+      // This creates a cycling color effect with no fading
+      const colorIndex = (i + floor(frameCount / 15)) % colorArray.length;
+      const flowerColor = colorArray[colorIndex];
+      
+      // Draw the flower
+      drawFlower(x, y, flowerSize, flowerColor);
+    }
+    
+    // Center flower removed as requested
+  }
+
   function draw() {
     // Set background color
     background(COLORS.background);
     
+    // Check if we're still loading recipe data (initial loading state only)
+    if (isLoadingRecipe) {
+      // Draw loading animation only during initial loading
+      drawLoadingAnimation();
+      
+      // Draw floral pattern border if there's space - moved here from outside
+      drawFloralBorder();
+      
+      // Draw top and bottom flowers on narrow screens - moved here from outside
+      drawTopBottomFlowers();
+      
+      return;
+    }
+    
+    // Only draw decorative flowers after loading is complete
     // Draw floral pattern border if there's space
     drawFloralBorder();
     
@@ -683,22 +1049,6 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Ensure no stroke for all text elements
     noStroke();
-    
-    // Check if we're still loading recipe data
-    if (isLoadingRecipe) {
-      // Draw loading screen
-      textAlign(CENTER, CENTER);
-      textSize(24);
-      fill('#333');
-      text("Loading today's recipe...", width/2, height/2);
-      
-      // Show current EST time for debugging
-      textSize(14);
-      const estTime = getCurrentESTTime();
-      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
-      
-      return;
-    }
     
     // Check if there was an error loading recipe data
     if (loadingError) {
@@ -728,6 +1078,19 @@ function drawWinMoveHistory(x, y, width, height) {
       console.log("No vessels initialized yet, calling initializeGame()");
       initializeGame();
       return;
+    }
+    
+    // Update hint animation progress if active
+    if (hintAnimationActive) {
+      hintAnimationProgress += 1 / hintAnimationDuration;
+      if (hintAnimationProgress >= 1) {
+        hintAnimationProgress = 1;
+        // When animation completes, add to completed animations list
+        if (hintAnimationTarget && !completedAnimations.includes(hintAnimationTarget)) {
+          completedAnimations.push(hintAnimationTarget);
+        }
+        hintAnimationActive = false; // Deactivate animation once complete
+      }
     }
     
     // Add safety check for vessel initialization - APlasker
@@ -797,7 +1160,7 @@ function drawWinMoveHistory(x, y, width, height) {
           bylineTimer--;
           if (bylineTimer === 0 && bylineTransitionState === "stable") {
             // Reset to default byline when timer expires with fade transition
-            updateBylineWithTransition("Drag & drop to combine ingredients!");
+            updateBylineWithTransition("Drop one ingredient on to another to combine!"); // Updated default byline - APlasker
           }
         }
         
@@ -808,8 +1171,13 @@ function drawWinMoveHistory(x, y, width, height) {
           const currentInactivityThreshold = baseInactivityThreshold * (inactivityReminderCount + 1);
           
           if (frameCount - lastAction > currentInactivityThreshold) {
-            // Set hint byline with transition
-            updateBylineWithTransition("Stuck? Use a Hint!", bylineHintDuration);
+            // Choose message based on whether this is the first inactivity message - APlasker
+            if (!firstInactivityMessageShown) {
+              updateBylineWithTransition("Need the rules? Tap the question mark!", bylineHintDuration);
+              firstInactivityMessageShown = true;
+            } else {
+              updateBylineWithTransition("Stuck? Use a Hint!", bylineHintDuration);
+            }
             // Update lastAction to prevent repeated triggers
             lastAction = frameCount;
             // Increment the reminder count for next time
@@ -825,11 +1193,9 @@ function drawWinMoveHistory(x, y, width, height) {
         // Draw start screen with animated demo and recipe stats
         drawStartScreen();
       } else {
-        // Show a loading message while waiting for recipe data
-        textAlign(CENTER, CENTER);
-        textSize(24);
-        fill('#333');
-        text("Loading recipe information...", width/2, height/2);
+        // Just draw the title while waiting for recipe data - no animation
+        // This ensures we don't have another loading animation phase
+        drawTitle();
         
         // Draw the help icon even during loading
         drawHelpIcon();
@@ -868,9 +1234,14 @@ function drawWinMoveHistory(x, y, width, height) {
       // This updates the hint button position, so call it BEFORE drawing the hint button
       drawGameCounters();
       
+      // Draw mistake counters separately (at 75% from top)
+      drawMistakeCounters();
+      
       // Check if only the final combination remains and disable hint button if so
       let onlyFinalComboRemains = isOnlyFinalComboRemaining();
-      hintButton.disabled = onlyFinalComboRemains;
+      
+      // Update hint button disabled state based on hint availability
+      hintButton.disabled = onlyFinalComboRemains || !areHintsAvailable();
       
       // Check for auto final combination sequence
       if (onlyFinalComboRemains && !autoFinalCombinationStarted && !finalAnimationInProgress) {
@@ -909,14 +1280,8 @@ function drawWinMoveHistory(x, y, width, height) {
         }
       }
       
-      // Draw hint button or hint vessel
-      if (showingHint && hintVessel) {
-        hintVessel.update();
-        hintVessel.draw();
-      } else {
-        // Draw the hint button
-        hintButton.draw();
-      }
+      // Draw hint button (removed hint vessel code)
+      hintButton.draw();
       
       // Separate animations by type for proper layering
       let regularAnimations = [];
@@ -991,7 +1356,9 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Calculate title size relative to play area width
     // Increased by 15% from the original value
-    const titleSize = Math.max(playAreaWidth * 0.063, 35); // Increased from 0.055 to 0.063, min from 30 to 35
+    const titleSize = gameStarted ? 
+      Math.max(playAreaWidth * 0.063 * 0.75, 26) : // Game screen: 75% smaller, min 26px (reduced from 35)
+      Math.max(playAreaWidth * 0.063, 35);         // Title screen: original size
     textSize(titleSize);
     
     // Use a bold sans-serif font
@@ -1032,8 +1399,8 @@ function drawWinMoveHistory(x, y, width, height) {
     // For title screen: positioned at 35% of play area height (changed from 40%)
     // For game screen: positioned at 8% of play area height (increased from 6.5%)
     const titleY = gameStarted ? 
-      playAreaY + (playAreaHeight * 0.08) : // Game screen position (increased from 6.5% to 8%)
-      playAreaY + (playAreaHeight * 0.35);   // Title screen position (changed from 0.40 to 0.35)
+      playAreaY + (playAreaHeight * 0.05) : // Game screen position (reduced from 8% to 5%)
+      playAreaY + (playAreaHeight * 0.32);   // Title screen position (reduced from 0.35 to 0.32)
     
     // Draw each letter with alternating colors
     for (let i = 0; i < title.length; i++) {
@@ -1112,8 +1479,8 @@ function drawWinMoveHistory(x, y, width, height) {
     // Only draw byline on game screen (not tutorial or win screens)
     if (!gameStarted || gameWon) return;
     
-    // Position byline at 13% of play area height from the top
-    const bylineY = playAreaY + (playAreaHeight * 0.13); // Changed from 12% to 13% of play area height
+    // Position byline at 10% of play area height from the top (moved up by 3%)
+    const bylineY = playAreaY + (playAreaHeight * 0.10); // Changed from 13% to 10% of play area height
     
     // Calculate byline size based on play area dimensions - match tutorial text
     const bylineSize = Math.max(playAreaWidth * 0.035, 14); // Same as description size in tutorial
@@ -1221,8 +1588,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // ENHANCEMENT - APlasker - Update version to reflect animation speed improvements- SIGNATURE VERSION
-    const versionText = "v20250421.1752 - Playsker";
+    // ENHANCEMENT - APlasker - Update version to reflect byline system improvements
+    const versionText = "v20250502.1408 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);

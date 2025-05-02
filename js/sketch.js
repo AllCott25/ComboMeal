@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v0.0417.02
+ * Culinary Logic Puzzle v0.0423.04
  * Created by APlasker
- * Last Updated: April 17, 2025 (19:45 EDT) by APlasker
+ * Last Updated: April 23, 2025 (19:19 EDT) by APlasker
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -41,9 +41,8 @@ let intermediate_combinations = [
   let startButton;
   let continueButton;
   let skipTutorialButton;
-  let showingHint = false;
-  let hintVessel = null;
-  let lastHintCombo = null;
+  let lastHintTime = 0; // Track when the last hint was requested
+  let hintCooldown = 500; // 0.5 second cooldown between hints (in milliseconds)
   let hintButton;
   let isMobile = false;
   let hintButtonY; // Position of the hint button 
@@ -55,7 +54,6 @@ let intermediate_combinations = [
   let persistentFlowerAnimation = null; // New global variable for persistent flower animation
   let activePartialCombo = null; // Track the currently active partial combination
   let partialCombinations = []; // Track all partial combinations that have been started
-  let hintedCombo = null; // Track the combination that is currently being hinted
   let autoFinalCombination = false; // Flag for automatic final combination sequence - APlasker
   let autoFinalCombinationStarted = false; // Flag to track if sequence has started - APlasker
   let autoFinalCombinationTimer = 0; // Timer for sequencing combinations - APlasker
@@ -65,11 +63,10 @@ let intermediate_combinations = [
   let autoFinalCombinationShakeDuration = 30; // 0.5 seconds at 60fps for shake animation - APlasker
   
   // Byline state variables - APlasker
-  let currentByline = "Drag & drop to combine ingredients!"; // Default byline
+  let currentByline = "Drop one ingredient on to another to combine!"; // Updated default byline - APlasker
   let nextByline = ""; // Store the upcoming byline message
-  let bylineTimer = 0; // Timer to track when to revert to default
-  let bylineDefaultDuration = 450; // 15 seconds at 30fps (reduced from 900)
-  let bylineHintDuration = 105; // 3.5 seconds at 30fps for non-default messages (reduced from 210)
+  let bylineTimer = 0; // Timer for temporary bylines, counts down frames
+  let bylineHintDuration = 210; // 7 seconds at 30fps - temporary byline display duration
   let lastAction = 0; // Track the last time the player took an action
   let inactivityReminderCount = 0; // Track how many inactivity reminders have been shown
   let baseInactivityThreshold = 300; // 10 seconds at 30fps - base inactivity threshold (reduced from 600)
@@ -80,14 +77,21 @@ let intermediate_combinations = [
   let transitionDuration = 0; // Duration to display message after transition
   
   // Success messages to display when combinations are created - APlasker
-  const successMessages = ["Smells good! Whatcha making?", "It's almost dinner time!"];
+  const successMessages = [
+    "Smells good!", 
+    "It's almost dinner time!", 
+    "I could eat", 
+    "Ooh whatcha makin?",
+    "The secret ingredient is love"
+  ];
   
   // Partial combo messages to display when yellow vessels are created - APlasker
   const partialComboMessages = [
     "Classic combination!",
     "Those definitely go together",
     "Ok now I'm getting hungry",
-    "Chop chop!"
+    "Chop chop!",
+    "Aww they like each other"
   ];
   // Track if first partial combo has been created and which messages have been used
   let firstPartialComboCreated = false;
@@ -95,12 +99,13 @@ let intermediate_combinations = [
   
   // Error messages to display when incorrect combinations are attempted - APlasker
   const errorMessages = [
-    "Sounds tasty, but not quite right",
-    "That's not exactly how you cook this dish",
+    "Something doesn't taste right",
+    "Yum but no",
     "Need a peek at the recipe? Try a hint!",
     "Keep combo and carry onbo",
-    "So close! What else sounds good?",
-    "That'd work in a different recipe"
+    "So close!",
+    "Oopsy daisy",
+    "What else can you add?"
   ];
   // Track error message state
   let firstErrorOccurred = false;
@@ -281,7 +286,8 @@ let intermediate_combinations = [
   // Animation class for dramatic verb reveals
   class VerbAnimation {
     constructor(verb, x, y, vesselRef) {
-      this.verb = verb;
+      // Transform verb to uppercase and add exclamation mark
+      this.verb = verb.toUpperCase() + "!";
       this.startX = x; // Starting position (over vessel)
       this.startY = y;
       
@@ -497,6 +503,8 @@ let intermediate_combinations = [
       this.disabled = false; // Add disabled state
       this.borderColor = borderColor; // New property for custom border color
       this.textBold = false; // New property for bold text
+      this.isCircular = false; // New property to determine if button is circular
+      this.textSizeMultiplier = 1.0; // New property to adjust text size (default: normal size)
     }
     
     draw() {
@@ -529,10 +537,17 @@ let intermediate_combinations = [
       strokeWeight(strokeW); // Relative stroke weight
       }
       
+      // Draw either a circle or rounded rectangle based on isCircular property
+      if (this.isCircular) {
+        // For circular buttons, use the width as diameter
+        circle(this.x, this.y, this.w);
+      } else {
+        // For rectangular buttons, use the standard rectangle
       rect(this.x, this.y, this.w, this.h, cornerRadius);
+      }
       
-      // Calculate font size relative to button height (smaller proportion)
-      const fontSize = Math.max(this.h * 0.3, 14); // 30% of button height, minimum 14px
+      // Calculate font size relative to button height, applying the text size multiplier
+      const fontSize = Math.max(this.h * 0.3 * this.textSizeMultiplier, 7); // 30% of button height * multiplier, minimum 7px
       textSize(fontSize);
       
       // Draw label
@@ -562,8 +577,17 @@ let intermediate_combinations = [
     }
     
     isInside(x, y) {
-      return !this.disabled && x > this.x - this.w/2 && x < this.x + this.w/2 && 
+      if (this.disabled) return false;
+      
+      if (this.isCircular) {
+        // For circular buttons, check if point is within circle
+        const distance = dist(x, y, this.x, this.y);
+        return distance <= this.w / 2;
+      } else {
+        // For rectangular buttons, use the standard boundary check
+        return x > this.x - this.w/2 && x < this.x + this.w/2 && 
              y > this.y - this.h/2 && y < this.y + this.h/2;
+      }
     }
     
     checkHover(x, y) {
@@ -576,288 +600,6 @@ let intermediate_combinations = [
         return true;
       }
       return false;
-    }
-  }
-  
-  // Hint Vessel class - extends Vessel with hint-specific functionality
-  class HintVessel {
-    constructor(combo) {
-      this.name = combo.name;
-      this.required = [...combo.required];
-      this.collected = [];
-      
-      // ENHANCEMENT - APlasker - Separate base ingredients from combinations
-      // These arrays will help us track what's still needed
-      this.baseRequired = [];
-      this.comboRequired = [];
-      
-      // Determine which required items are base ingredients vs combinations
-      for (const item of this.required) {
-        // Check if this item is the name of an intermediate combination
-        // Add safety check to ensure intermediate_combinations exists
-        const isCombo = typeof intermediate_combinations !== 'undefined' && 
-                       intermediate_combinations ? 
-                       intermediate_combinations.some(c => c.name === item) : 
-                       false;
-        if (isCombo) {
-          this.comboRequired.push(item);
-        } else {
-          this.baseRequired.push(item);
-        }
-      }
-      
-      console.log(`HintVessel for ${this.name} - Base ingredients: ${this.baseRequired.length}, Combinations: ${this.comboRequired.length}`);
-      
-      // Position the hint vessel at the same position as the hint button
-      this.x = width * 0.5; // Center horizontally
-      
-      // Add a smaller vertical offset to split the difference between original and current position
-      // Calculate the offset as a percentage of the screen height, but halve it
-      const verticalOffset = Math.max(windowHeight * 0.015, 10); // 1.5% of screen height, minimum 10px
-      console.log(`Adding reduced vertical offset of ${verticalOffset}px to hint vessel position`);
-      
-      // Use the fixed initial hint button position + reduced vertical offset
-      this.y = initialHintButtonY + verticalOffset;
-      
-      // Calculate dimensions to exactly match other advanced vessels - Updated by APlasker
-      // Use the same formula as in arrangeVessels function
-      const margin = Math.max(playAreaWidth * 0.0125, 3); // 1.25% of play area width, min 3px
-      const basic_w = (playAreaWidth - (4 * margin)) / 3; // 3 vessels per row with margins
-      
-      // Use the exact same width and height as advanced vessels
-      this.w = basic_w * 2 + margin; // Same as advanced vessels
-      this.h = basic_w * 0.8; // Same height as basic vessels (updated to match)
-      
-      // ENHANCEMENT - APlasker - Set vessel properties for advanced drawing and interactions
-      this.isAdvanced = true;
-      
-      // Use separate scales for body and text to match Vessel class
-      this.scale = 1;
-      this.targetScale = 1;
-      this.bodyScale = 1;
-      this.targetBodyScale = 1;
-      this.textScale = 1;
-      this.targetTextScale = 1;
-      
-      // Highlight as hint vessel
-      this.color = COLORS.vesselHint; // Red for hint vessels
-    }
-    
-    update() {
-      // Scale animation now uses both bodyScale and textScale
-      this.scale = lerp(this.scale, this.targetScale, 0.2); // Legacy
-      this.bodyScale = lerp(this.bodyScale, this.targetBodyScale, 0.2);
-      this.textScale = lerp(this.textScale, this.targetTextScale, 0.2);
-    }
-    
-    draw() {
-      // Isolate drawing context for the hint vessel
-      push();
-      
-      translate(this.x, this.y);
-      // Use bodyScale for the vessel body
-      scale(this.bodyScale);
-      
-      // Draw pot handles (small circles) BEHIND the main shape
-      fill('#888888');
-      stroke('black');
-      
-      // MODIFIED - Use screen height as reference for stroke weight to match other vessels
-      const strokeW = Math.max(windowHeight * 0.0025, 2); // 0.25% of screen height, minimum 2px
-      strokeWeight(strokeW);
-      
-      // Position handles slightly lower and half-overlapping with the main shape
-      // Move handles a bit past the edge of the pot - updated to match Vessel class
-      circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, this.h * 0.2);
-      circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, this.h * 0.2);
-      
-      // Draw vessel (pot body)
-      fill(this.color);
-      stroke('black');
-      strokeWeight(strokeW);
-      
-      // Calculate border radius to match regular vessels
-      const topCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px
-      const bottomCornerRadius = Math.max(this.h * 0.3, 15); // 30% of height, min 15px
-      
-      // Draw pot body with rounded corners matching vessel class - updated position
-      rectMode(CENTER);
-      rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
-      
-      // Reset scale to apply textScale for text
-      scale(1/this.bodyScale * this.textScale);
-      
-      // Draw combo name and progress indicator as a centered block
-      fill('black'); // Updated to match vessel class
-      noStroke();
-      textAlign(CENTER, CENTER);
-      
-      // MODIFIED - Use screen height as reference for font size to match other vessels
-      const fontSize = Math.max(windowHeight * 0.015, 10); // 1.5% of screen height, minimum 10px
-      textSize(fontSize);
-      textStyle(BOLD); // Added to match vessel class
-      
-      // Calculate the height of both text elements together
-      const lineHeight = fontSize * 1.2;
-      const totalTextHeight = lineHeight * 2; // Two lines: name and progress
-      
-      // Position both lines as a centered block - vertically centered in the vessel
-      // Offset the entire block to match the vessel body position (-this.h * 0.1)
-      const centerY = -this.h * 0.1;
-      
-      // Draw name on first line (half a line up from center)
-      text(this.name, 0, centerY - lineHeight/2);
-      
-      // Draw progress indicator on second line (half a line down from center)
-      text(`${this.collected.length}/${this.required.length}`, 0, centerY + lineHeight/2);
-      
-      // Reset text style
-      textStyle(NORMAL);
-      
-      // Restore drawing context
-      pop();
-    }
-    
-    isInside(x, y) {
-      return x > this.x - this.w / 2 && x < this.x + this.w / 2 && y > this.y - this.h / 2 && y < this.y + this.h / 2;
-    }
-    
-    addIngredient(ingredient) {
-      // Check if the ingredient is a required ingredient or combination and not already collected
-      if (this.required.includes(ingredient) && !this.collected.includes(ingredient)) {
-        this.collected.push(ingredient);
-        this.pulse();
-        
-        // Update our tracking of what's still required
-        if (this.baseRequired && this.baseRequired.includes(ingredient)) {
-          // Remove from baseRequired if it's a base ingredient
-          this.baseRequired = this.baseRequired.filter(item => item !== ingredient);
-        } else if (this.comboRequired && this.comboRequired.includes(ingredient)) {
-          // Remove from comboRequired if it's a combination
-          this.comboRequired = this.comboRequired.filter(item => item !== ingredient);
-        }
-        
-        return true;
-      }
-      return false;
-    }
-    
-    isComplete() {
-      // Check that we've collected all required items (base ingredients AND combinations)
-      return this.collected.length === this.required.length && 
-             this.required.every(ing => this.collected.includes(ing));
-    }
-    
-    pulse(duration = 150) {
-      console.log(`Pulse method called for hint vessel: ${this.name || "unnamed"}`);
-      
-      // Update to use separate body and text scales to match Vessel class
-      this.targetBodyScale = 1.2;
-      this.targetTextScale = 1.1;
-      this.targetScale = 1.2; // Legacy
-      
-      // Reset scales after duration
-      setTimeout(() => { 
-        this.targetBodyScale = 1;
-        this.targetTextScale = 1;
-        this.targetScale = 1;
-      }, duration);
-      
-      console.log(`Pulsing hint vessel ${this.name || "unnamed"} with bodyScale=${this.targetBodyScale}, textScale=${this.targetTextScale}, duration=${duration}ms`);
-    }
-    
-    // Add bouncePulse method for consistency with Vessel class
-    bouncePulse() {
-      console.log(`Bounce pulse animation started for hint vessel: ${this.name || "unnamed"}`);
-      
-      // Initial bounce magnitudes and durations - 3 bounces total
-      const bounces = [
-        { bodyScale: 1.25, textScale: 1.15, duration: 600 },  // First bounce - largest
-        { bodyScale: 1.15, textScale: 1.08, duration: 450 },  // Second bounce - medium
-        { bodyScale: 1.08, textScale: 1.04, duration: 300 }   // Third bounce - small
-      ];
-      
-      // Function to execute a single bounce with specified parameters
-      const executeBounce = (index) => {
-        // Skip if we've finished all bounces or vessel is no longer valid
-        if (index >= bounces.length || !showingHint || !hintVessel || hintVessel !== this) {
-          return;
-        }
-        
-        const bounce = bounces[index];
-        
-        // Set target scales for this bounce
-        this.targetBodyScale = bounce.bodyScale;
-        this.targetTextScale = bounce.textScale;
-        this.targetScale = bounce.bodyScale; // Legacy support
-        
-        console.log(`Hint vessel bounce ${index+1} - magnitude: ${bounce.bodyScale.toFixed(2)}`);
-        
-        // Reset to normal size after duration
-        setTimeout(() => {
-          // Return to normal size
-          this.targetBodyScale = 1;
-          this.targetTextScale = 1;
-          this.targetScale = 1;
-          
-          // Wait a brief moment before starting the next bounce
-          setTimeout(() => {
-            // Move to next bounce in sequence
-            executeBounce(index + 1);
-          }, 150); // 150ms gap between bounces
-          
-        }, bounce.duration);
-      };
-      
-      // Start the bounce sequence
-      executeBounce(0);
-    }
-    
-    // Convert to a regular vessel when complete but keep it red
-    toVessel() {
-      console.log(`Converting hint vessel to regular vessel: ${this.name || "unnamed"}`);
-      
-      // Calculate appropriate vessel dimensions based on play area size
-      const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
-      const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
-      
-      let v = new Vessel([], [], this.name, COLORS.vesselHint, this.x, this.y, vesselWidth, vesselHeight);
-      v.isAdvanced = true; // Mark as advanced for proper rendering
-      
-      // Use bouncePulse for hint-completed vessels to emphasize the achievement
-      console.log("Using bounce pulse for hint-completed vessel");
-      v.bouncePulse(); // Use new bounce pulse animation
-      
-      // Find and set the verb from the combination
-      for (let combo of intermediate_combinations) {
-        if (combo.name === this.name && combo.verb) {
-          v.verb = combo.verb;
-          v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
-          console.log(`Setting verb "${v.verb}" for hint-completed vessel: ${this.name}`);
-          break;
-        }
-      }
-      
-      // If it's the final combination, check that as well
-      if (!v.verb && final_combination.name === this.name) {
-        if (final_combination.verb) {
-          v.verb = final_combination.verb;
-          v.verbDisplayTime = 120; // Display for 120 frames
-          console.log(`Setting verb "${v.verb}" for hint-completed final vessel`);
-        } else {
-          // Fallback verb for final combination if none exists
-          v.verb = "Prepare";
-          v.verbDisplayTime = 120;
-          console.log("Using fallback verb for hint-completed final vessel");
-        }
-      }
-      
-      // Add to completedGreenVessels with isHint flag - APlasker
-      if (!completedGreenVessels.some(vessel => vessel.name === this.name)) {
-        completedGreenVessels.push({name: this.name, isHint: true});
-      }
-      
-      return v;
     }
   }
   
@@ -1638,7 +1380,8 @@ let intermediate_combinations = [
     
     // Check if help modal was active but is now inactive,
     // ensure HTML elements are properly cleaned up
-    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && helpModal.htmlElements.length > 0) {
+    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && 
+        helpModal.htmlElements && helpModal.htmlElements.length > 0) {
       helpModal.removeHTMLElements();
     }
     
@@ -2003,8 +1746,12 @@ let intermediate_combinations = [
     usedErrorMessages = [];
     
     // Reset byline to default - APlasker
-    currentByline = "Drag & drop to combine ingredients!";
+    currentByline = "Drop one ingredient on to another to combine!"; // Updated default byline - APlasker
+    nextByline = "";
     bylineTimer = 0;
+    bylineTransitionState = "stable";
+    bylineOpacity = 255;
+    isTransitioning = false;
     
     // Force a re-arrangement of vessels to ensure proper positioning
     console.log("Ensuring vessels are properly arranged");
@@ -2328,7 +2075,26 @@ let intermediate_combinations = [
     hintCount = 0; // Reset hint count when game starts
     completedGreenVessels = []; // Reset completed green vessels - APlasker
     partialCombinations = []; // Reset partial combinations
-    hintedCombo = null; // Reset the hinted combination
+    hintedCombos = []; // Track which combos have been hinted
+    hintedCombo = null; // Currently highlighted combo for recipe card
+    lastHintTime = 0; // Track when the last hint was requested
+    hintCooldown = 500; // 0.5 second cooldown between hints (in milliseconds)
+    
+    // Reset byline state
+    currentByline = "Drop one ingredient on to another to combine!"; // Updated default byline - APlasker
+    nextByline = "";
+    bylineTimer = 0;
+    bylineTransitionState = "stable";
+    bylineOpacity = 255;
+    isTransitioning = false;
+    
+    // Reset message tracking
+    firstErrorOccurred = false;
+    firstPartialComboCreated = false;
+    usedPartialComboMessages = [];
+    usedErrorMessages = [];
+    firstInactivityMessageShown = false; // Added to track first inactivity message - APlasker
+    inactivityReminderCount = 0;
   }
   
   // Function to get current time in EST for debugging
@@ -2391,7 +2157,7 @@ let intermediate_combinations = [
     
     // Check if help modal was active but is now inactive,
     // ensure HTML elements are properly cleaned up
-    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && helpModal.htmlElements.length > 0) {
+    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && helpModal.htmlElements && helpModal.htmlElements.length > 0) {
       helpModal.removeHTMLElements();
     }
     
@@ -2488,8 +2254,11 @@ let intermediate_combinations = [
       const startX = vessel ? vessel.x : playAreaX + playAreaWidth/2;
       const startY = vessel ? vessel.y : playAreaY + playAreaHeight/2;
       
+      // Transform verb to uppercase and add exclamation mark before calling parent constructor
+      const transformedVerb = verb.toUpperCase() + "!";
+      
       // Call parent constructor with vessel reference
-      super(verb, startX, startY, vessel);
+      super(transformedVerb, startX, startY, vessel);
       
       // Override properties for more dramatic effect
       this.maxSize = playAreaWidth; // Limit to exact play area width (was playAreaWidth * 1.2)
@@ -2943,8 +2712,8 @@ let intermediate_combinations = [
   
   // Function to draw the help icon
   function drawHelpIcon() {
-    // Calculate the 90% horizontal position in the play area
-    const finalCircleX = playAreaX + (playAreaWidth * 0.9);
+    // Calculate the 93% horizontal position in the play area (moved from 90% to 93%)
+    const finalCircleX = playAreaX + (playAreaWidth * 0.93);
     
     // Position vertically at 2.25% of play area height from the top (updated from 1.5%)
     helpIconSize = Math.max(playAreaWidth * 0.04, 25); // 4% of play area width, minimum 25px
@@ -3217,76 +2986,6 @@ let intermediate_combinations = [
     const titleY = playAreaY + (playAreaHeight * 0.05);
     
     // Draw each letter with alternating colors
-  }
-  
-  function draw() {
-    // Set background color
-    background(COLORS.background);
-    
-    // Draw floral pattern border if there's space
-    drawFloralBorder();
-    
-    // Draw top and bottom flowers on narrow screens
-    drawTopBottomFlowers();
-    
-    // Ensure no stroke for all text elements
-    noStroke();
-    
-    // Check if we're still loading recipe data
-    if (isLoadingRecipe) {
-      // Draw loading screen
-      textAlign(CENTER, CENTER);
-      textSize(24);
-      fill('#333');
-      text("Loading today's recipe...", width/2, height/2);
-      
-      // Show current EST time for debugging
-      textSize(14);
-      const estTime = getCurrentESTTime();
-      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
-      
-      return;
-    }
-    
-    // Check if there was an error loading recipe data
-    if (loadingError) {
-      // ... existing loading error code ...
-      return;
-    }
-    
-    // Add a check for properly initialized vessels and force reinitialization if needed
-    if (vessels.length === 0 && !isLoadingRecipe) {
-      console.log("No vessels found, initializing game");
-      initializeGame();
-      return;
-    }
-    
-    // Verify vessel initialization is correct
-    if (gameStarted && vessels.some(v => !v.isInside || typeof v.isInside !== 'function')) {
-      console.log("Found improperly initialized vessels, resetting game");
-      resetGame();
-      return;
-    }
-    
-    // Remaining draw function code ...
-  }
-  
-  // Add a reset function to handle initialization issues
-  function resetGame() {
-    console.log("Resetting game due to initialization issues");
-    // Clear current state
-    vessels = [];
-    animations = [];
-    draggedVessel = null;
-    gameStarted = false;
-    gameWon = false;
-    
-    // Reset game flags
-    isLoadingRecipe = false;
-    loadingError = false;
-    
-    // Reinitialize
-    initializeGame();
   }
   
   
