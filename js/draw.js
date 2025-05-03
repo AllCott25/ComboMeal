@@ -1589,7 +1589,7 @@ function drawWinMoveHistory(x, y, width, height) {
     fill(100); // Gray color for version text
 
     // ENHANCEMENT - APlasker - Update version to reflect byline system improvements
-    const versionText = "v20250502.1408 - APlasker";
+    const versionText = "v20240502.1408 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);

@@ -1703,6 +1703,13 @@ let intermediate_combinations = [
       offsetY = 0;
     }
     
+    // Reset eggFound flag at the end of mouseReleased to ensure it's not carried over to next interaction
+    // This fixes the issue where the first drag after an egg combination doesn't work correctly
+    if (eggFound) {
+      console.log("Resetting eggFound flag at end of mouseReleased()");
+      eggFound = false;
+    }
+    
     // Reset hover states for all vessels
     for (let v of vessels) {
       v.hovering = false;

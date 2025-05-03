@@ -10,6 +10,7 @@
  * - Updated row 1 text to clarify dragging one ingredient onto another
  * - Updated row 2 text to reference the recipe card instead of combo icons
  * - Replaced red hint vessel with circular hint button to match current UI
+ * - Fixed base vessel color to display properly as white
  */
 
 // Global variable to track help modal state
@@ -96,7 +97,7 @@ function showHelpModal() {
       
       // Vessel configurations
       const vesselConfig = [
-        { name: "Carrots", color: "white", text: "Drag & drop one ingredient on to another to combine them step-by-step into a mystery recipe." },
+        { name: "Carrots", color: "vesselBase", text: "Drag & drop one ingredient on to another to combine them step-by-step into a mystery recipe." },
         { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow combos need more ingredients. Check the recipe card to see how much more to add." },
         { name: "Carrot Sheet Cake", color: "green", text: "Combos turn green & transform when you reach the next step. Keep combining until you've made the final dish!" },
         { type: "hintButton", text: "Use Hints to discover what to make next to help complete the dish." },
@@ -262,6 +263,53 @@ function wrapTextToWidth(text, maxWidth) {
   }
   
   return lines;
+}
+
+// Create a tutorial vessel with the same appearance as a game vessel but ensuring correct colors
+function createTutorialVessel(name, colorType, x, y, width, height) {
+  // Map color types to appropriate vessel configurations
+  let ingredients = [name]; // Use the name as the only ingredient
+  let complete_combinations = [];
+  let color;
+  let isComplete = false;
+  
+  // Configure vessel based on color type
+  if (colorType === "white" || colorType === "vesselBase") {
+    // Basic ingredient - use pure white
+    color = "white"; // We want pure white for better visibility in the help modal
+  } else if (colorType === "yellow") {
+    // Partial combination
+    color = COLORS.vesselYellow;
+    isComplete = false;
+  } else if (colorType === "green") {
+    // Complete combination
+    color = COLORS.green;
+    isComplete = true;
+  } else if (colorType === "red" || colorType === "#FF5252") {
+    // Hint vessel
+    color = COLORS.vesselHint;
+  }
+  
+  // Create a standard vessel with the right configuration
+  const vessel = new Vessel(ingredients, complete_combinations, name, color, x, y, width, height);
+  
+  // Configure for tutorial context
+  vessel.isTutorial = true;
+  vessel.isComplete = isComplete;
+  
+  // Ensure text formatting is consistent with game vessels
+  vessel.getDisplayText = function() {
+    return this.name;
+  };
+  
+  // Set proper text margin for correct text wrapping
+  vessel.textMargin = 0.75; // Use 75% of vessel width for text
+  
+  // Scale down both vessel body and text to 66% of normal size
+  vessel.bodyScale = 0.66;
+  vessel.textScale = 0.66;
+  
+  return vessel;
 }
 
 // Ensure showHelpModal is available globally
