@@ -1,7 +1,7 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: April 24, 2025 (APlasker)
+ * Last Updated: May 3, 2025 (APlasker)
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
@@ -40,8 +40,8 @@ function showHelpModal() {
       // Draw modal container with white background and red border
       rectMode(CENTER);
       fill(255); // White background
-      stroke(COLORS.secondary); // Red border (using game's secondary color)
-      strokeWeight(3);
+      stroke(0, 50); // Use the same subtle border as buttons (50% opacity black)
+      strokeWeight(2); // Match the buttons' stroke weight
       rect(this.x, this.y, this.width, this.height, 10); // Rounded corners (10px radius)
       
       // Draw X button in top-left corner
@@ -67,6 +67,12 @@ function showHelpModal() {
       textSize(this.width * 0.05); // 5% of modal width
       textStyle(BOLD);
       text("How to Play", this.x, this.y - this.height/2 + 35); // Changed from 30 to 35
+      
+      // Add underline to the title
+      const titleWidth = textWidth("How to Play");
+      stroke(0); // Black line
+      strokeWeight(1.5);
+      line(this.x - titleWidth/2, this.y - this.height/2 + 55, this.x + titleWidth/2, this.y - this.height/2 + 55);
       
       // Calculate vertical shift for content (2% of modal height up)
       const contentShift = this.height * 0.02;
@@ -179,8 +185,8 @@ function drawStarIcon(x, y, size) {
   // Use COLORS.tertiary for mustard yellow
   fill(COLORS.tertiary);
   
-  // Add black outline with same visual weight as vessels
-  stroke(0);
+  // Add subtle outline with same visual weight as vessels
+  stroke(0, 50); // Use the same subtle border as buttons
   strokeWeight(2);
   
   // Set parameters for a 5-pointed star
@@ -205,26 +211,23 @@ function drawStarIcon(x, y, size) {
 function drawHintButtonIcon(x, y, size) {
   push();
   
-  // Use COLORS.vesselHint for the hint button color (red)
+  // Use COLORS.vesselHint for hint button fill (red)
   fill(COLORS.vesselHint);
   
-  // Add black outline to match in-game button
-  stroke('black');
+  // Use the same subtle border as buttons
+  stroke(0, 50);
   strokeWeight(2);
   
-  // Draw the circular button
+  // Draw circular button
   circle(x, y, size);
   
-  // Draw the "Hint" text in white (matching the in-game button)
+  // Draw "Hint" text
   fill('white');
   noStroke();
   textAlign(CENTER, CENTER);
-  textSize(size * 0.25); // Size the text proportionally to fit in the button
+  textSize(size * 0.22); // Reduced from 0.30 to 0.22 to match the Recipe Card Hint button
   textStyle(BOLD);
-  text("Hint", x, y); // Center the text in the button
-  
-  // Reset text style
-  textStyle(NORMAL);
+  text("Hint", x, y);
   
   pop();
 }

@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v0.0423.04
+ * Culinary Logic Puzzle v0.0502.01
  * Created by APlasker
- * Last Updated: April 23, 2025 (19:19 EDT) by APlasker
+ * Last Updated: May 2, 2025 (21:59 EDT) by APlasker
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -763,20 +763,21 @@ let intermediate_combinations = [
         // Advanced vessel (pot or pan based on color)
         
         if (this.color === COLORS.green || this.color === COLORS.vesselGreen || this.color === COLORS.primary) {
-          // Green vessel (pan with long handle) - standardized for all green vessels
-          // Draw handle BEHIND the main shape
+          // Green vessel now using two circular handles like yellow vessels - APlasker
+          // Draw handles BEHIND the main shape
           fill('#888888');
-          stroke('black');
+          stroke(0, 50); // Use the same subtle border as buttons
           strokeWeight(strokeW);
-          rectMode(CENTER);
-          // Draw handle as thin horizontal rectangle - handle width reduced by 50% - APlasker
-          const handleCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px
-          rect(this.w * 0.48, -this.h * 0.2, this.w * 0.25, this.h * 0.15, handleCornerRadius);
+          // Position handles slightly lower and half-overlapping with the main shape
+          // Move handles a bit past the edge of the pot
+          const handleSize = this.h * 0.2;
+          circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
+          circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
         } else if (this.color === COLORS.vesselYellow || this.color === COLORS.vesselHint) {
           // Yellow or Red vessel (pot with two handles) - UNIFIED IMPLEMENTATION
           // Draw handles BEHIND the main shape
           fill('#888888');
-          stroke('black');
+          stroke(0, 50); // Use the same subtle border as buttons
           strokeWeight(strokeW);
           // Position handles slightly lower and half-overlapping with the main shape
           // Move handles a bit past the edge of the pot
@@ -787,7 +788,7 @@ let intermediate_combinations = [
         
         // Draw vessel body
         fill(vesselColor);
-        stroke('black');
+        stroke(0, 50); // Use the same subtle border as buttons
         strokeWeight(strokeW);
         
         // Calculate border radius to match basic vessels
@@ -801,7 +802,7 @@ let intermediate_combinations = [
       } else {
         // Basic ingredient vessel (rectangle with extremely rounded bottom corners)
         fill(vesselColor);
-        stroke('black');
+        stroke(0, 50); // Use the same subtle border as buttons
         strokeWeight(strokeW);
         
         // Calculate border radius relative to vessel height
@@ -2052,8 +2053,7 @@ let intermediate_combinations = [
       "Hint", 
       showHint, 
       'white', 
-      '#FF5252',
-      'black' // New parameter for black border
+      '#FF5252'
     );
     
     // Set text to bold
@@ -2070,6 +2070,9 @@ let intermediate_combinations = [
       COLORS.secondary, 
       'white'
     );
+    
+    // Set text to bold for Cook! button
+    startButton.textBold = true;
     
     // Reset game state
     gameWon = false;
@@ -2856,8 +2859,8 @@ let intermediate_combinations = [
     
     push();
     
-    // Determine the vessel outline color based on the fill color
-    let outlineColor = color === COLORS.vesselYellow || color === COLORS.vesselHint ? color : '#333';
+    // Determine the vessel outline color based on the fill color - now using subtle border for all
+    let outlineColor = color === COLORS.vesselYellow || color === COLORS.vesselHint ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.5)';
     
     // Set the stroke properties
     stroke(outlineColor);

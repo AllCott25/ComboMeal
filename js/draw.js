@@ -217,7 +217,7 @@ function drawWinMoveHistory(x, y, width, height) {
     push();
     
     // Position counters at 89% from the top of the play area (updated from 87%)
-    const counterY = playAreaY + playAreaHeight * 0.89;
+    const counterY = playAreaY + playAreaHeight * 0.905; // Updated from 0.89 to 0.905 (1.5% lower)
     
     // Position card horizontally at the center of the screen
     const centerX = playAreaX + playAreaWidth / 2;
@@ -230,8 +230,8 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Calculate card dimensions (updated height)
     const cardPadding = Math.max(playAreaWidth * 0.03, 15); // Padding inside card (3% of play area width, min 15px)
-    const cardWidth = Math.max(playAreaWidth * 0.85, 200); // 85% of play area width, min 200px
-    const cardHeight = playAreaHeight * 0.23; // 23% of play area height as requested
+    const cardWidth = Math.max(playAreaWidth * 0.95, 200); // 95% of play area width, min 200px
+    const cardHeight = playAreaHeight * 0.28; // 28% of play area height as requested
     
     // Position card (centered horizontally and at 89% from top vertically)
     const cardX = centerX;
@@ -269,8 +269,8 @@ function drawWinMoveHistory(x, y, width, height) {
       const hintButtonDiameter = cardHeight * 0.66 * 0.8; // Reduced to 80% of original size
       
       // Position hint button on top of the recipe card
-      // Positioned 55% from the top edge and 80% from the left edge of the card
-      const newHintButtonX = cardX - cardWidth/2 + (cardWidth * 0.80); // 80% from the left edge of the card
+      // Positioned 55% from the top edge and 82% from the left edge of the card (moved 2% right)
+      const newHintButtonX = cardX - cardWidth/2 + (cardWidth * 0.82); // 82% from the left edge of the card (moved from 80%)
       const newHintButtonY = cardY - cardHeight/2 + (cardHeight * 0.55); // 55% from the top edge of the card
       
       // Update hint button position
@@ -296,7 +296,7 @@ function drawWinMoveHistory(x, y, width, height) {
       initialHintButtonY = newHintButtonY;
     
       // Update hint button styling
-      hintButton.borderColor = 'black';
+      hintButton.borderColor = null; // Use default subtle border like Cook! button
       hintButton.textBold = true;
     }
     
@@ -412,8 +412,9 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // --- SETUP VERTICAL LAYOUT FOR COMBOS ---
     // Calculate the vertical spacing within the card
-    const verticalMargin = cardHeight * 0.05; // 5% top and bottom margins
-    const availableHeight = cardHeight - (verticalMargin * 2); // Available height after margins
+    const verticalMargin = cardHeight * 0.03; // 3% top margin (reduced from 5%)
+    const bottomMargin = cardHeight * 0.05; // 5% bottom margin (unchanged)
+    const availableHeight = cardHeight - (verticalMargin + bottomMargin); // Available height after margins
     const totalLines = comboInfo.length + 1; // +1 for the "Recipe" header
     const lineHeight = Math.max(availableHeight / totalLines, 20); // Minimum line height of 20px
     
@@ -427,10 +428,11 @@ function drawWinMoveHistory(x, y, width, height) {
       
       // Start with the default font size
       let smallestFontSize = defaultFontSize;
-      const maxTextWidth = cardWidth * 0.55;
+      const maxTextWidth = cardWidth * 0.58; // Changed from 0.60 to 0.58
       
-      // Check all possible combinations, not just visible ones
-      const allPossibleCombos = [...intermediate_combinations, final_combination];
+      // Check all possible combinations, but exclude the final combination
+      // since it won't be revealed in the recipe card during gameplay
+      const allPossibleCombos = [...intermediate_combinations];
       
       // First pass: Check all possible combinations with their maximum possible text length
       for (let combo of allPossibleCombos) {
@@ -449,12 +451,25 @@ function drawWinMoveHistory(x, y, width, height) {
         
         // Check if this text would be too long with default font size
         if (textWidth(fullText) > maxTextWidth) {
-          // Calculate reduced font size with lower minimum (8px instead of 10px)
-          const reducedFontSize = Math.max(defaultFontSize * 0.8, 8); // Changed from 10 to 8
-          
-          // Update smallest font size if this is smaller
-          if (reducedFontSize < smallestFontSize) {
-            smallestFontSize = reducedFontSize;
+          // First try 90% of default font size
+          textSize(Math.max(defaultFontSize * 0.9, 8));
+          // Check if text fits at 90% size
+          if (textWidth(fullText) > maxTextWidth) {
+            // If still too long, reduce to 80% of default
+            const reducedFontSize = Math.max(defaultFontSize * 0.8, 8);
+            
+            // Update smallest font size if this is smaller
+            if (reducedFontSize < smallestFontSize) {
+              smallestFontSize = reducedFontSize;
+            }
+          } else {
+            // 90% size is sufficient
+            const reducedFontSize = Math.max(defaultFontSize * 0.9, 8);
+            
+            // Update smallest font size if this is smaller
+            if (reducedFontSize < smallestFontSize) {
+              smallestFontSize = reducedFontSize;
+            }
           }
         }
       }
@@ -479,7 +494,7 @@ function drawWinMoveHistory(x, y, width, height) {
     fill('black');
     noStroke();
     textAlign(CENTER, CENTER); // Center alignment for title
-    textSize(Math.min(lineHeight * 0.6, 18)); // Text size scaled to line height, max 18px
+    textSize(Math.min(lineHeight * 0.6, 18) - 2); // Text size scaled to line height, max 18px, reduced by 2px
     textStyle(BOLD);
     text("Recipe", cardX, startY); // Position at card center for centered text
     
@@ -532,7 +547,7 @@ function drawWinMoveHistory(x, y, width, height) {
         comboText = `${capitalizedVerb} the ${name}`;
         
         // Check if text is too long and needs truncation with the smallest font size
-        const maxTextWidth = cardWidth * 0.55;
+        const maxTextWidth = cardWidth * 0.58; // Changed from 0.60 to 0.58
         
         if (textWidth(comboText) > maxTextWidth) {
           // Text is too long, remove "the" instead of using ellipsis
@@ -588,7 +603,7 @@ function drawWinMoveHistory(x, y, width, height) {
         const fullText = `${capitalizedVerb} the ${name} ${progressText}`;
         
         // We already know the smallest font size, so just check for truncation
-        const maxTextWidth = cardWidth * 0.55;
+        const maxTextWidth = cardWidth * 0.58; // Changed from 0.60 to 0.58
         let truncatedText = fullText;
         
         if (textWidth(fullText) > maxTextWidth) {
@@ -636,8 +651,23 @@ function drawWinMoveHistory(x, y, width, height) {
           comboText = truncatedText;
         }
       } else {
-        // For incomplete combos, show ingredient count
-        comboText = `${combo.requiredCount} ingredient${combo.requiredCount !== 1 ? 's' : ''}`;
+        // For incomplete combos, show ingredient count or verb for final combo
+        if (combo.isFinalCombo) {
+          // For final combo, show its verb with an exclamation mark
+          let verb = "Mix"; // Default fallback verb
+          
+          // Find the verb for the final combination
+          if (final_combination.verb) {
+            verb = final_combination.verb;
+          }
+          
+          // Format as "Verb!" - capitalize first letter of verb
+          const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
+          comboText = `${capitalizedVerb}!`;
+        } else {
+          // For other incomplete combos, show ingredient count as before
+          comboText = `${combo.requiredCount} ingredient${combo.requiredCount !== 1 ? 's' : ''}`;
+        }
         // No need to set font size here as we're using the global smallest font size
       }
       
@@ -647,12 +677,21 @@ function drawWinMoveHistory(x, y, width, height) {
       
       // Calculate number prefix width to position highlight correctly (avoiding the number)
       textAlign(LEFT, CENTER);
+      
+      // Draw numbered circle prefix with 50% larger size
+      const comboFontSize = recipeCardFontSize;
+      const prefixFontSize = comboFontSize * 1.5; // 50% larger font for numbered circles
+      
+      // Draw the prefix first with larger font
+      textSize(prefixFontSize);
       const numberPrefixWidth = textWidth(`${numberPrefix} `);
       
       // Draw the parallelogram highlight for partial combos (but not for completed ones)
       if (combo.isPartialCombo && !combo.isCompleted) {
         // Calculate the width of the main text (without number prefix)
+        textSize(comboFontSize); // Temporarily set back to combo font size to measure text
         const mainTextWidth = textWidth(comboText);
+        textSize(prefixFontSize); // Set back to prefix font size
         
         // Draw parallelogram highlight using mustard yellow with 100% opacity
         noStroke();
@@ -681,11 +720,15 @@ function drawWinMoveHistory(x, y, width, height) {
         line(checkmarkX - 5, y, checkmarkX, y + 5);
         line(checkmarkX, y + 5, checkmarkX + 8, y - 5);
         
-        // Draw text in bold when completed
+        // Draw prefix in bold with larger font
         noStroke();
         textStyle(BOLD);
         fill('black');
-        text(fullComboText, textLeftMargin, y);
+        text(numberPrefix + " ", textLeftMargin, y);
+        
+        // Switch back to regular font size for the rest of the text
+        textSize(comboFontSize);
+        text(comboText, textLeftMargin + numberPrefixWidth, y);
       } else if (hintedCombos.includes(combo.name)) {
         // For hinted combos, use hint color (red) and bold text with potential animation
         noStroke();
@@ -719,13 +762,24 @@ function drawWinMoveHistory(x, y, width, height) {
           fill(COLORS.vesselHint);
         }
         
-        text(fullComboText, textLeftMargin, y);
+        // Draw prefix with larger font
+        text(numberPrefix + " ", textLeftMargin, y);
+        
+        // Switch back to regular font size for the rest of the text
+        textSize(comboFontSize);
+        text(comboText, textLeftMargin + numberPrefixWidth, y);
       } else {
         // For incomplete combos, just show the ingredient count
         fill('#333333'); // Darker gray for incomplete
         noStroke();
         textStyle(NORMAL);
-        text(fullComboText, textLeftMargin, y);
+        
+        // Draw prefix with larger font
+        text(numberPrefix + " ", textLeftMargin, y);
+        
+        // Switch back to regular font size for the rest of the text
+        textSize(comboFontSize);
+        text(comboText, textLeftMargin + numberPrefixWidth, y);
       }
     }
     
@@ -812,7 +866,7 @@ function drawWinMoveHistory(x, y, width, height) {
       if (i < displayCount) {
         // Filled error counter (black)
         fill('black');
-        stroke('black');
+        stroke(0, 50); // Use the same subtle border as buttons
         strokeWeight(1.5); // Reduced from 2px (75% of original)
         circle(x, y, circleSize);
         
@@ -828,7 +882,7 @@ function drawWinMoveHistory(x, y, width, height) {
       } else {
         // Empty error placeholder - 25% opacity black (reduced from 50%) - APlasker
         fill('rgba(0, 0, 0, 0.25)');
-        stroke('black');
+        stroke(0, 50); // Use the same subtle border as buttons
         strokeWeight(1.5); // Reduced from 2px (75% of original)
         circle(x, y, circleSize);
       }
@@ -1588,8 +1642,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // ENHANCEMENT - APlasker - Update version to reflect byline system improvements
-    const versionText = "v20240502.1408 - APlasker";
+    // ENHANCEMENT - APlasker - Update version to reflect green vessel handle redesign
+    const versionText = "v20250503.1627 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
