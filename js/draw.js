@@ -231,7 +231,7 @@ function drawWinMoveHistory(x, y, width, height) {
     // Calculate card dimensions (updated height)
     const cardPadding = Math.max(playAreaWidth * 0.03, 15); // Padding inside card (3% of play area width, min 15px)
     const cardWidth = Math.max(playAreaWidth * 0.95, 200); // 95% of play area width, min 200px
-    const cardHeight = playAreaHeight * 0.28; // 28% of play area height as requested
+    const cardHeight = playAreaHeight * 0.26; // 26% of play area height (reduced from 28%)
     
     // Position card (centered horizontally and at 89% from top vertically)
     const cardX = centerX;
@@ -1643,7 +1643,7 @@ function drawWinMoveHistory(x, y, width, height) {
     fill(100); // Gray color for version text
 
     // ENHANCEMENT - APlasker - Update version to reflect green vessel handle redesign
-    const versionText = "v20250503.1627 - APlasker";
+    const versionText = "v20250503.2006 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);

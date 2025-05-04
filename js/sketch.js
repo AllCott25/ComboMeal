@@ -2781,7 +2781,7 @@ let intermediate_combinations = [
     const buttonColor = isHelpIconHovered ? COLORS.secondary : COLORS.primary;
     
     // Draw the button shape
-    noFill();
+    fill('white'); // Use white fill like base vessels
     strokeWeight(2);
     stroke(buttonColor);
     

@@ -11,6 +11,8 @@
  * - Updated row 2 text to reference the recipe card instead of combo icons
  * - Replaced red hint vessel with circular hint button to match current UI
  * - Fixed base vessel color to display properly as white
+ * - Added underline to "How to Play" title (May 3, 2025)
+ * - Adjusted Hint button text size to match in-game button (May 3, 2025)
  */
 
 // Global variable to track help modal state
