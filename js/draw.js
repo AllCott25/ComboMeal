@@ -231,7 +231,7 @@ function drawWinMoveHistory(x, y, width, height) {
     // Calculate card dimensions (updated height)
     const cardPadding = Math.max(playAreaWidth * 0.03, 15); // Padding inside card (3% of play area width, min 15px)
     const cardWidth = Math.max(playAreaWidth * 0.95, 200); // 95% of play area width, min 200px
-    const cardHeight = playAreaHeight * 0.26; // 26% of play area height (reduced from 28%)
+    const cardHeight = playAreaHeight * 0.23; // 23% of play area height
     
     // Position card (centered horizontally and at 89% from top vertically)
     const cardX = centerX;
@@ -412,7 +412,7 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // --- SETUP VERTICAL LAYOUT FOR COMBOS ---
     // Calculate the vertical spacing within the card
-    const verticalMargin = cardHeight * 0.03; // 3% top margin (reduced from 5%)
+    const verticalMargin = cardHeight * 0.02; // 2% top margin (reduced from 3% by 33%)
     const bottomMargin = cardHeight * 0.05; // 5% bottom margin (unchanged)
     const availableHeight = cardHeight - (verticalMargin + bottomMargin); // Available height after margins
     const totalLines = comboInfo.length + 1; // +1 for the "Recipe" header
@@ -1643,7 +1643,7 @@ function drawWinMoveHistory(x, y, width, height) {
     fill(100); // Gray color for version text
 
     // ENHANCEMENT - APlasker - Update version to reflect green vessel handle redesign
-    const versionText = "v20250503.2006 - APlasker";
+    const versionText = "v20250503.2211 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
