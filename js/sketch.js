@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v0.0502.01
+ * Culinary Logic Puzzle v0.0505.03
  * Created by APlasker
- * Last Updated: May 2, 2025 (21:59 EDT) by APlasker
+ * Last Updated: May 5, 2025 (00:03 EDT) by APlasker
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -1219,6 +1219,42 @@ let intermediate_combinations = [
         return false;
       }
       
+      // Special handling for tutorial mode - APlasker
+      if (isTutorialMode) {
+        console.log("Tutorial win screen click detected, isMouseOverLetterScore:", isMouseOverLetterScore);
+        
+        // Check if recipe card area is clicked
+        if (isMouseOverCard) {
+          console.log("Tutorial recipe card clicked - opening recipe URL");
+          viewRecipe(); // Allow recipe link functionality
+          return false;
+        }
+        
+        // Check if score card area is clicked
+        if (isMouseOverLetterScore) {
+          console.log("Tutorial score card clicked - loading today's recipe");
+          
+          // Reset tutorial mode
+          isTutorialMode = false;
+          
+          // Reset game state
+          gameStarted = false;
+          gameWon = false;
+          moveHistory = [];
+          hintCount = 0;
+          vessels = [];
+          animations = [];
+          
+          // Reload the page to get the default recipe
+          window.location.reload();
+          
+          return false;
+        }
+        
+        return false;
+      }
+      
+      // Regular (non-tutorial) win screen handling
       // Check if letter score area is clicked
       if (isMouseOverLetterScore) {
         console.log("Share Score triggered (win screen click)");
@@ -1317,7 +1353,15 @@ let intermediate_combinations = [
     // Check for help icon click
     if (!gameWon && isHelpIconHovered) {
       if (typeof showHelpModal === 'function') {
+        if (!gameStarted) {
+          // On title screen, launch tutorial mode
+          console.log("How to Play button clicked on title screen - launching tutorial");
+          startTutorial();
+        } else {
+          // In game, show help modal
+          console.log("Help button clicked in game - showing help modal");
         showHelpModal();
+        }
         return false; // Prevent other click handling
       }
     }
@@ -1766,6 +1810,160 @@ let intermediate_combinations = [
     arrangeVessels();
   }
   
+  // Function to start tutorial mode - APlasker
+  function startTutorial() {
+    console.log("Starting tutorial mode with recipe from date:", tutorialRecipeDate);
+    
+    // Set tutorial mode flag
+    isTutorialMode = true;
+    
+    // Reset game state
+    gameWon = false;
+    turnCounter = 0;
+    moveHistory = [];
+    animations = [];
+    vessels = [];
+    
+    // Reset tutorial-specific variables
+    tutorialErrorCount = 0;
+    
+    // Reset all tutorial message flags - APlasker
+    tutorialMessagesShown = {
+      startShown: false,
+      inactivityShown: false,
+      firstErrorShown: false,
+      subsequentErrorsShown: false,
+      firstSuccessShown: false,
+      firstComboCompletedShown: false
+    };
+    
+    // Clear any existing recipe data
+    intermediate_combinations = [];
+    final_combination = {};
+    ingredients = [];
+    
+    // Set loading state
+    isLoadingRecipe = true;
+    
+    // Load the tutorial recipe
+    loadTutorialRecipe().then(() => {
+      // Once recipe is loaded, start the game
+      gameStarted = true;
+      
+      // Trigger help button animation from rectangular to circular
+      helpButtonAnimating = true;
+      helpButtonAnimationProgress = 0;
+      
+      // Initialize lastAction to current frame count
+      lastAction = frameCount;
+      
+      // Reset message tracking
+      firstPartialComboCreated = false;
+      usedPartialComboMessages = [];
+      firstErrorOccurred = false;
+      usedErrorMessages = [];
+      
+      // Set tutorial-specific byline
+      currentByline = tutorialBylines.start;
+      tutorialMessagesShown.startShown = true; // Mark start message as shown
+      nextByline = "";
+      bylineTimer = 0;
+      bylineTransitionState = "stable";
+      bylineOpacity = 255;
+      isTransitioning = false;
+      
+      // Arrange vessels for tutorial
+      console.log("Arranging vessels for tutorial");
+      arrangeVessels();
+      
+      // Automatically show help modal after a short delay to ensure everything is loaded
+      setTimeout(() => {
+        console.log("Automatically showing help modal for tutorial");
+        if (typeof showHelpModal === 'function') {
+          showHelpModal();
+        }
+      }, 500); // 500ms delay to ensure the game is fully initialized
+    }).catch(error => {
+      console.error("Error loading tutorial recipe:", error);
+      isLoadingRecipe = false;
+      loadingError = true;
+    });
+  }
+  
+  // Function to load the tutorial recipe - APlasker
+  async function loadTutorialRecipe() {
+    try {
+      console.log("Loading tutorial recipe from date:", tutorialRecipeDate);
+      
+      // Use the existing fetchRecipeByDate function with our tutorial date
+      const recipeData = await fetchRecipeByDate(tutorialRecipeDate);
+      
+      if (!recipeData) {
+        console.error("No tutorial recipe data found");
+        throw new Error("Tutorial recipe not found");
+      }
+      
+      console.log("Tutorial recipe data loaded successfully");
+      
+      // Store recipe data in the global variable
+      recipe_data = recipeData;
+      
+      // Store the recipe object globally for stats access
+      recipe = recipeData;
+      
+      // Update game variables with recipe data
+      intermediate_combinations = recipeData.intermediateCombinations;
+      final_combination = recipeData.finalCombination;
+      easter_eggs = recipeData.easterEggs;
+      ingredients = recipeData.baseIngredients;
+      base_ingredients = recipeData.baseIngredients;
+      recipeUrl = recipeData.recipeUrl;
+      recipeDescription = recipeData.description || "A tutorial recipe to help you learn the game!";
+      recipeAuthor = recipeData.author || "Tutorial";
+      
+      // Load the recipe image if URL is provided
+      if (recipeData.imgUrl) {
+        console.log("Loading tutorial recipe image from URL:", recipeData.imgUrl);
+        isLoadingImage = true;
+        
+        // Use loadImage with success and error callbacks
+        loadImage(
+          recipeData.imgUrl,
+          // Success callback
+          (img) => {
+            console.log("Tutorial recipe image loaded successfully");
+            recipeImage = img;
+            isLoadingImage = false;
+            recipeDataLoadedForStats = true;
+          },
+          // Error callback
+          (err) => {
+            console.error("Error loading tutorial recipe image:", err);
+            recipeImage = null;
+            isLoadingImage = false;
+            recipeDataLoadedForStats = true;
+          }
+        );
+      } else {
+        recipeDataLoadedForStats = true;
+      }
+      
+      // Initialize game with the tutorial recipe
+      initializeGame();
+      
+      // Set loading state to false
+      isLoadingRecipe = false;
+      
+    } catch (error) {
+      console.error("Error loading tutorial recipe:", error);
+      loadingError = true;
+      isLoadingRecipe = false;
+      isLoadingImage = false;
+      recipeDataLoadedForStats = true;
+      throw error;
+    }
+  }
+  
   function triggerHapticFeedback(type) {
     // Only trigger haptic feedback if the device supports it
     if (navigator.vibrate) {
@@ -1878,6 +2076,49 @@ let intermediate_combinations = [
           return false;
         }
         
+        // Special handling for tutorial mode - APlasker
+        if (isTutorialMode) {
+          console.log("Tutorial win screen touch detected");
+          
+          // Use simplified hover detection based on screen position
+          isMouseOverLetterScore = (touchY >= height/2);
+          isMouseOverCard = (touchY < height/2);
+          
+          // Handle recipe card clicks in tutorial mode
+          if (isMouseOverCard) {
+            console.log("Tutorial recipe card touched - opening recipe URL");
+            viewRecipe(); // Allow recipe link functionality
+            touchHandled = true;
+            return false;
+          }
+          
+          // Handle score card click
+          if (isMouseOverLetterScore) {
+            console.log("Tutorial score card touched - loading today's recipe");
+            
+            // Reset tutorial mode
+            isTutorialMode = false;
+            
+            // Reset game state
+            gameStarted = false;
+            gameWon = false;
+            moveHistory = [];
+            hintCount = 0;
+            vessels = [];
+            animations = [];
+            
+            // Reload the page to get the default recipe
+            window.location.reload();
+            
+            touchHandled = true;
+            return false;
+          }
+          
+          touchHandled = true;
+          return false;
+        }
+        
+        // Regular (non-tutorial) win screen handling
         // Use simpler touch detection on win screen - top half shows recipe, bottom half shares score
         if (touchY < height/2) {
           // Top half = view recipe
@@ -1939,7 +2180,7 @@ let intermediate_combinations = [
         const progress = helpButtonAnimationProgress;
         
         // Define dimensions for rectangular button mode 
-        const rectWidth = Math.max(playAreaWidth * 0.15, 90); // Width for "How to Play" text
+        const rectWidth = Math.max(playAreaWidth * 0.15, 90); // Width for "First Time?" text
         const rectHeight = helpIconSize; // Same height as circle
         
         // Calculate the 90% horizontal position in the play area
@@ -1973,7 +2214,15 @@ let intermediate_combinations = [
         
         if (touchedHelpButton) {
           if (typeof showHelpModal === 'function') {
+            if (!gameStarted) {
+              // On title screen, launch tutorial mode
+              console.log("How to Play button touched on title screen - launching tutorial");
+              startTutorial();
+            } else {
+              // In game, show help modal
+              console.log("Help button touched in game - showing help modal");
             showHelpModal();
+            }
             touchHandled = true;
             return false; // Prevent other touch handling
           }
@@ -2073,6 +2322,9 @@ let intermediate_combinations = [
     
     // Set text to bold for Cook! button
     startButton.textBold = true;
+    
+    // Set tutorialButton to null (removed button)
+    tutorialButton = null;
     
     // Reset game state
     gameWon = false;
@@ -2257,399 +2509,6 @@ let intermediate_combinations = [
   
   
   
-  // Add a new class for the special final animation
-  class FinalVerbAnimation extends VerbAnimation {
-    constructor(verb, vessel) {
-      // Get vessel position if available, otherwise use center
-      const startX = vessel ? vessel.x : playAreaX + playAreaWidth/2;
-      const startY = vessel ? vessel.y : playAreaY + playAreaHeight/2;
-      
-      // Transform verb to uppercase and add exclamation mark before calling parent constructor
-      const transformedVerb = verb.toUpperCase() + "!";
-      
-      // Call parent constructor with vessel reference
-      super(transformedVerb, startX, startY, vessel);
-      
-      // Override properties for more dramatic effect
-      this.maxSize = playAreaWidth; // Limit to exact play area width (was playAreaWidth * 1.2)
-      this.duration = 72; // 2.4 seconds at 30fps (reduced from 144)
-      this.initialSize = this.vesselRef ? Math.max(this.vesselRef.w, this.vesselRef.h) * 0.75 : this.maxSize * 0.5;
-      
-      // Set flag to prevent game win until animation completes
-      this.isFinalAnimation = true;
-      
-      // Add transition circle properties
-      this.transitionCircleSize = 0;
-      this.transitionCircleOpacity = 255;
-      // Use 110% of whichever dimension is larger (width or height)
-      this.maxCircleSize = max(width, height) * 1.1; 
-      
-      console.log("Creating FINAL verb animation for:", verb, "at position:", startX, startY);
-    }
-    
-    // Override update to signal when to proceed to win screen
-    update() {
-      const result = super.update();
-      
-      // Track frames explicitly for more precise timing
-      const framesPassed = this.progress * this.duration;
-      
-      // Check if we've reached exactly 38 frames (1.25 seconds at 30fps)
-      if (framesPassed >= 38) {
-        console.log("Final verb animation at frame 38 - showing win screen with hard cut transition");
-        showWinScreen();
-        // Mark animation as complete
-        this.active = false;
-        return true;
-      }
-      
-      return result;
-    }
-    
-    // Override draw to make text larger and more dramatic
-    draw() {
-      if (!this.active) return;
-      
-      // Calculate animation phases
-      const growPhase = 0.3; // First 30% of animation is growth
-      const holdPhase = 0.7; // Hold until 70% of animation
-      
-      // Calculate size based on animation phase
-      let currentSize;
-      if (this.progress < growPhase) {
-        // Growing phase - ease in with cubic function
-        const t = this.progress / growPhase;
-        const easedT = t * t * (3 - 2 * t); // Smooth step function
-        // Start at initialSize and grow to maxSize
-        currentSize = map(easedT, 0, 1, this.initialSize, this.maxSize);
-      } else if (this.progress < holdPhase) {
-        // Hold phase - maintain full size
-        currentSize = this.maxSize;
-      } else {
-        // No shrinking, maintain size but fade out
-        currentSize = this.maxSize;
-      }
-      
-      push();
-      
-      // Draw transition circle before the cloud but after saving state
-      // Circle should grow throughout animation but never fade
-      if (this.progress < 0.5) {
-        // Growing phase - from 0 to 110% of largest screen dimension
-        this.transitionCircleSize = map(this.progress, 0, 0.5, 0, this.maxCircleSize);
-      } else {
-        // Maintain full size - no fading
-        this.transitionCircleSize = this.maxCircleSize;
-      }
-      
-      // Draw the tan circle with full opacity (no fade out)
-      const tanColor = color(COLORS.background);
-      tanColor.setAlpha(255); // Always full opacity
-      
-      // Ensure we're at screen center for the circle
-      fill(tanColor);
-      noStroke();
-      // Center in screen, not at animation position
-      ellipse(playAreaX + playAreaWidth/2, playAreaY + playAreaHeight/2, this.transitionCircleSize);
-      
-      // Draw cloud background
-      noStroke();
-      
-      // Draw main cloud with higher opacity
-      let cloudOpacity = min(255, this.opacity * 1.2); // Increase opacity by 20%
-      fill(255, 255, 255, cloudOpacity);
-      
-      beginShape();
-      for (let i = 0; i < this.cloudPoints.length; i++) {
-        const point = this.cloudPoints[i];
-        
-        // Calculate variation using noise for organic cloud shape
-        // Add angle-based phase to ensure more consistent wobbliness around the entire perimeter
-        const phaseOffset = point.angle * 0.3; // Use angle as part of noise input for more consistent variation
-        const noiseVal = noise(point.noiseOffset + frameCount * 0.01, phaseOffset);
-        const variation = map(noiseVal, 0, 1, -point.variationAmount, point.variationAmount);
-        
-        // Calculate radius with variation
-        const radius = (currentSize / 2) * (1 + variation);
-        
-        // Calculate point position
-        const px = this.x + cos(point.angle) * radius;
-        const py = this.y + sin(point.angle) * radius;
-        
-        curveVertex(px, py);
-        
-        // Add extra vertices at the beginning and end for smooth curves
-        if (i === 0) {
-          curveVertex(px, py);
-        } else if (i === this.cloudPoints.length - 1) {
-          curveVertex(px, py);
-          curveVertex(this.x + cos(this.cloudPoints[0].angle) * radius, 
-                    this.y + sin(this.cloudPoints[0].angle) * radius);
-        }
-      }
-      endShape(CLOSE);
-      
-      // Always draw verb text when the cloud is visible (improved visibility)
-      if (currentSize > this.maxSize * 0.1) { // As long as the cloud is at least 10% visible
-        // Calculate text opacity based on progress
-        let textOpacity = this.opacity; // Use the global opacity we're tracking
-        
-        // Calculate maximum allowed text width (80% of play area width)
-        const maxTextWidth = playAreaWidth * 0.8;
-        
-        // Start with a smaller font size than before - 20% of cloud size instead of 25%
-        // This helps avoid overflow on smaller screens while still being dramatic
-        let fontSize = max(min(currentSize * 0.20, 80), 30);
-        
-        // Set text properties for measurement
-        textAlign(CENTER, CENTER);
-        textSize(fontSize);
-        textStyle(BOLD);
-        
-        // Check if verb text fits within max width
-        let verbWidth = textWidth(this.verb);
-        
-        // If text is too wide, either scale down font size or wrap text
-        let textLines = [this.verb];
-        
-        // If text is still too wide even at minimum font size, use text wrapping
-        if (verbWidth > maxTextWidth && fontSize <= 30) {
-          textLines = splitTextIntoLines(this.verb, maxTextWidth);
-        } 
-        // Otherwise, reduce font size until text fits (but don't go below minimum)
-        else if (verbWidth > maxTextWidth) {
-          // Scale down font size until text fits (or until we hit the minimum size)
-          while (verbWidth > maxTextWidth && fontSize > 30) {
-            fontSize -= 2;
-            textSize(fontSize);
-            verbWidth = textWidth(this.verb);
-          }
-        }
-        
-        // Apply the final font size
-        textSize(fontSize);
-        
-        // Draw the text (shadow first, then actual text)
-        const lineHeight = fontSize * 1.2; // Line spacing for multi-line text
-        const startY = this.y - ((textLines.length - 1) * lineHeight / 2);
-        
-        for (let i = 0; i < textLines.length; i++) {
-          const lineY = startY + (i * lineHeight);
-          
-          // Draw text shadow for better visibility
-          fill(0, 0, 0, textOpacity * 0.4);
-          text(textLines[i], this.x + 4, lineY + 4);
-          
-          // Draw main text with stronger color and golden outline
-          let primaryColor = color(COLORS.secondary);
-          primaryColor.setAlpha(textOpacity);
-          
-          // Create an outline color with the same opacity
-          let outlineColor = color(COLORS.tertiary); // Yellow/gold
-          outlineColor.setAlpha(textOpacity);
-          
-          // Draw golden outline for dramatic effect
-          stroke(outlineColor);
-          strokeWeight(3);
-          fill(primaryColor);
-          text(textLines[i], this.x, lineY);
-        }
-      }
-      
-      pop();
-    }
-  }
-  
-  // Function to create a final verb animation and delay the win screen
-  function createFinalVerbAnimation(verb) {
-    // Default verb if none is provided
-    const displayVerb = verb || "Complete!";
-    
-    // Find the final vessel
-    const finalVessel = vessels.find(v => v.name === final_combination.name);
-    
-    // Create the special animation with vessel reference
-    animations.push(new FinalVerbAnimation(displayVerb, finalVessel));
-    
-    // Create the persistent flower animation instead of adding to regular animations
-    persistentFlowerAnimation = new FlowerBurstAnimation();
-  }
-  
-  // Add a class for the celebratory flower burst animation
-  class FlowerBurstAnimation {
-    constructor() {
-      this.active = true;
-      this.duration = 90; // 3 seconds at 30fps (reduced from 180)
-      this.progress = 0;
-      this.flowers = [];
-      this.delayFrames = 23; // Delay start by 0.75 seconds (23 frames at 30fps, reduced from 45)
-      this.delayComplete = false;
-      
-      // Center of the screen
-      this.centerX = playAreaX + playAreaWidth/2;
-      this.centerY = playAreaY + playAreaHeight/2;
-      
-      // Create flowers that will burst outward
-      const numberOfFlowers = 60; // Lots of flowers for a dense effect
-      
-      for (let i = 0; i < numberOfFlowers; i++) {
-        // Random angle for outward trajectory
-        const angle = random(TWO_PI);
-        
-        // Random distance from center (will be multiplied by progress)
-        const maxRadius = max(width, height) * 1.5; // Much larger to ensure flowers leave screen
-        const radius = random(maxRadius * 0.7, maxRadius);
-        
-        // Random size for variety
-        const size = random(10, 25);
-        
-        // Random speed for varied expansion
-        const speed = random(0.8, 1.2);
-        
-        // Random color from our palette (green, orange, yellow only)
-        const colorOptions = [COLORS.primary, COLORS.secondary, COLORS.tertiary];
-        const color = colorOptions[floor(random(colorOptions.length))];
-        
-        // Create the flower with simpler properties (no rotation or gravity)
-        this.flowers.push({
-          angle,
-          radius,
-          size,
-          color,
-          speed
-        });
-      }
-      
-      console.log("Created simplified flower burst animation with", numberOfFlowers, "flowers (delayed by 0.75s)");
-    }
-    
-    update() {
-      // Handle delay before starting animation
-      if (!this.delayComplete) {
-        this.delayFrames--;
-        if (this.delayFrames <= 0) {
-          this.delayComplete = true;
-          console.log("Flower burst delay complete, starting animation");
-        }
-        return false; // Don't remove during delay
-      }
-      
-      // Update progress once delay is complete
-      this.progress += 1 / this.duration;
-      
-      // Animation complete when progress reaches 1
-      if (this.progress >= 1) {
-        this.active = false;
-        return true;
-      }
-      
-      return false;
-    }
-    
-    draw() {
-      // Don't draw anything during the delay period
-      if (!this.delayComplete || !this.active) return;
-      
-      push();
-      
-      for (const flower of this.flowers) {
-        // Calculate current radius - continuous expansion throughout the animation
-        // Using easeOutQuad for natural feeling acceleration at the start
-        const easeOutQuad = 1 - (1 - this.progress) * (1 - this.progress);
-        const currentRadius = flower.radius * easeOutQuad * flower.speed;
-        
-        // Calculate position with straight outward movement (no rotation)
-        const x = this.centerX + cos(flower.angle) * currentRadius;
-        const y = this.centerY + sin(flower.angle) * currentRadius;
-        
-        // Only draw if on screen (performance optimization)
-        if (x > -flower.size && x < width + flower.size && 
-            y > -flower.size && y < height + flower.size) {
-          // Draw the flower
-          drawFlower(x, y, flower.size, flower.color);
-        }
-      }
-      
-      pop();
-    }
-  }
-  
-  // Function to actually show the win screen after animation completes
-  
-  
-  // Add a new helper function for creating verb animations after vessel positioning
-  function createVerbAnimationForVessel(vessel) {
-    let verbFound = false;
-    
-    // First, check if this is the final combination
-    const isFinalCombination = vessels.length === 1 && vessel.name === final_combination.name;
-    
-    if (isFinalCombination) {
-      console.log("Final combination detected in createVerbAnimationForVessel - using FinalVerbAnimation");
-      
-      // For final combinations, find the verb but don't create regular animation
-      if (final_combination.verb) {
-        vessel.verb = final_combination.verb;
-        verbFound = true;
-        console.log(`Found verb "${vessel.verb}" for final vessel`);
-      } else {
-        // Fallback verb for final combination if none exists
-        vessel.verb = "Complete!";
-        verbFound = true;
-        console.log("Using fallback verb 'Complete!' for final vessel");
-      }
-      
-      // Create special final verb animation instead of regular one
-      const finalVerb = vessel.verb;
-      createFinalVerbAnimation(finalVerb);
-      
-      // Set verbDisplayTime to prevent duplicate animations
-      vessel.verbDisplayTime = 119;
-      
-      return true;
-    }
-    
-    // If not final combination, proceed with regular verb setting
-    // Find and set the verb from intermediate combinations
-    for (let combo of intermediate_combinations) {
-      if (combo.name === vessel.name && combo.verb) {
-        vessel.verb = combo.verb;
-        verbFound = true;
-        console.log(`Found verb "${vessel.verb}" for vessel: ${vessel.name}`);
-        break;
-      }
-    }
-    
-    // Check final combination reference if no verb found yet (for non-final vessels that use final recipe)
-    if (!verbFound && final_combination.name === vessel.name) {
-      if (final_combination.verb) {
-        vessel.verb = final_combination.verb;
-        verbFound = true;
-        console.log(`Found verb "${vessel.verb}" for vessel with final recipe name`);
-      } else {
-        // Fallback verb for final combination if none exists
-        vessel.verb = "Prepare";
-        verbFound = true;
-        console.log("Using fallback verb for vessel with final recipe name");
-      }
-    }
-    
-    // If we still don't have a verb, use a default
-    if (!verbFound && !vessel.verb) {
-      vessel.verb = "Mix";
-      console.log("No verb found, using default verb 'Mix'");
-    }
-    
-    // Create the animation directly instead of waiting for displayVerb to be called
-    console.log("Creating immediate verb animation for:", vessel.verb, "at position", vessel.x, vessel.y);
-    animations.push(new VerbAnimation(vessel.verb, vessel.x, vessel.y, vessel));
-    
-    // Set verbDisplayTime to 119 to prevent duplicate animations from displayVerb()
-    vessel.verbDisplayTime = 119;
-    
-    return true;
-  }
-  
   // Function to transition to a new byline message with fade effect
   function updateBylineWithTransition(newMessage, duration = bylineHintDuration) {
     // Prevent interrupting ongoing transitions
@@ -2674,7 +2533,26 @@ let intermediate_combinations = [
   
   // Function to handle showing random error messages - APlasker
   function showRandomErrorMessage() {
-    // Determine probability based on whether this is the first error
+    // For tutorial mode, use specific tutorial bylines
+    if (isTutorialMode) {
+      tutorialErrorCount++;
+      
+      if (tutorialErrorCount === 1 && !tutorialMessagesShown.firstErrorShown) {
+        // First error in tutorial - show message if it hasn't been shown yet
+        updateBylineWithTransition(tutorialBylines.firstError, bylineHintDuration);
+        tutorialMessagesShown.firstErrorShown = true;
+      } else if (tutorialErrorCount > 1 && !tutorialMessagesShown.subsequentErrorsShown) {
+        // Second or subsequent errors in tutorial - show message if it hasn't been shown yet
+        updateBylineWithTransition(tutorialBylines.subsequentErrors, bylineHintDuration);
+        tutorialMessagesShown.subsequentErrorsShown = true;
+      }
+      
+      // Update last action timestamp
+      lastAction = frameCount;
+      return;
+    }
+    
+    // Standard game error message logic (existing code)
     let probability = firstErrorOccurred ? 0.33 : 0.75;
     
     // Mark first error as occurred
@@ -2702,8 +2580,6 @@ let intermediate_combinations = [
         // Display the message
         updateBylineWithTransition(randomMessage, bylineHintDuration);
       }
-    } else {
-      // No byline update if we don't show a random message
     }
     
     // Update last action timestamp
@@ -2745,7 +2621,7 @@ let intermediate_combinations = [
     const progress = helpButtonAnimationProgress;
     
     // Define dimensions for rectangular button mode
-    const rectWidth = Math.max(playAreaWidth * 0.18, 90); // Width for "How to Play" text (updated from 15% to 18%)
+    const rectWidth = Math.max(playAreaWidth * 0.15, 90); // Width for "How to Play" text (updated from 15% to 18%)
     const rectHeight = helpIconSize; // Same height as circle
     const cornerRadius = rectHeight / 2;
     
@@ -2800,14 +2676,14 @@ let intermediate_combinations = [
     
     // Draw the text with proper fade effect - no outline for better legibility
     if (progress < 0.5) {
-      // Show "How to Play" text with fadeout
+      // Show "First Time?" text with fadeout
       const textOpacity = 1 - (progress * 2); // Fade out from 1 to 0 during first half
       fill(red(buttonColor), green(buttonColor), blue(buttonColor), 255 * textOpacity);
       noStroke(); // Remove outline for better legibility
       textAlign(CENTER, CENTER);
-      textSize(Math.max(helpIconSize * 0.3, 12)); // Smaller text size for "How to Play"
+      textSize(Math.max(helpIconSize * 0.3, 12)); // Smaller text size for "First Time?"
       textStyle(NORMAL);
-      text("How to Play", currentCenterX, helpIconY);
+      text("First Time?", currentCenterX, helpIconY);
     } 
     
     if (progress > 0.5) {
@@ -2997,5 +2873,28 @@ let intermediate_combinations = [
     
     // Draw each letter with alternating colors
   }
+  
+  // Tutorial mode variables - Added by APlasker
+  let tutorialButton; // Button for launching tutorial mode
+  let isTutorialMode = false; // Flag to track if we're in tutorial mode
+  let tutorialRecipeDate = "01/01/2001"; // Date to use for the tutorial recipe
+  let tutorialBylines = {
+    start: "Try combining the Tomato with the Garlic!",
+    inactivity: "Tap the question mark up top for the rules!",
+    firstError: "Hmm those don't go together. Try a hint!",
+    subsequentErrors: "Hmm... Flour, tomatos, cheese... could be a pizza?",
+    firstSuccess: "Perfect! What else does it need?",
+    firstComboCompleted: "Nice job! On to the next step!"
+  }; // Object to store tutorial-specific bylines
+  // Flags to track which tutorial messages have been shown - APlasker
+  let tutorialMessagesShown = {
+    startShown: false,
+    inactivityShown: false,
+    firstErrorShown: false,
+    subsequentErrorsShown: false,
+    firstSuccessShown: false,
+    firstComboCompletedShown: false
+  }; // Tracking which messages have been shown
+  let tutorialErrorCount = 0; // Track incorrect combination attempts in tutorial
   
   

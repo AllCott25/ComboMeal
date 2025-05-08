@@ -505,8 +505,8 @@ function drawWinMoveHistory(x, y, width, height) {
     line(cardX - recipeTextWidth/2, startY + lineHeight/4, cardX + recipeTextWidth/2, startY + lineHeight/4);
     
     // --- DRAW COMBO ITEMS VERTICALLY ---
-    // Array of circled number emojis for combo numbering
-    const numberedCircles = ["❶", "❷", "❸", "❹", "❺"];
+    // Replace circled number emojis with "Step N: " format
+    const stepPrefixes = ["Step 1: ", "Step 2: ", "Step 3: ", "Step 4: ", "Step 5: "];
     
     // Reset alignment for the list items
     textAlign(LEFT, CENTER);
@@ -665,26 +665,28 @@ function drawWinMoveHistory(x, y, width, height) {
           const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
           comboText = `${capitalizedVerb}!`;
         } else {
-          // For other incomplete combos, show ingredient count as before
-          comboText = `${combo.requiredCount} ingredient${combo.requiredCount !== 1 ? 's' : ''}`;
+          // For other incomplete combos, replace "# ingredients" with "? ? ? ?"
+          // Generate a string of question marks with spaces equal to the number of ingredients
+          let questionMarks = Array(combo.requiredCount).fill("?").join(" ");
+          comboText = questionMarks;
         }
         // No need to set font size here as we're using the global smallest font size
       }
       
-      // Add numbered circle prefix
-      const numberPrefix = numberedCircles[i] || `${i+1}.`; // Fallback to regular numbers if we exceed available circle emojis
-      const fullComboText = `${numberPrefix} ${comboText}`;
+      // Add step prefix
+      const stepPrefix = stepPrefixes[i] || `Step ${i+1}: `; // Fallback to "Step N: " if we exceed available prefixes
+      const fullComboText = `${stepPrefix}${comboText}`;
       
-      // Calculate number prefix width to position highlight correctly (avoiding the number)
+      // Calculate step prefix width to position highlight correctly (avoiding the prefix)
       textAlign(LEFT, CENTER);
       
-      // Draw numbered circle prefix with 50% larger size
+      // Draw step prefix with same size as combo text (not 50% larger like before)
       const comboFontSize = recipeCardFontSize;
-      const prefixFontSize = comboFontSize * 1.5; // 50% larger font for numbered circles
+      const prefixFontSize = comboFontSize; // Same size for step prefix
       
-      // Draw the prefix first with larger font
+      // Draw the prefix first
       textSize(prefixFontSize);
-      const numberPrefixWidth = textWidth(`${numberPrefix} `);
+      const stepPrefixWidth = textWidth(`${stepPrefix}`);
       
       // Draw the parallelogram highlight for partial combos (but not for completed ones)
       if (combo.isPartialCombo && !combo.isCompleted) {
@@ -703,10 +705,10 @@ function drawWinMoveHistory(x, y, width, height) {
         const highlightY = y - highlightHeight/2;
         
         beginShape();
-        vertex(textLeftMargin + numberPrefixWidth, highlightY); // Top left
-        vertex(textLeftMargin + numberPrefixWidth + mainTextWidth + skew, highlightY); // Top right
-        vertex(textLeftMargin + numberPrefixWidth + mainTextWidth, highlightY + highlightHeight); // Bottom right
-        vertex(textLeftMargin + numberPrefixWidth - skew, highlightY + highlightHeight); // Bottom left
+        vertex(textLeftMargin + stepPrefixWidth, highlightY); // Top left
+        vertex(textLeftMargin + stepPrefixWidth + mainTextWidth + skew, highlightY); // Top right
+        vertex(textLeftMargin + stepPrefixWidth + mainTextWidth, highlightY + highlightHeight); // Bottom right
+        vertex(textLeftMargin + stepPrefixWidth - skew, highlightY + highlightHeight); // Bottom left
         endShape(CLOSE);
       }
       
@@ -720,15 +722,15 @@ function drawWinMoveHistory(x, y, width, height) {
         line(checkmarkX - 5, y, checkmarkX, y + 5);
         line(checkmarkX, y + 5, checkmarkX + 8, y - 5);
         
-        // Draw prefix in bold with larger font
+        // Draw prefix in bold
         noStroke();
         textStyle(BOLD);
         fill('black');
-        text(numberPrefix + " ", textLeftMargin, y);
+        text(stepPrefix, textLeftMargin, y);
         
-        // Switch back to regular font size for the rest of the text
+        // Switch to regular font size for the rest of the text
         textSize(comboFontSize);
-        text(comboText, textLeftMargin + numberPrefixWidth, y);
+        text(comboText, textLeftMargin + stepPrefixWidth, y);
       } else if (hintedCombos.includes(combo.name)) {
         // For hinted combos, use hint color (red) and bold text with potential animation
         noStroke();
@@ -762,24 +764,26 @@ function drawWinMoveHistory(x, y, width, height) {
           fill(COLORS.vesselHint);
         }
         
-        // Draw prefix with larger font
-        text(numberPrefix + " ", textLeftMargin, y);
+        // Draw prefix with same font
+        textStyle(BOLD); // Make step prefix bold
+        text(stepPrefix, textLeftMargin, y);
         
-        // Switch back to regular font size for the rest of the text
+        // Draw the rest of the text
         textSize(comboFontSize);
-        text(comboText, textLeftMargin + numberPrefixWidth, y);
+        textStyle(NORMAL); // Reset to normal text style for combo text
+        text(comboText, textLeftMargin + stepPrefixWidth, y);
       } else {
-        // For incomplete combos, just show the ingredient count
+        // For incomplete combos, just show the question marks
         fill('#333333'); // Darker gray for incomplete
         noStroke();
+        
+        // Draw prefix in bold
+        textStyle(BOLD);
+        text(stepPrefix, textLeftMargin, y);
+        
+        // Draw the rest of the text (question marks) in normal style
         textStyle(NORMAL);
-        
-        // Draw prefix with larger font
-        text(numberPrefix + " ", textLeftMargin, y);
-        
-        // Switch back to regular font size for the rest of the text
-        textSize(comboFontSize);
-        text(comboText, textLeftMargin + numberPrefixWidth, y);
+        text(comboText, textLeftMargin + stepPrefixWidth, y);
       }
     }
     
@@ -1225,8 +1229,16 @@ function drawWinMoveHistory(x, y, width, height) {
           const currentInactivityThreshold = baseInactivityThreshold * (inactivityReminderCount + 1);
           
           if (frameCount - lastAction > currentInactivityThreshold) {
-            // Choose message based on whether this is the first inactivity message - APlasker
-            if (!firstInactivityMessageShown) {
+            // For tutorial mode, use the tutorial-specific inactivity message
+            if (isTutorialMode) {
+              // Only show tutorial inactivity message once
+              if (!tutorialMessagesShown.inactivityShown) {
+                updateBylineWithTransition(tutorialBylines.inactivity, bylineHintDuration);
+                tutorialMessagesShown.inactivityShown = true;
+              }
+            } 
+            // Regular game mode - choose message based on whether this is the first inactivity message
+            else if (!firstInactivityMessageShown) {
               updateBylineWithTransition("Need the rules? Tap the question mark!", bylineHintDuration);
               firstInactivityMessageShown = true;
             } else {
@@ -1642,8 +1654,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // ENHANCEMENT - APlasker - Update version to reflect green vessel handle redesign
-    const versionText = "v20250503.2211 - APlasker";
+    // ENHANCEMENT - APlasker - Update version to reflect recipe card text format changes
+    const versionText = "v20250505.0003 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
@@ -1725,4 +1737,397 @@ function drawWinMoveHistory(x, y, width, height) {
     }, 100); // Short delay to ensure clean state
   }
   
+  
+  // Add a new class for the special final animation
+  class FinalVerbAnimation extends VerbAnimation {
+    constructor(verb, vessel) {
+      // Get vessel position if available, otherwise use center
+      const startX = vessel ? vessel.x : playAreaX + playAreaWidth/2;
+      const startY = vessel ? vessel.y : playAreaY + playAreaHeight/2;
+      
+      // Transform verb to uppercase and add exclamation mark before calling parent constructor
+      const transformedVerb = verb.toUpperCase() + "!";
+      
+      // Call parent constructor with vessel reference
+      super(transformedVerb, startX, startY, vessel);
+      
+      // Override properties for more dramatic effect
+      this.maxSize = playAreaWidth; // Limit to exact play area width (was playAreaWidth * 1.2)
+      this.duration = 72; // 2.4 seconds at 30fps (reduced from 144)
+      this.initialSize = this.vesselRef ? Math.max(this.vesselRef.w, this.vesselRef.h) * 0.75 : this.maxSize * 0.5;
+      
+      // Set flag to prevent game win until animation completes
+      this.isFinalAnimation = true;
+      
+      // Add transition circle properties
+      this.transitionCircleSize = 0;
+      this.transitionCircleOpacity = 255;
+      // Use 110% of whichever dimension is larger (width or height)
+      this.maxCircleSize = max(width, height) * 1.1; 
+      
+      console.log("Creating FINAL verb animation for:", verb, "at position:", startX, startY);
+    }
+    
+    // Override update to signal when to proceed to win screen
+    update() {
+      const result = super.update();
+      
+      // Track frames explicitly for more precise timing
+      const framesPassed = this.progress * this.duration;
+      
+      // Check if we've reached exactly 38 frames (1.25 seconds at 30fps)
+      if (framesPassed >= 38) {
+        console.log("Final verb animation at frame 38 - showing win screen with hard cut transition");
+        showWinScreen();
+        // Mark animation as complete
+        this.active = false;
+        return true;
+      }
+      
+      return result;
+    }
+    
+    // Override draw to make text larger and more dramatic
+    draw() {
+      if (!this.active) return;
+      
+      // Calculate animation phases
+      const growPhase = 0.3; // First 30% of animation is growth
+      const holdPhase = 0.7; // Hold until 70% of animation
+      
+      // Calculate size based on animation phase
+      let currentSize;
+      if (this.progress < growPhase) {
+        // Growing phase - ease in with cubic function
+        const t = this.progress / growPhase;
+        const easedT = t * t * (3 - 2 * t); // Smooth step function
+        // Start at initialSize and grow to maxSize
+        currentSize = map(easedT, 0, 1, this.initialSize, this.maxSize);
+      } else if (this.progress < holdPhase) {
+        // Hold phase - maintain full size
+        currentSize = this.maxSize;
+      } else {
+        // No shrinking, maintain size but fade out
+        currentSize = this.maxSize;
+      }
+      
+      push();
+      
+      // Draw transition circle before the cloud but after saving state
+      // Circle should grow throughout animation but never fade
+      if (this.progress < 0.5) {
+        // Growing phase - from 0 to 110% of largest screen dimension
+        this.transitionCircleSize = map(this.progress, 0, 0.5, 0, this.maxCircleSize);
+      } else {
+        // Maintain full size - no fading
+        this.transitionCircleSize = this.maxCircleSize;
+      }
+      
+      // Draw the tan circle with full opacity (no fade out)
+      const tanColor = color(COLORS.background);
+      tanColor.setAlpha(255); // Always full opacity
+      
+      // Ensure we're at screen center for the circle
+      fill(tanColor);
+      noStroke();
+      // Center in screen, not at animation position
+      ellipse(playAreaX + playAreaWidth/2, playAreaY + playAreaHeight/2, this.transitionCircleSize);
+      
+      // Draw cloud background
+      noStroke();
+      
+      // Draw main cloud with higher opacity
+      let cloudOpacity = min(255, this.opacity * 1.2); // Increase opacity by 20%
+      fill(255, 255, 255, cloudOpacity);
+      
+      beginShape();
+      for (let i = 0; i < this.cloudPoints.length; i++) {
+        const point = this.cloudPoints[i];
+        
+        // Calculate variation using noise for organic cloud shape
+        // Add angle-based phase to ensure more consistent wobbliness around the entire perimeter
+        const phaseOffset = point.angle * 0.3; // Use angle as part of noise input for more consistent variation
+        const noiseVal = noise(point.noiseOffset + frameCount * 0.01, phaseOffset);
+        const variation = map(noiseVal, 0, 1, -point.variationAmount, point.variationAmount);
+        
+        // Calculate radius with variation
+        const radius = (currentSize / 2) * (1 + variation);
+        
+        // Calculate point position
+        const px = this.x + cos(point.angle) * radius;
+        const py = this.y + sin(point.angle) * radius;
+        
+        curveVertex(px, py);
+        
+        // Add extra vertices at the beginning and end for smooth curves
+        if (i === 0) {
+          curveVertex(px, py);
+        } else if (i === this.cloudPoints.length - 1) {
+          curveVertex(px, py);
+          curveVertex(this.x + cos(this.cloudPoints[0].angle) * radius, 
+                    this.y + sin(this.cloudPoints[0].angle) * radius);
+        }
+      }
+      endShape(CLOSE);
+      
+      // Always draw verb text when the cloud is visible (improved visibility)
+      if (currentSize > this.maxSize * 0.1) { // As long as the cloud is at least 10% visible
+        // Calculate text opacity based on progress
+        let textOpacity = this.opacity; // Use the global opacity we're tracking
+        
+        // Calculate maximum allowed text width (80% of play area width)
+        const maxTextWidth = playAreaWidth * 0.8;
+        
+        // Start with a smaller font size than before - 20% of cloud size instead of 25%
+        // This helps avoid overflow on smaller screens while still being dramatic
+        let fontSize = max(min(currentSize * 0.20, 80), 30);
+        
+        // Set text properties for measurement
+        textAlign(CENTER, CENTER);
+        textSize(fontSize);
+        textStyle(BOLD);
+        
+        // Check if verb text fits within max width
+        let verbWidth = textWidth(this.verb);
+        
+        // If text is too wide, either scale down font size or wrap text
+        let textLines = [this.verb];
+        
+        // If text is still too wide even at minimum font size, use text wrapping
+        if (verbWidth > maxTextWidth && fontSize <= 30) {
+          textLines = splitTextIntoLines(this.verb, maxTextWidth);
+        } 
+        // Otherwise, reduce font size until text fits (but don't go below minimum)
+        else if (verbWidth > maxTextWidth) {
+          // Scale down font size until text fits (or until we hit the minimum size)
+          while (verbWidth > maxTextWidth && fontSize > 30) {
+            fontSize -= 2;
+            textSize(fontSize);
+            verbWidth = textWidth(this.verb);
+          }
+        }
+        
+        // Apply the final font size
+        textSize(fontSize);
+        
+        // Draw the text (shadow first, then actual text)
+        const lineHeight = fontSize * 1.2; // Line spacing for multi-line text
+        const startY = this.y - ((textLines.length - 1) * lineHeight / 2);
+        
+        for (let i = 0; i < textLines.length; i++) {
+          const lineY = startY + (i * lineHeight);
+          
+          // Draw text shadow for better visibility
+          fill(0, 0, 0, textOpacity * 0.4);
+          text(textLines[i], this.x + 4, lineY + 4);
+          
+          // Draw main text with stronger color and golden outline
+          let primaryColor = color(COLORS.secondary);
+          primaryColor.setAlpha(textOpacity);
+          
+          // Create an outline color with the same opacity
+          let outlineColor = color(COLORS.tertiary); // Yellow/gold
+          outlineColor.setAlpha(textOpacity);
+          
+          // Draw golden outline for dramatic effect
+          stroke(outlineColor);
+          strokeWeight(3);
+          fill(primaryColor);
+          text(textLines[i], this.x, lineY);
+        }
+      }
+      
+      pop();
+    }
+  }
+  
+  // Function to create a final verb animation and delay the win screen
+  function createFinalVerbAnimation(verb) {
+    // Default verb if none is provided
+    const displayVerb = verb || "Complete!";
+    
+    // Find the final vessel
+    const finalVessel = vessels.find(v => v.name === final_combination.name);
+    
+    // Create the special animation with vessel reference
+    animations.push(new FinalVerbAnimation(displayVerb, finalVessel));
+    
+    // Create the persistent flower animation instead of adding to regular animations
+    persistentFlowerAnimation = new FlowerBurstAnimation();
+  }
+  
+  // Add a class for the celebratory flower burst animation
+  class FlowerBurstAnimation {
+    constructor() {
+      this.active = true;
+      this.duration = 90; // 3 seconds at 30fps (reduced from 180)
+      this.progress = 0;
+      this.flowers = [];
+      this.delayFrames = 23; // Delay start by 0.75 seconds (23 frames at 30fps, reduced from 45)
+      this.delayComplete = false;
+      
+      // Center of the screen
+      this.centerX = playAreaX + playAreaWidth/2;
+      this.centerY = playAreaY + playAreaHeight/2;
+      
+      // Create flowers that will burst outward
+      const numberOfFlowers = 60; // Lots of flowers for a dense effect
+      
+      for (let i = 0; i < numberOfFlowers; i++) {
+        // Random angle for outward trajectory
+        const angle = random(TWO_PI);
+        
+        // Random distance from center (will be multiplied by progress)
+        const maxRadius = max(width, height) * 1.5; // Much larger to ensure flowers leave screen
+        const radius = random(maxRadius * 0.7, maxRadius);
+        
+        // Random size for variety
+        const size = random(10, 25);
+        
+        // Random speed for varied expansion
+        const speed = random(0.8, 1.2);
+        
+        // Random color from our palette (green, orange, yellow only)
+        const colorOptions = [COLORS.primary, COLORS.secondary, COLORS.tertiary];
+        const color = colorOptions[floor(random(colorOptions.length))];
+        
+        // Create the flower with simpler properties (no rotation or gravity)
+        this.flowers.push({
+          angle,
+          radius,
+          size,
+          color,
+          speed
+        });
+      }
+      
+      console.log("Created simplified flower burst animation with", numberOfFlowers, "flowers (delayed by 0.75s)");
+    }
+    
+    update() {
+      // Handle delay before starting animation
+      if (!this.delayComplete) {
+        this.delayFrames--;
+        if (this.delayFrames <= 0) {
+          this.delayComplete = true;
+          console.log("Flower burst delay complete, starting animation");
+        }
+        return false; // Don't remove during delay
+      }
+      
+      // Update progress once delay is complete
+      this.progress += 1 / this.duration;
+      
+      // Animation complete when progress reaches 1
+      if (this.progress >= 1) {
+        this.active = false;
+        return true;
+      }
+      
+      return false;
+    }
+    
+    draw() {
+      // Don't draw anything during the delay period
+      if (!this.delayComplete || !this.active) return;
+      
+      push();
+      
+      for (const flower of this.flowers) {
+        // Calculate current radius - continuous expansion throughout the animation
+        // Using easeOutQuad for natural feeling acceleration at the start
+        const easeOutQuad = 1 - (1 - this.progress) * (1 - this.progress);
+        const currentRadius = flower.radius * easeOutQuad * flower.speed;
+        
+        // Calculate position with straight outward movement (no rotation)
+        const x = this.centerX + cos(flower.angle) * currentRadius;
+        const y = this.centerY + sin(flower.angle) * currentRadius;
+        
+        // Only draw if on screen (performance optimization)
+        if (x > -flower.size && x < width + flower.size && 
+            y > -flower.size && y < height + flower.size) {
+          // Draw the flower
+          drawFlower(x, y, flower.size, flower.color);
+        }
+      }
+      
+      pop();
+    }
+  }
+  
+  // Function to actually show the win screen after animation completes
+  
+  
+  // Add a new helper function for creating verb animations after vessel positioning
+  function createVerbAnimationForVessel(vessel) {
+    let verbFound = false;
+    
+    // First, check if this is the final combination
+    const isFinalCombination = vessels.length === 1 && vessel.name === final_combination.name;
+    
+    if (isFinalCombination) {
+      console.log("Final combination detected in createVerbAnimationForVessel - using FinalVerbAnimation");
+      
+      // For final combinations, find the verb but don't create regular animation
+      if (final_combination.verb) {
+        vessel.verb = final_combination.verb;
+        verbFound = true;
+        console.log(`Found verb "${vessel.verb}" for final vessel`);
+      } else {
+        // Fallback verb for final combination if none exists
+        vessel.verb = "Complete!";
+        verbFound = true;
+        console.log("Using fallback verb 'Complete!' for final vessel");
+      }
+      
+      // Create special final verb animation instead of regular one
+      const finalVerb = vessel.verb;
+      createFinalVerbAnimation(finalVerb);
+      
+      // Set verbDisplayTime to prevent duplicate animations
+      vessel.verbDisplayTime = 119;
+      
+      return true;
+    }
+    
+    // If not final combination, proceed with regular verb setting
+    // Find and set the verb from intermediate combinations
+    for (let combo of intermediate_combinations) {
+      if (combo.name === vessel.name && combo.verb) {
+        vessel.verb = combo.verb;
+        verbFound = true;
+        console.log(`Found verb "${vessel.verb}" for vessel: ${vessel.name}`);
+        break;
+      }
+    }
+    
+    // Check final combination reference if no verb found yet (for non-final vessels that use final recipe)
+    if (!verbFound && final_combination.name === vessel.name) {
+      if (final_combination.verb) {
+        vessel.verb = final_combination.verb;
+        verbFound = true;
+        console.log(`Found verb "${vessel.verb}" for vessel with final recipe name`);
+      } else {
+        // Fallback verb for final combination if none exists
+        vessel.verb = "Prepare";
+        verbFound = true;
+        console.log("Using fallback verb for vessel with final recipe name");
+      }
+    }
+    
+    // If we still don't have a verb, use a default
+    if (!verbFound && !vessel.verb) {
+      vessel.verb = "Mix";
+      console.log("No verb found, using default verb 'Mix'");
+    }
+    
+    // Create the animation directly instead of waiting for displayVerb to be called
+    console.log("Creating immediate verb animation for:", vessel.verb, "at position", vessel.x, vessel.y);
+    animations.push(new VerbAnimation(vessel.verb, vessel.x, vessel.y, vessel));
+    
+    // Set verbDisplayTime to 119 to prevent duplicate animations from displayVerb()
+    vessel.verbDisplayTime = 119;
+    
+    return true;
+  }
   

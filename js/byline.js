@@ -226,11 +226,22 @@ const Byline = (function() {
    * Show a random message when the player creates a successful combination
    */
   function showSuccessMessage() {
-    // 50% chance of showing a success message
-    if (Math.random() < 0.5) {
-      // Pick a random message from the array
-      const randomMessage = successMessages[Math.floor(Math.random() * successMessages.length)];
-      updateWithTransition(randomMessage, bylineHintDuration);
+    // Check if in tutorial mode
+    if (window.isTutorialMode) {
+      // For tutorial, check if success message hasn't been shown yet
+      if (!window.tutorialMessagesShown.firstSuccessShown) {
+        window.tutorialMessagesShown.firstSuccessShown = true;
+        updateWithTransition(window.tutorialBylines.firstSuccess, bylineHintDuration);
+      }
+    } 
+    // Standard game success messages
+    else {
+      // 50% chance of showing a success message
+      if (Math.random() < 0.5) {
+        // Pick a random message from the array
+        const randomMessage = successMessages[Math.floor(Math.random() * successMessages.length)];
+        updateWithTransition(randomMessage, bylineHintDuration);
+      }
     }
     
     // Always reset inactivity counter when player successfully creates a combination
@@ -242,6 +253,19 @@ const Byline = (function() {
    * Show a message for partial combinations (yellow vessels)
    */
   function showPartialComboMessage() {
+    // Handle tutorial mode separately
+    if (window.isTutorialMode) {
+      // For tutorial, check if the completed combo message hasn't been shown yet
+      if (!window.tutorialMessagesShown.firstComboCompletedShown) {
+        window.tutorialMessagesShown.firstComboCompletedShown = true;
+        updateWithTransition(window.tutorialBylines.firstComboCompleted, bylineHintDuration);
+      }
+      // Always reset inactivity counter
+      resetInactivityCount();
+      return;
+    }
+    
+    // Standard game partial combo messages
     // If this is the first partial combo, always show a message
     if (!firstPartialComboCreated) {
       firstPartialComboCreated = true;

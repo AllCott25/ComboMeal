@@ -1,7 +1,7 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: May 3, 2025 (APlasker)
+ * Last Updated: May 7, 2025 (22:34) - APlasker
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
@@ -13,13 +13,22 @@
  * - Fixed base vessel color to display properly as white
  * - Added underline to "How to Play" title (May 3, 2025)
  * - Adjusted Hint button text size to match in-game button (May 3, 2025)
+ * - Added centered intro text with mission statement (May 7, 2025, 22:24) - APlasker
+ * - Adjusted row spacing for better content visibility (May 7, 2025, 22:24) - APlasker
+ * - Fine-tuned vertical spacing of title and content (May 7, 2025, 22:34) - APlasker
  */
 
 // Global variable to track help modal state
 window.helpModal = null;
 
+// Array to store tutorial vessels for animations
+window.tutorialVessels = [];
+
 // Function to create and display the help modal
 function showHelpModal() {
+  // Clear any existing tutorial vessels
+  window.tutorialVessels = [];
+
   // Create the help modal if it doesn't exist
   window.helpModal = {
     active: true,
@@ -68,13 +77,17 @@ function showHelpModal() {
       textAlign(CENTER, TOP);
       textSize(this.width * 0.05); // 5% of modal width
       textStyle(BOLD);
-      text("How to Play", this.x, this.y - this.height/2 + 35); // Changed from 30 to 35
+      
+      // Use different title text based on tutorial mode - APlasker
+      const titleText = (typeof isTutorialMode !== 'undefined' && isTutorialMode) ? 
+        "Tutorial Recipe" : "How to Play";
+      text(titleText, this.x, this.y - this.height/2 + 30); // Title at top
       
       // Add underline to the title
-      const titleWidth = textWidth("How to Play");
+      const titleWidth = textWidth(titleText);
       stroke(0); // Black line
       strokeWeight(1.5);
-      line(this.x - titleWidth/2, this.y - this.height/2 + 55, this.x + titleWidth/2, this.y - this.height/2 + 55);
+      line(this.x - titleWidth/2, this.y - this.height/2 + 45, this.x + titleWidth/2, this.y - this.height/2 + 45);
       
       // Calculate vertical shift for content (2% of modal height up)
       const contentShift = this.height * 0.02;
@@ -82,7 +95,7 @@ function showHelpModal() {
       // Define vessel and text properties - RAISED BY 2% OF MODAL HEIGHT
       const contentWidth = this.width * 0.9; // 90% of modal width
       const contentHeight = this.height * 0.85; // 85% of modal height
-      const contentTop = this.y - this.height/2 + 70 - contentShift; // Raised by contentShift
+      const contentTop = this.y - this.height/2 + 75 - contentShift; // Adjusted to 75px from top with 2% shift
       
       // Calculate column widths
       const vesselColumnWidth = contentWidth * 0.30; // 30% of content width
@@ -96,38 +109,44 @@ function showHelpModal() {
       const vesselWidth = vesselColumnWidth * 1.7; // 170% of column width
       const vesselHeight = vesselWidth * 0.6; // Maintain aspect ratio
       
-      // Calculate spacing between rows
-      const rowCount = 5; // Five rows of content including star row
-      const rowSpacing = (contentHeight / rowCount)*.5; // Changed from (contentHeight / rowCount) * 0.5 to fix overlapping rows
+      // Calculate spacing between rows - ADJUSTED: reduced to 40% of original
+      const rowCount = 5; // Five rows of content (intro text + 4 instruction rows)
+      const rowSpacing = (contentHeight / rowCount) * 0.40; // Adjusted to 40% as requested
       
       // Calculate vertical offset for Column 1 (1% of modal height)
       const column1VerticalOffset = this.height * 0.01;
       
-      // Vessel configurations
+      // Draw intro text at the top of the content area
+      this.drawIntroText(contentTop, contentWidth);
+      
+      // Vessel configurations for standard rows (now starts at index 0 since we removed the multi-vessel row)
       const vesselConfig = [
-        { name: "Carrots", color: "vesselBase", text: "Drag & drop one ingredient on to another to combine them step-by-step into a mystery recipe." },
-        { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow combos need more ingredients. Check the recipe card to see how much more to add." },
-        { name: "Carrot Sheet Cake", color: "green", text: "Combos turn green & transform when you reach the next step. Keep combining until you've made the final dish!" },
-        { type: "hintButton", text: "Use Hints to discover what to make next to help complete the dish." },
+        { name: "Carrots", color: "vesselBase", text: "Drag & drop one ingredient on to another to combine them! Which ingredients go together?" },
+        { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow Combos need more ingredients in order to complete that step of the recipe. What else can you add?" },
+        { name: "Carrot Sheet Cake", color: "green", text: "A completed Combo turns green and transforms. Keep combining until you make the final dish!" },
+        { type: "hintButton", text: "Check the recipe card and use Hints to help you figure out what to make next." },
         { type: "star", text: "Combine everything together with as few mistakes as possible to make the grade!" }
       ];
       
-      // Draw each row
+      // Draw each regular row
       for (let i = 0; i < vesselConfig.length; i++) {
         const config = vesselConfig[i];
-        // Calculate row Y positions with tighter spacing
-        const rowY = contentTop + (rowSpacing * 2 * i) + rowSpacing;
+        // Calculate row Y positions with tighter spacing - add extra space after intro text
+        const rowY = contentTop + rowSpacing + (rowSpacing * 2 * i) + rowSpacing;
         
         if (config.type === "star") {
-          // Draw star icon for the 5th row - add vertical offset to Column 1
+          // Draw star icon for the last row - add vertical offset to Column 1
           drawStarIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.5);
         } else if (config.type === "hintButton") {
-          // Draw circular hint button for the 4th row - add vertical offset to Column 1
+          // Draw circular hint button for the hint row - add vertical offset to Column 1
           drawHintButtonIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.4);
         } else {
           // Draw vessel for regular rows - add vertical offset to Column 1
           const vessel = createTutorialVessel(config.name, config.color, vesselColumnX, rowY + column1VerticalOffset, vesselWidth, vesselHeight);
           vessel.draw();
+          
+          // Store the vessel for future animation
+          window.tutorialVessels.push(vessel);
         }
         
         // Draw explanation text - kept at original position (no offset for Column 2)
@@ -147,6 +166,31 @@ function showHelpModal() {
       }
       
       pop();
+    },
+    
+    // New method to draw the intro text
+    drawIntroText: function(startY, availableWidth) {
+      const introText = "Solve the secret recipe by combining ingredients and using your noodle!";
+      
+      // Calculate text properties
+      const textWidth = availableWidth * 0.8; // Use 80% of available width
+      const fontSize = this.width * 0.04; // 4% of modal width
+      const lineHeight = fontSize * 1.3; // 130% of font size
+      
+      // Style the text
+      fill(COLORS.primary); // Use green for the intro text to make it stand out
+      noStroke();
+      textAlign(CENTER, TOP);
+      textSize(fontSize);
+      textStyle(BOLD);
+      
+      // Wrap the text
+      const wrappedLines = wrapTextToWidth(introText, textWidth);
+      
+      // Draw each line
+      for (let i = 0; i < wrappedLines.length; i++) {
+        text(wrappedLines[i], this.x, startY + (i * lineHeight));
+      }
     },
     
     hide: function() {
@@ -315,6 +359,12 @@ function createTutorialVessel(name, colorType, x, y, width, height) {
   vessel.textScale = 0.66;
   
   return vessel;
+}
+
+// Animation function for tutorial vessels (to be implemented)
+function animateTutorialVessels() {
+  // This will be implemented in the future to enable animations
+  // It will use the vessels stored in window.tutorialVessels
 }
 
 // Ensure showHelpModal is available globally

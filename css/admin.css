@@ -133,6 +133,25 @@ button[type="button"]:hover {
     border: 1px solid #bee5eb;
 }
 
+/* Character counter styles */
+.char-counter {
+    font-size: 12px;
+    color: #777;
+    margin-top: 4px;
+    text-align: right;
+    transition: all 0.2s ease;
+}
+
+.char-counter.limit-warning {
+    color: #f39c12;
+    font-weight: bold;
+}
+
+.char-counter.limit-reached {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
 .tabs {
     display: flex;
     margin-bottom: 20px;

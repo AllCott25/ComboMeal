@@ -53,6 +53,13 @@ function combineVessels(v1, v2) {
             new_v.color = COLORS.green; // Use COLORS.green instead of string 'green'
             new_v.ingredients = []; // Clear ingredients since this is now a complete combination
             
+            // Call success message for completed combination (green vessel) - APlasker
+            if (typeof Byline !== 'undefined' && Byline.showSuccessMessage) {
+              Byline.showSuccessMessage();
+            } else if (typeof window.Byline !== 'undefined' && window.Byline.showSuccessMessage) {
+              window.Byline.showSuccessMessage();
+            }
+            
             // Set the verb from the combination and display it
             for (let combo of intermediate_combinations) {
               if (combo.name === C.name && combo.verb) {
@@ -108,6 +115,13 @@ function combineVessels(v1, v2) {
         } else {
           console.log(`Created yellow vessel with ingredients: ${U.join(', ')}`);
           console.log(`Missing ingredients for ${C.name}: ${C.required.filter(ing => !U.includes(ing)).join(', ')}`);
+          
+          // Call partial combo message for yellow vessel (partial combination) - APlasker
+          if (typeof Byline !== 'undefined' && Byline.showPartialComboMessage) {
+            Byline.showPartialComboMessage();
+          } else if (typeof window.Byline !== 'undefined' && window.Byline.showPartialComboMessage) {
+            window.Byline.showPartialComboMessage();
+          }
           
           // Track this as the active partial combination
           activePartialCombo = C.name;
@@ -405,23 +419,14 @@ function combineVessels(v1, v2) {
       return !combo.required.some(ingredient => completedCombos.includes(ingredient));
     });
     
-    // If all intermediate combinations are done or hinted, check final combination
-    if (availableCombos.length === 0 && 
-        !completedCombos.includes(final_combination.name) && 
-        !hintedCombos.includes(final_combination.name)) {
-      
-      let finalComboRequiredCount = final_combination.required.length;
-      let finalComboCompletedCount = final_combination.required.filter(req => 
-        completedCombos.includes(req)).length;
-      
-      if (finalComboCompletedCount > 0 && finalComboCompletedCount < finalComboRequiredCount) {
-        return true; // Final combo is available
-      }
-      
-      return false; // No combos available
+    // If we have intermediate combinations available, hint is available
+    if (availableCombos.length > 0) {
+      return true;
     }
     
-    return availableCombos.length > 0; // Return true if there are available combos
+    // If there are no intermediate combinations available, don't consider the final combination
+    // This will prevent hints on the final step as requested
+    return false;
   }
   
   // Function to show a hint
@@ -495,20 +500,8 @@ function combineVessels(v1, v2) {
       console.log("Available combinations after filtering out those requiring completed combos:", 
         availableCombos.map(c => c.name));
       
-      // If all intermediate combinations are done or hinted, check final combination
-      if (availableCombos.length === 0 && 
-          !completedCombos.includes(final_combination.name) && 
-          !hintedCombos.includes(final_combination.name)) {
-        // For the final combination, we actually want to use completed combinations
-        // But only if not all required combinations are completed yet
-        let finalComboRequiredCount = final_combination.required.length;
-        let finalComboCompletedCount = final_combination.required.filter(req => 
-          completedCombos.includes(req)).length;
-        
-        if (finalComboCompletedCount > 0 && finalComboCompletedCount < finalComboRequiredCount) {
-          availableCombos = [final_combination];
-        }
-      }
+      // We no longer check for final combination since areHintsAvailable will prevent
+      // the hint button from being active when only the final combination is available
       
       // For each available combination, calculate what percentage of its ingredients are visible
       availableCombos.forEach(combo => {
@@ -1689,17 +1682,42 @@ function combineVessels(v1, v2) {
     // Get the required components for the final combination
     const requiredComponents = final_combination.required;
     
-    // If we don't have the right number of vessels, we're not ready
-    if (vessels.length !== requiredComponents.length) return false;
+    // Create maps to track requirements and available vessels
+    let requiredComponentsMap = {};
+    let availableVesselsMap = {};
     
-    // Check if each vessel corresponds to a required component
-    const vesselNames = vessels.map(v => v.name);
-    
-    // For each required component, check if there's a matching vessel
+    // Count occurrences of each required component
     for (const component of requiredComponents) {
-      if (!vesselNames.includes(component)) {
+      requiredComponentsMap[component] = (requiredComponentsMap[component] || 0) + 1;
+    }
+    
+    // Count occurrences of each available vessel by name
+    // First handle named vessels (intermediate/final combinations)
+    for (const vessel of vessels) {
+      if (vessel.name) {
+        availableVesselsMap[vessel.name] = (availableVesselsMap[vessel.name] || 0) + 1;
+      } else if (vessel.ingredients && vessel.ingredients.length === 1) {
+        // Handle base ingredients that might be direct parts of the final recipe
+        const baseIngredient = vessel.ingredients[0];
+        if (requiredComponentsMap[baseIngredient]) {
+          availableVesselsMap[baseIngredient] = (availableVesselsMap[baseIngredient] || 0) + 1;
+        }
+      }
+    }
+    
+    // Check if all required components are available in the right quantities
+    for (const component in requiredComponentsMap) {
+      if (!availableVesselsMap[component] || 
+          availableVesselsMap[component] < requiredComponentsMap[component]) {
         return false;
       }
+    }
+    
+    // Also verify we don't have extra vessels that aren't part of the final combination
+    // (This prevents auto-combining when there are irrelevant vessels)
+    let totalRequiredCount = Object.values(requiredComponentsMap).reduce((sum, count) => sum + count, 0);
+    if (vessels.length > totalRequiredCount) {
+      return false;
     }
     
     // If we've passed all checks, we're ready
