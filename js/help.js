@@ -1,7 +1,7 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: May 7, 2025 (22:34) - APlasker
+ * Last Updated: May 8, 2025 (15:21) - APlasker
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
@@ -16,6 +16,7 @@
  * - Added centered intro text with mission statement (May 7, 2025, 22:24) - APlasker
  * - Adjusted row spacing for better content visibility (May 7, 2025, 22:24) - APlasker
  * - Fine-tuned vertical spacing of title and content (May 7, 2025, 22:34) - APlasker
+ * - Implemented variable spacing to better utilize modal height (May 8, 2025, 15:21) - APlasker
  */
 
 // Global variable to track help modal state
@@ -71,7 +72,10 @@ function showHelpModal() {
       line(xPosX - xSize/2, xPosY - xSize/2, xPosX + xSize/2, xPosY + xSize/2);
       line(xPosX - xSize/2, xPosY + xSize/2, xPosX + xSize/2, xPosY - xSize/2);
       
-      // "How to Play" title - LOWERED BY ADDITIONAL 5px (total 15px from original)
+      // Calculate title position (30px from top edge)
+      const titleY = this.y - this.height/2 + 30;
+      
+      // "How to Play" title 
       fill(0); // Black text
       noStroke();
       textAlign(CENTER, TOP);
@@ -81,21 +85,25 @@ function showHelpModal() {
       // Use different title text based on tutorial mode - APlasker
       const titleText = (typeof isTutorialMode !== 'undefined' && isTutorialMode) ? 
         "Tutorial Recipe" : "How to Play";
-      text(titleText, this.x, this.y - this.height/2 + 30); // Title at top
+      text(titleText, this.x, titleY); // Title at top
       
-      // Add underline to the title
+      // Calculate title height for positioning the underline
+      const titleHeight = textAscent() + textDescent();
+      
+      // Add underline 15px below the title (not fixed from top edge)
       const titleWidth = textWidth(titleText);
+      const underlineY = titleY + 15; // Position underline 15px below title
       stroke(0); // Black line
       strokeWeight(1.5);
-      line(this.x - titleWidth/2, this.y - this.height/2 + 45, this.x + titleWidth/2, this.y - this.height/2 + 45);
+      line(this.x - titleWidth/2, underlineY, this.x + titleWidth/2, underlineY);
       
-      // Calculate vertical shift for content (2% of modal height up)
-      const contentShift = this.height * 0.02;
+      // Define content area start position (relative to modal height)
+      // Position content to start 75px from top edge
+      const contentTop = this.y - this.height/2 + 75;
       
-      // Define vessel and text properties - RAISED BY 2% OF MODAL HEIGHT
+      // Define vessel and text properties
       const contentWidth = this.width * 0.9; // 90% of modal width
       const contentHeight = this.height * 0.85; // 85% of modal height
-      const contentTop = this.y - this.height/2 + 75 - contentShift; // Adjusted to 75px from top with 2% shift
       
       // Calculate column widths
       const vesselColumnWidth = contentWidth * 0.30; // 30% of content width
@@ -105,21 +113,23 @@ function showHelpModal() {
       const vesselColumnX = this.x - contentWidth/2 + vesselColumnWidth/2; // Left column
       const textColumnX = this.x + contentWidth/2 - textColumnWidth/2; // Right column
       
-      // Calculate vessel sizes
+      // Calculate vessel sizes (unchanged)
       const vesselWidth = vesselColumnWidth * 1.7; // 170% of column width
       const vesselHeight = vesselWidth * 0.6; // Maintain aspect ratio
-      
-      // Calculate spacing between rows - ADJUSTED: reduced to 40% of original
-      const rowCount = 5; // Five rows of content (intro text + 4 instruction rows)
-      const rowSpacing = (contentHeight / rowCount) * 0.40; // Adjusted to 40% as requested
       
       // Calculate vertical offset for Column 1 (1% of modal height)
       const column1VerticalOffset = this.height * 0.01;
       
+      // Calculate available vertical space for content
+      // Account for title area and bottom margin
+      const titleAreaHeight = 75; // Space used by title section from top edge
+      const bottomMargin = this.height * 0.05; // 5% bottom margin
+      const availableHeight = this.height - titleAreaHeight - bottomMargin;
+      
       // Draw intro text at the top of the content area
       this.drawIntroText(contentTop, contentWidth);
       
-      // Vessel configurations for standard rows (now starts at index 0 since we removed the multi-vessel row)
+      // Vessel configurations for standard rows
       const vesselConfig = [
         { name: "Carrots", color: "vesselBase", text: "Drag & drop one ingredient on to another to combine them! Which ingredients go together?" },
         { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow Combos need more ingredients in order to complete that step of the recipe. What else can you add?" },
@@ -128,18 +138,25 @@ function showHelpModal() {
         { type: "star", text: "Combine everything together with as few mistakes as possible to make the grade!" }
       ];
       
+      // Calculate row spacing to evenly distribute the content
+      // We need space for intro text plus all rows in vesselConfig
+      const rowCount = vesselConfig.length + 1; // +1 for intro text
+      const rowHeight = availableHeight / rowCount;
+      
       // Draw each regular row
       for (let i = 0; i < vesselConfig.length; i++) {
         const config = vesselConfig[i];
-        // Calculate row Y positions with tighter spacing - add extra space after intro text
-        const rowY = contentTop + rowSpacing + (rowSpacing * 2 * i) + rowSpacing;
+        
+        // Calculate position for this row - evenly spaced
+        // Leave space for intro text (one row height) plus current row position
+        const rowY = contentTop + rowHeight + (i * rowHeight);
         
         if (config.type === "star") {
           // Draw star icon for the last row - add vertical offset to Column 1
-          drawStarIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.5);
+          drawStarIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.4);
         } else if (config.type === "hintButton") {
           // Draw circular hint button for the hint row - add vertical offset to Column 1
-          drawHintButtonIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.4);
+          drawHintButtonIcon(vesselColumnX, rowY + column1VerticalOffset, vesselWidth * 0.32);
         } else {
           // Draw vessel for regular rows - add vertical offset to Column 1
           const vessel = createTutorialVessel(config.name, config.color, vesselColumnX, rowY + column1VerticalOffset, vesselWidth, vesselHeight);
@@ -168,7 +185,7 @@ function showHelpModal() {
       pop();
     },
     
-    // New method to draw the intro text
+    // Method to draw the intro text
     drawIntroText: function(startY, availableWidth) {
       const introText = "Solve the secret recipe by combining ingredients and using your noodle!";
       
