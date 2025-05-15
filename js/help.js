@@ -1,7 +1,7 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: May 8, 2025 (15:21) - APlasker
+ * Last Updated: May 15, 2025 (10:34) - APlasker
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
@@ -17,6 +17,7 @@
  * - Adjusted row spacing for better content visibility (May 7, 2025, 22:24) - APlasker
  * - Fine-tuned vertical spacing of title and content (May 7, 2025, 22:34) - APlasker
  * - Implemented variable spacing to better utilize modal height (May 8, 2025, 15:21) - APlasker
+ * - Updated row 2-5 text and colors to match latest game version (May 15, 2025, 10:34) - APlasker
  */
 
 // Global variable to track help modal state
@@ -63,7 +64,7 @@ function showHelpModal() {
       
       // X button circle background
       noStroke();
-      fill(COLORS.secondary); // Red background for X
+      fill(COLORS.secondary); // Pink background for X
       circle(xPosX, xPosY, xSize * 2); // Circle with diameter of 30px
       
       // X mark
@@ -132,8 +133,8 @@ function showHelpModal() {
       // Vessel configurations for standard rows
       const vesselConfig = [
         { name: "Carrots", color: "vesselBase", text: "Drag & drop one ingredient on to another to combine them! Which ingredients go together?" },
-        { name: "Carrots + Flour + Eggs", color: "yellow", text: "Yellow Combos need more ingredients in order to complete that step of the recipe. What else can you add?" },
-        { name: "Carrot Sheet Cake", color: "green", text: "A completed Combo turns green and transforms. Keep combining until you make the final dish!" },
+        { name: "Carrots + Flour + Eggs", color: "yellow", text: "Complete each recipe step by combining everything needed. What else can you add?" },
+        { name: "Carrot Sheet Cake", color: "#cfc23f", text: "The combo transforms when all the step's ingredients are added. Keep combining correctly until you have one final dish." },
         { type: "hintButton", text: "Check the recipe card and use Hints to help you figure out what to make next." },
         { type: "star", text: "Combine everything together with as few mistakes as possible to make the grade!" }
       ];
@@ -241,12 +242,12 @@ function showHelpModal() {
   };
 }
 
-// Function to draw a 5-pointed star icon in mustard yellow with black outline
+// Function to draw a 5-pointed star icon with bright yellow color
 function drawStarIcon(x, y, size) {
   push();
   
-  // Use COLORS.tertiary for mustard yellow
-  fill(COLORS.tertiary);
+  // Use bright yellow color (#f7dc30) for star
+  fill('#f7dc30');
   
   // Add subtle outline with same visual weight as vessels
   stroke(0, 50); // Use the same subtle border as buttons
@@ -274,8 +275,8 @@ function drawStarIcon(x, y, size) {
 function drawHintButtonIcon(x, y, size) {
   push();
   
-  // Use COLORS.vesselHint for hint button fill (red)
-  fill(COLORS.vesselHint);
+  // Use pink color (#cf6d88) for hint button
+  fill('#cf6d88');
   
   // Use the same subtle border as buttons
   stroke(0, 50);
@@ -354,6 +355,10 @@ function createTutorialVessel(name, colorType, x, y, width, height) {
   } else if (colorType === "red" || colorType === "#FF5252") {
     // Hint vessel
     color = COLORS.vesselHint;
+  } else {
+    // Use the exact color provided (for mustard yellow #cfc23f)
+    color = colorType;
+    isComplete = true;
   }
   
   // Create a standard vessel with the right configuration

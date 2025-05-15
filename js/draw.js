@@ -257,7 +257,7 @@ function drawWinMoveHistory(x, y, width, height) {
     // Draw flowers in each corner
     drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
     drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
-    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
+    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left - Changed from tertiary to peach - APlasker
     drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
     
     // Create an array of combo information objects with ingredient counts
@@ -283,8 +283,8 @@ function drawWinMoveHistory(x, y, width, height) {
       // Set isCircular flag to true for circle shape
       hintButton.isCircular = true;
       
-      // Change hint button color to match hint vessel color (red) and text to white
-      hintButton.color = COLORS.vesselHint;
+      // Change hint button color to match Cook! button (pink) and text to white
+      hintButton.color = COLORS.secondary;
       hintButton.textColor = 'white';
       
       // Reduce hint text size to 50% of current size
@@ -324,7 +324,7 @@ function drawWinMoveHistory(x, y, width, height) {
         isBaseIngredientsOnly,
         baseIngredientCount,
         baseIngredientPercentage,
-        isPartialCombo: partialCombinations.includes(combo.name) // Add tracking for partial combos
+        isPartialCombo: partialCombinations.includes(combo.name) || startedCombinations.includes(combo.name) // Check both arrays - APlasker
       });
     }
     
@@ -384,7 +384,7 @@ function drawWinMoveHistory(x, y, width, height) {
       baseIngredientCount: finalBaseIngsCount, // Store the count of base ingredients
       baseIngredientPercentage: totalFinalRequired > 0 ? finalBaseIngsCount / totalFinalRequired : 0,
       isFinalCombo: true,
-      isPartialCombo: partialCombinations.includes(final_combination.name) // Add tracking for final combo as well
+      isPartialCombo: partialCombinations.includes(final_combination.name) || startedCombinations.includes(final_combination.name) // Check both arrays - APlasker
     });
     
     // --- IMPLEMENT SORTING LOGIC FOR COMBOS - APlasker ---
@@ -392,23 +392,110 @@ function drawWinMoveHistory(x, y, width, height) {
     // Step 2: Sort other combinations (to the right, highest percentage of base ingredients rightmost)
     // Step 3: Ensure final combo is all the way on the right
     
-    comboInfo.sort((a, b) => {
-      // Final combo always goes last (furthest right)
-      if (a.isFinalCombo) return 1;
-      if (b.isFinalCombo) return -1;
+    // NEW PARENT-CHILD RELATIONSHIP LOGIC - APlasker - 2025-05-14
+    // Create relationship maps to track which combos are used in other combos
+    try {
+      // Define relationship maps
+      const comboRelationships = {}; // Parent → [children]
+      const comboParents = {}; // Child → parent
       
-      // Sort base-ingredients-only combos to the left (instead of right)
-      if (a.isBaseIngredientsOnly && !b.isBaseIngredientsOnly) return -1;
-      if (!a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) return 1;
+      // Build the relationship maps
+      intermediate_combinations.forEach(combo => {
+        // For each combo, check its required ingredients
+        combo.required.forEach(ingredient => {
+          // Check if this ingredient is another combo (not a base ingredient)
+          if (intermediate_combinations.some(ic => ic.name === ingredient)) {
+            // This ingredient is a combo used in another combo
+            if (!comboRelationships[combo.name]) {
+              comboRelationships[combo.name] = [];
+            }
+            comboRelationships[combo.name].push(ingredient);
+            
+            // Also track the parent of each combo
+            comboParents[ingredient] = combo.name;
+          }
+        });
+      });
       
-      // For base-ingredients-only combos, sort by ingredient count (highest count leftmost)
-      if (a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) {
-        return b.requiredCount - a.requiredCount;
-      }
+      // Add parent and child relationship data to comboInfo
+      comboInfo.forEach(combo => {
+        combo.children = comboRelationships[combo.name] || [];
+        combo.parent = comboParents[combo.name] || null;
+      });
       
-      // For other combos, sort by percentage of base ingredients (highest percentage rightmost)
-      return a.baseIngredientPercentage - b.baseIngredientPercentage;
-    });
+      console.log("Built combo relationships:", {
+        relationships: comboRelationships,
+        parents: comboParents
+      });
+      
+      // Keeping track of sibling groups (combos that share the same parent)
+      const siblingGroups = {};
+      
+      // Group combos by their parent
+      Object.keys(comboParents).forEach(child => {
+        const parent = comboParents[child];
+        if (!siblingGroups[parent]) {
+          siblingGroups[parent] = [];
+        }
+        siblingGroups[parent].push(child);
+      });
+      
+      // Sort the combos with the new parent-child logic
+      comboInfo.sort((a, b) => {
+        // Final combo always goes last (furthest right)
+        if (a.isFinalCombo) return 1;
+        if (b.isFinalCombo) return -1;
+        
+        // Sort base-ingredients-only combos to the left (instead of right)
+        if (a.isBaseIngredientsOnly && !b.isBaseIngredientsOnly) return -1;
+        if (!a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) return 1;
+        
+        // If they share the same parent, keep them together
+        if (a.parent && b.parent && a.parent === b.parent) {
+          // If they share a parent, sort alphabetically or by some other property
+          return a.name.localeCompare(b.name);
+        }
+        
+        // If a is a parent of b, put b first
+        if (a.children.includes(b.name)) {
+          return 1; // Parent comes after child
+        }
+        
+        // If b is a parent of a, put a first
+        if (b.children.includes(a.name)) {
+          return -1; // Child comes before parent
+        }
+        
+        // For base-ingredients-only combos, sort by ingredient count (highest count leftmost)
+        if (a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) {
+          return b.requiredCount - a.requiredCount;
+        }
+        
+        // For other combos, use the existing logic
+        return a.baseIngredientPercentage - b.baseIngredientPercentage;
+      });
+    } catch (error) {
+      // If there's any error in the new logic, log it and fall back to the original sorting
+      console.error("Error in parent-child combo sorting, falling back to default:", error);
+      
+      comboInfo.sort((a, b) => {
+        // Final combo always goes last (furthest right)
+        if (a.isFinalCombo) return 1;
+        if (b.isFinalCombo) return -1;
+        
+        // Sort base-ingredients-only combos to the left (instead of right)
+        if (a.isBaseIngredientsOnly && !b.isBaseIngredientsOnly) return -1;
+        if (!a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) return 1;
+        
+        // For base-ingredients-only combos, sort by ingredient count (highest count leftmost)
+        if (a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) {
+          return b.requiredCount - a.requiredCount;
+        }
+        
+        // For other combos, sort by percentage of base ingredients (highest percentage rightmost)
+        return a.baseIngredientPercentage - b.baseIngredientPercentage;
+      });
+    }
     
     // --- SETUP VERTICAL LAYOUT FOR COMBOS ---
     // Calculate the vertical spacing within the card
@@ -665,9 +752,40 @@ function drawWinMoveHistory(x, y, width, height) {
           const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
           comboText = `${capitalizedVerb}!`;
         } else {
+          // Add debugging to help identify issue with missing text
+          console.log(`Generating question marks for combo step ${i+1}:`, {
+            name: combo.name,
+            requiredCount: combo.requiredCount,
+            isPartialCombo: combo.isPartialCombo,
+            isParent: combo.children && combo.children.length > 0,
+            children: combo.children
+          });
+          
+          // Make sure requiredCount is valid for parent combos too
+          let ingredientCount = combo.requiredCount;
+          
+          // If requiredCount is missing or 0 for a parent combo, calculate it
+          if ((!ingredientCount || ingredientCount === 0) && combo.children && combo.children.length > 0) {
+            console.log(`Fixing missing requiredCount for parent combo: ${combo.name}`);
+            // Find the original combo object to get required.length
+            for (let ic of intermediate_combinations) {
+              if (ic.name === combo.name) {
+                ingredientCount = ic.required.length;
+                console.log(`Found original required count: ${ingredientCount}`);
+                break;
+              }
+            }
+          }
+          
+          // If we still don't have a valid count, fallback to children count + 2 (estimation)
+          if (!ingredientCount || ingredientCount === 0) {
+            ingredientCount = (combo.children ? combo.children.length : 0) + 2;
+            console.log(`Using fallback count for ${combo.name}: ${ingredientCount}`);
+          }
+          
           // For other incomplete combos, replace "# ingredients" with "? ? ? ?"
           // Generate a string of question marks with spaces equal to the number of ingredients
-          let questionMarks = Array(combo.requiredCount).fill("?").join(" ");
+          let questionMarks = Array(ingredientCount).fill("?").join(" ");
           comboText = questionMarks;
         }
         // No need to set font size here as we're using the global smallest font size
@@ -689,15 +807,20 @@ function drawWinMoveHistory(x, y, width, height) {
       const stepPrefixWidth = textWidth(`${stepPrefix}`);
       
       // Draw the parallelogram highlight for partial combos (but not for completed ones)
-      if (combo.isPartialCombo && !combo.isCompleted) {
+      if (combo.isPartialCombo) {
         // Calculate the width of the main text (without number prefix)
         textSize(comboFontSize); // Temporarily set back to combo font size to measure text
         const mainTextWidth = textWidth(comboText);
         textSize(prefixFontSize); // Set back to prefix font size
         
-        // Draw parallelogram highlight using mustard yellow with 100% opacity
+        // IMPORTANT: Use the exact same color that the vessel will have when completed
+        // This ensures perfect color matching between highlight and future vessel
         noStroke();
-        fill(COLORS.tertiary); // Mustard yellow with 100% opacity (removed the '40' alpha value)
+        
+        // Call getNextCompletedVesselColor with the combo name to get the exact same color
+        // that will be used when this vessel is created
+        const highlightColor = getNextCompletedVesselColor(combo.name);
+        fill(highlightColor);
         
         // Draw parallelogram shape - skewed to the right
         const skew = 6; // Amount of skew for parallelogram
@@ -932,7 +1055,7 @@ function drawWinMoveHistory(x, y, width, height) {
         } else if (colorIndex === 1) {
           drawFlower(x, y, petalSize, COLORS.secondary);
         } else {
-          drawFlower(x, y, petalSize, COLORS.tertiary);
+          drawFlower(x, y, petalSize, COLORS.peach); // Changed from tertiary (white) to peach/orange - APlasker
         }
       }
     }
@@ -951,7 +1074,7 @@ function drawWinMoveHistory(x, y, width, height) {
         } else if (colorIndex === 1) {
           drawFlower(x, y, petalSize, COLORS.secondary);
         } else {
-          drawFlower(x, y, petalSize, COLORS.tertiary);
+          drawFlower(x, y, petalSize, COLORS.peach); // Changed from tertiary to peach consistently
         }
       }
     }
@@ -993,9 +1116,9 @@ function drawWinMoveHistory(x, y, width, height) {
         if (colorIndex === 0) {
           drawFlower(x, topY, smallerPetalSize, COLORS.primary); // Green
         } else if (colorIndex === 1) {
-          drawFlower(x, topY, smallerPetalSize, COLORS.secondary); // Red/Orange
+          drawFlower(x, topY, smallerPetalSize, COLORS.secondary); // Pink
         } else {
-          drawFlower(x, topY, smallerPetalSize, COLORS.tertiary); // Yellow
+          drawFlower(x, topY, smallerPetalSize, COLORS.peach); // Changed from tertiary (white) to peach/orange - APlasker
         }
       }
     }
@@ -1012,11 +1135,11 @@ function drawWinMoveHistory(x, y, width, height) {
       if (bottomY - smallerPetalSize * 2 > playAreaY + playAreaHeight) {
         const colorIndex = Math.abs(i) % 3; // Use absolute value for symmetry
         if (colorIndex === 0) {
-          drawFlower(x, bottomY, smallerPetalSize, COLORS.tertiary); // Yellow (different order from top)
+          drawFlower(x, bottomY, smallerPetalSize, COLORS.peach); // Peach
         } else if (colorIndex === 1) {
           drawFlower(x, bottomY, smallerPetalSize, COLORS.primary); // Green
         } else {
-          drawFlower(x, bottomY, smallerPetalSize, COLORS.secondary); // Red/Orange
+          drawFlower(x, bottomY, smallerPetalSize, COLORS.secondary); // Pink
         }
       }
     }
@@ -1057,8 +1180,8 @@ function drawWinMoveHistory(x, y, width, height) {
     // Array of colors to cycle through
     const colorArray = [
       COLORS.primary,   // Green
-      COLORS.secondary, // Orange
-      COLORS.tertiary   // Yellow
+      COLORS.secondary, // Pink
+      COLORS.peach      // Peach/orange
     ];
     
     // Draw flowers in a circle
@@ -1474,13 +1597,13 @@ function drawWinMoveHistory(x, y, width, height) {
       let letterColor;
       switch (i % 3) {
         case 0:
-          letterColor = COLORS.primary; // Green
+          letterColor = '#cfc23f'; // Changed from COLORS.primary (olive green) to mustard yellow
           break;
         case 1:
-          letterColor = COLORS.tertiary; // Yellow
+          letterColor = '#f7dc30'; // Changed from COLORS.peach to bright yellow
           break;
         case 2:
-          letterColor = COLORS.secondary; // Red
+          letterColor = COLORS.secondary; // Pink
           break;
       }
       
@@ -1490,23 +1613,48 @@ function drawWinMoveHistory(x, y, width, height) {
       let letterX = x + letterWidths[i]/2;
       let letterY = titleY + offsetY;
       
-      // Draw black outline - thinner for bubble style
+      // SOLID OUTLINE APPROACH - Create smooth solid outlines with multiple text copies
+      push(); // Save drawing state
+      
+      // Set text properties for all layers
+      textAlign(CENTER, CENTER);
+      textSize(titleSize);
+      
+      // Calculate outline sizes
+      const outerSize = 6;  // Outer black outline thickness
+      const middleSize = 4; // Middle peach outline thickness
+      const innerSize = 2;  // Inner black outline thickness
+      
+      // 1. Draw outer black outline (largest) using multiple offset copies
       fill('black');
-      noStroke();
+      // Create a circular pattern of offsets for smooth round outline
+      for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+        let offsetX = cos(angle) * outerSize;
+        let offsetY = sin(angle) * outerSize;
+        text(title[i], letterX + offsetX, letterY + offsetY);
+      }
       
-      // Draw the letter with a thinner outline
-      text(title[i], letterX - outlineWeight, letterY); // Left
-      text(title[i], letterX + outlineWeight, letterY); // Right
-      text(title[i], letterX, letterY - outlineWeight); // Top
-      text(title[i], letterX, letterY + outlineWeight); // Bottom
-      text(title[i], letterX - outlineWeight, letterY - outlineWeight); // Top-left
-      text(title[i], letterX + outlineWeight, letterY - outlineWeight); // Top-right
-      text(title[i], letterX - outlineWeight, letterY + outlineWeight); // Bottom-left
-      text(title[i], letterX + outlineWeight, letterY + outlineWeight); // Bottom-right
+      // 2. Draw middle peach layer using multiple offset copies
+      fill(COLORS.peach);
+      for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+        let offsetX = cos(angle) * middleSize;
+        let offsetY = sin(angle) * middleSize;
+        text(title[i], letterX + offsetX, letterY + offsetY);
+      }
       
-      // Draw letter fill with color
+      // 3. Draw inner black layer using multiple offset copies
+      fill('black');
+      for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+        let offsetX = cos(angle) * innerSize;
+        let offsetY = sin(angle) * innerSize;
+        text(title[i], letterX + offsetX, letterY + offsetY);
+      }
+      
+      // 4. Draw the final colored letter in the center
       fill(letterColor);
       text(title[i], letterX, letterY);
+      
+      pop(); // Restore drawing state
       
       // Move to the next letter position with kerning
       x += letterWidths[i] * (1 + kerningFactor);
@@ -1632,16 +1780,26 @@ function drawWinMoveHistory(x, y, width, height) {
     const margin = Math.max(playAreaWidth * 0.0125, 3); // 1.25% of play area width, min 3px
     
     // Calculate button sizes relative to play area
-    const buttonWidth = Math.max(playAreaWidth * 0.3, 120);
+    const buttonWidth = Math.max(playAreaWidth * 0.25, 120); // Reduced from 30% to 25% of play area width - APlasker
     const buttonHeight = Math.max(playAreaHeight * 0.08, 40);
     
-    // Update start button dimensions
+    // Update button dimensions for both buttons
     startButton.w = buttonWidth;
     startButton.h = buttonHeight;
     
-    // Center the start button in the play area
-    startButton.x = playAreaX + playAreaWidth/2;
-    startButton.y = playAreaY + playAreaHeight * 0.9; // Positioned at 90% of play area height
+    // Position both buttons properly - APlasker
+    tutorialButton.x = playAreaX + playAreaWidth * 0.3; // 30% of play area width
+    tutorialButton.y = playAreaY + playAreaHeight * 0.88; // Lowered from 85% to 88% - APlasker
+    tutorialButton.w = buttonWidth;
+    tutorialButton.h = buttonHeight;
+    
+    startButton.x = playAreaX + playAreaWidth * 0.7; // 70% of play area width
+    startButton.y = playAreaY + playAreaHeight * 0.88; // Lowered from 85% to 88% - APlasker
+    
+    // Draw both buttons after positioning them
+    tutorialButton.draw();
+    tutorialButton.checkHover(mouseX, mouseY);
+    
     startButton.draw();
     startButton.checkHover(mouseX, mouseY);
     
@@ -1654,8 +1812,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // ENHANCEMENT - APlasker - Update version to reflect recipe card text format changes
-    const versionText = "v20250505.0003 - APlasker";
+    // ENHANCEMENT - APlasker - Update version to reflect vessel-style button outlines
+    const versionText = "v20250515.1545 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);

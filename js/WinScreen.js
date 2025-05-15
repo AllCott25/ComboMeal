@@ -119,13 +119,13 @@ function drawWinScreen() {
     let letterColor;
     switch (i % 3) {
       case 0:
-        letterColor = COLORS.primary; // Green
+        letterColor = '#cfc23f'; // Changed from COLORS.primary to mustard yellow to match COMBO MEAL
         break;
       case 1:
-        letterColor = COLORS.tertiary; // Yellow
+        letterColor = '#f7dc30'; // Changed from COLORS.peach to bright yellow to match COMBO MEAL
         break;
       case 2:
-        letterColor = COLORS.secondary; // Red
+        letterColor = COLORS.secondary; // Pink
         break;
     }
     
@@ -135,23 +135,48 @@ function drawWinScreen() {
     let letterX = x + letterWidths[i]/2;
     let letterY = playAreaY + playAreaHeight * 0.06 + offsetY;
     
-    // Draw black outline - thinner for bubble style
+    // SOLID OUTLINE APPROACH - Create smooth solid outlines with multiple text copies - Updated to match COMBO MEAL title
+    push(); // Save drawing state
+    
+    // Set text properties for all layers
+    textAlign(CENTER, CENTER);
+    textSize(rewardMessageSize);
+    
+    // Calculate outline sizes
+    const outerSize = 6;  // Outer black outline thickness
+    const middleSize = 4; // Middle peach outline thickness
+    const innerSize = 2;  // Inner black outline thickness
+    
+    // 1. Draw outer black outline (largest) using multiple offset copies
     fill('black');
-    noStroke();
+    // Create a circular pattern of offsets for smooth round outline
+    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+      let offsetX = cos(angle) * outerSize;
+      let offsetY = sin(angle) * outerSize;
+      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
+    }
     
-    // Draw the letter with a thinner outline
-    text(rewardMessage[i], letterX - outlineWeight, letterY); // Left
-    text(rewardMessage[i], letterX + outlineWeight, letterY); // Right
-    text(rewardMessage[i], letterX, letterY - outlineWeight); // Top
-    text(rewardMessage[i], letterX, letterY + outlineWeight); // Bottom
-    text(rewardMessage[i], letterX - outlineWeight, letterY - outlineWeight); // Top-left
-    text(rewardMessage[i], letterX + outlineWeight, letterY - outlineWeight); // Top-right
-    text(rewardMessage[i], letterX - outlineWeight, letterY + outlineWeight); // Bottom-left
-    text(rewardMessage[i], letterX + outlineWeight, letterY + outlineWeight); // Bottom-right
+    // 2. Draw middle peach layer using multiple offset copies
+    fill(COLORS.peach);
+    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+      let offsetX = cos(angle) * middleSize;
+      let offsetY = sin(angle) * middleSize;
+      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
+    }
     
-    // Draw letter fill with color
+    // 3. Draw inner black layer using multiple offset copies
+    fill('black');
+    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+      let offsetX = cos(angle) * innerSize;
+      let offsetY = sin(angle) * innerSize;
+      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
+    }
+    
+    // 4. Draw the final colored letter in the center
     fill(letterColor);
     text(rewardMessage[i], letterX, letterY);
+    
+    pop(); // Restore drawing state
     
     // Move to the next letter position with kerning
     x += letterWidths[i] * (1 + kerningFactor);
@@ -166,6 +191,10 @@ function drawWinScreen() {
   fill(0, 0, 0, 30);
   noStroke();
   rect(cardX + 5, cardY + 5, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px
+  
+  // Check if mouse is over the recipe card area - Added by APlasker to fix recipe link functionality
+  isMouseOverCard = mouseX > cardX - cardWidth/2 && mouseX < cardX + cardWidth/2 && 
+                   mouseY > cardY - cardHeight/2 && mouseY < cardY + cardHeight/2;
   
   // Card - make it look slightly interactive with a subtle hover effect
   if (isMouseOverCard) {
@@ -188,7 +217,7 @@ function drawWinScreen() {
   // Draw flowers in each corner
   drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
   drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
-  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
+  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left - Changed from tertiary to peach - APlasker
   drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
   
   // RESET TEXT ALIGNMENT FOR RECIPE NAME - Ensure centered text
@@ -314,117 +343,22 @@ function drawWinScreen() {
   const descriptionX = cardX - cardWidth/2 + cardWidth * 0.82; // 82% of card width from left
   const descriptionWidth = cardWidth * 0.30; // Updated to 30% of card width (was 32%)
   
-  // Update description Y position - 40% card height from top (was 30%)
-  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.40; // Updated to 40% of card height from top
+  // Update description Y position - 50% card height from top (changed from 40% to 50%)
+  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.50; // Updated to 50% of card height from top
   
   // Isolate text context for description
   push();
   fill(0);
   // RESET TEXT ALIGNMENT FOR DESCRIPTION - Ensure left-aligned text
   textAlign(LEFT, TOP);
-  textSize(min(max(playAreaWidth * 0.022, 10), 14)); // Increased font size by approximately 2pts
+  textSize(min(max(playAreaWidth * 0.03, 11), 14)); // Increased font size to 3% (min 11px, max 14px)
   fill('#666');
   
-  // Limit description height to 33% of card height
-  const maxDescriptionHeight = cardHeight * 0.33;
+  // Limit description height to 60% of card height (increased from 33%)
+  const maxDescriptionHeight = cardHeight * 0.60;
   
   text(recipeDescription, descriptionX, descriptionY, descriptionWidth, maxDescriptionHeight); // Added max height constraint
   pop(); // End description text context
-  
-  // Position ingredients at a fixed 50% from the top of the card, regardless of description height
-  const ingredientsY = cardY - cardHeight/2 + cardHeight * 0.50;
-  
-  // Isolate text context for ingredients section
-  push();
-  
-  // Display up to 6 ingredients in a single column, without a header
-  textSize(min(max(playAreaWidth * 0.022, 10), 12)); // Updated font size to 2.2% (min 10px, max 12px)
-  fill('#666');
-  textAlign(LEFT, TOP); // Explicitly set top alignment
-  textStyle(BOLD); // Make ingredients text bold
-  
-  // Take only the first 6 ingredients (updated from 4)
-  const ingredientsToShow = ingredients.slice(0, 6);
-  
-  // Function to process ingredients for display
-  function processIngredientsForColumn(ingredientsList, charLimit) {
-    return ingredientsList.map(ingredient => {
-      let lines = [];
-      let words = ingredient.split(' ');
-      let currentLine = "";
-      
-      for (let word of words) {
-        if (currentLine === "") {
-          currentLine = word;
-        } else if ((currentLine + " " + word).length <= charLimit) {
-          currentLine += " " + word;
-        } else {
-          lines.push(currentLine);
-          currentLine = word;
-        }
-      }
-      
-      if (currentLine !== "") {
-        lines.push(currentLine);
-      }
-      
-      return {
-        original: ingredient,
-        lines: lines
-      };
-    });
-  }
-  
-  // Character limit for ingredients, adjust for screen size
-  const charLimit = useVerticalLayout ? 15 : 20;
-  
-  // Process ingredients for the single column
-  const processedIngredients = processIngredientsForColumn(ingredientsToShow, charLimit);
-  
-  // Calculate spacing
-  const lineHeight = useVerticalLayout ? 8 : 10;
-  const ingredientSpacing = useVerticalLayout ? 2 : 3;
-  
-  // Position ingredients list at 84% from left of card
-  const ingredientsListX = cardX - cardWidth/2 + cardWidth * 0.84; // Updated to 84% from left
-  let yOffset = ingredientsY;
-  
-  // Maximum height for ingredients
-  const maxIngredientsHeight = cardHeight * 0.33;
-  let totalIngredientsHeight = 0;
-  
-  // Draw ingredients in a single column
-  for (let i = 0; i < processedIngredients.length; i++) {
-    const lines = processedIngredients[i].lines;
-    
-    // Calculate height of this ingredient
-    const ingredientHeight = lines.length * lineHeight + ingredientSpacing;
-    
-    // Check if adding this ingredient would exceed max height
-    if (totalIngredientsHeight + ingredientHeight > maxIngredientsHeight) {
-      break;
-    }
-    
-    // Draw each line of this ingredient
-    for (let j = 0; j < lines.length; j++) {
-      if (j === 0) {
-        // Only add bullet to the first line of each ingredient
-        text("• " + lines[j], ingredientsListX, yOffset, cardWidth * 0.32); // Use 32% of card width as requested
-      } else {
-        // Indent subsequent lines to align with text after bullet
-        text("  " + lines[j], ingredientsListX, yOffset, cardWidth * 0.32); // Use 32% of card width as requested
-      }
-      yOffset += lineHeight;
-      totalIngredientsHeight += lineHeight;
-    }
-    
-    // Add spacing between ingredients
-    yOffset += ingredientSpacing;
-    totalIngredientsHeight += ingredientSpacing;
-  }
-  
-  textStyle(NORMAL); // Reset text style
-  pop(); // End ingredients section context
   
   // Add "Make this recipe for real!" text at the bottom of the card - updated position and text
   push(); // Isolate text context for Recipe Details
@@ -433,13 +367,15 @@ function drawWinScreen() {
   const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.20; // Updated to 20% from bottom (was 10%)
   
   textAlign(LEFT, CENTER);
-  textSize(min(max(playAreaWidth * 0.03, 11), 14)); // Updated minimum to 11px (was 10px)
+  textSize(min(max(playAreaWidth * 0.035, 12), 16)); // Increased font size to 3.5% (min 12px, max 16px)
+  textStyle(BOLD); // Make the text bold
   if (isMouseOverCard) {
     fill(COLORS.primary); // Green text when hovered
   } else {
     fill('#666'); // Gray text normally
   }
   text("Make this recipe for real! →", recipeDetailsX, recipeDetailsY, cardWidth * 0.32); // Limited width to 32% of card width
+  textStyle(NORMAL); // Reset text style
   pop(); // End Recipe Details context
   
   // ===== SCORE SECTION =====
@@ -1111,13 +1047,13 @@ function drawTutorialWinScreen() {
     let letterColor;
     switch (i % 3) {
       case 0:
-        letterColor = COLORS.primary; // Green
+        letterColor = '#cfc23f'; // Changed from COLORS.primary to mustard yellow to match COMBO MEAL
         break;
       case 1:
-        letterColor = COLORS.tertiary; // Yellow
+        letterColor = '#f7dc30'; // Changed from COLORS.peach to bright yellow to match COMBO MEAL
         break;
       case 2:
-        letterColor = COLORS.secondary; // Red
+        letterColor = COLORS.secondary; // Pink
         break;
     }
     
@@ -1127,23 +1063,48 @@ function drawTutorialWinScreen() {
     let letterX = x + letterWidths[i]/2;
     let letterY = playAreaY + playAreaHeight * 0.06 + offsetY;
     
-    // Draw black outline - thinner for bubble style
+    // SOLID OUTLINE APPROACH - Create smooth solid outlines with multiple text copies - Updated to match COMBO MEAL title
+    push(); // Save drawing state
+    
+    // Set text properties for all layers
+    textAlign(CENTER, CENTER);
+    textSize(rewardMessageSize);
+    
+    // Calculate outline sizes
+    const outerSize = 6;  // Outer black outline thickness
+    const middleSize = 4; // Middle peach outline thickness
+    const innerSize = 2;  // Inner black outline thickness
+    
+    // 1. Draw outer black outline (largest) using multiple offset copies
     fill('black');
-    noStroke();
+    // Create a circular pattern of offsets for smooth round outline
+    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+      let offsetX = cos(angle) * outerSize;
+      let offsetY = sin(angle) * outerSize;
+      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
+    }
     
-    // Draw the letter with a thinner outline
-    text(rewardMessage[i], letterX - outlineWeight, letterY); // Left
-    text(rewardMessage[i], letterX + outlineWeight, letterY); // Right
-    text(rewardMessage[i], letterX, letterY - outlineWeight); // Top
-    text(rewardMessage[i], letterX, letterY + outlineWeight); // Bottom
-    text(rewardMessage[i], letterX - outlineWeight, letterY - outlineWeight); // Top-left
-    text(rewardMessage[i], letterX + outlineWeight, letterY - outlineWeight); // Top-right
-    text(rewardMessage[i], letterX - outlineWeight, letterY + outlineWeight); // Bottom-left
-    text(rewardMessage[i], letterX + outlineWeight, letterY + outlineWeight); // Bottom-right
+    // 2. Draw middle peach layer using multiple offset copies
+    fill(COLORS.peach);
+    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+      let offsetX = cos(angle) * middleSize;
+      let offsetY = sin(angle) * middleSize;
+      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
+    }
     
-    // Draw letter fill with color
+    // 3. Draw inner black layer using multiple offset copies
+    fill('black');
+    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
+      let offsetX = cos(angle) * innerSize;
+      let offsetY = sin(angle) * innerSize;
+      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
+    }
+    
+    // 4. Draw the final colored letter in the center
     fill(letterColor);
     text(rewardMessage[i], letterX, letterY);
+    
+    pop(); // Restore drawing state
     
     // Move to the next letter position with kerning
     x += letterWidths[i] * (1 + kerningFactor);
@@ -1158,6 +1119,10 @@ function drawTutorialWinScreen() {
   fill(0, 0, 0, 30);
   noStroke();
   rect(cardX + 5, cardY + 5, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px
+  
+  // Check if mouse is over the recipe card area - Added by APlasker to fix recipe link functionality
+  isMouseOverCard = mouseX > cardX - cardWidth/2 && mouseX < cardX + cardWidth/2 && 
+                   mouseY > cardY - cardHeight/2 && mouseY < cardY + cardHeight/2;
   
   // Card - make it look slightly interactive with a subtle hover effect
   if (isMouseOverCard) {
@@ -1180,7 +1145,7 @@ function drawTutorialWinScreen() {
   // Draw flowers in each corner
   drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
   drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
-  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
+  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left - Changed from tertiary to peach - APlasker
   drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
   
   // RESET TEXT ALIGNMENT FOR RECIPE NAME - Ensure centered text
@@ -1304,1127 +1269,41 @@ function drawTutorialWinScreen() {
   // Draw recipe description - updated position and width
   // Move description right by using 82% of card width from left
   const descriptionX = cardX - cardWidth/2 + cardWidth * 0.82; // 82% of card width from left
-  const descriptionWidth = cardWidth * 0.30; // Updated to 30% of card width (was 32%)
+  const descriptionWidth = cardWidth * 0.30; // Updated to 30% of card width
   
-  // Update description Y position - 40% card height from top (was 30%)
-  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.40; // Updated to 40% of card height from top
+  // Update description Y position to 50% card height from top (changed from 40%)
+  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.50; // Updated to 50% of card height from top
   
   // Isolate text context for description
   push();
   fill(0);
   // RESET TEXT ALIGNMENT FOR DESCRIPTION - Ensure left-aligned text
   textAlign(LEFT, TOP);
-  textSize(min(max(playAreaWidth * 0.022, 10), 14)); // Increased font size by approximately 2pts
+  textSize(min(max(playAreaWidth * 0.03, 11), 14)); // Increased font size to 3% (min 11px, max 14px)
   fill('#666');
   
-  // Limit description height to 33% of card height
-  const maxDescriptionHeight = cardHeight * 0.33;
+  // Limit description height to 60% of card height (increased from 33%)
+  const maxDescriptionHeight = cardHeight * 0.60;
   
-  text(recipeDescription, descriptionX, descriptionY, descriptionWidth, maxDescriptionHeight); // Added max height constraint
+  text(recipeDescription, descriptionX, descriptionY, descriptionWidth, maxDescriptionHeight);
   pop(); // End description text context
-  
-  // Position ingredients at a fixed 50% from the top of the card, regardless of description height
-  const ingredientsY = cardY - cardHeight/2 + cardHeight * 0.50;
-  
-  // Isolate text context for ingredients section
-  push();
-  
-  // Display up to 6 ingredients in a single column, without a header
-  textSize(min(max(playAreaWidth * 0.022, 10), 12)); // Updated font size to 2.2% (min 10px, max 12px)
-  fill('#666');
-  textAlign(LEFT, TOP); // Explicitly set top alignment
-  textStyle(BOLD); // Make ingredients text bold
-  
-  // Take only the first 6 ingredients (updated from 4)
-  const ingredientsToShow = ingredients.slice(0, 6);
-  
-  // Function to process ingredients for display
-  function processIngredientsForColumn(ingredientsList, charLimit) {
-    return ingredientsList.map(ingredient => {
-      let lines = [];
-      let words = ingredient.split(' ');
-      let currentLine = "";
-      
-      for (let word of words) {
-        if (currentLine === "") {
-          currentLine = word;
-        } else if ((currentLine + " " + word).length <= charLimit) {
-          currentLine += " " + word;
-        } else {
-          lines.push(currentLine);
-          currentLine = word;
-        }
-      }
-      
-      if (currentLine !== "") {
-        lines.push(currentLine);
-      }
-      
-      return {
-        original: ingredient,
-        lines: lines
-      };
-    });
-  }
-  
-  // Character limit for ingredients, adjust for screen size
-  const charLimit = useVerticalLayout ? 15 : 20;
-  
-  // Process ingredients for the single column
-  const processedIngredients = processIngredientsForColumn(ingredientsToShow, charLimit);
-  
-  // Calculate spacing
-  const lineHeight = useVerticalLayout ? 8 : 10;
-  const ingredientSpacing = useVerticalLayout ? 2 : 3;
-  
-  // Position ingredients list at 84% from left of card
-  const ingredientsListX = cardX - cardWidth/2 + cardWidth * 0.84; // Updated to 84% from left
-  let yOffset = ingredientsY;
-  
-  // Maximum height for ingredients
-  const maxIngredientsHeight = cardHeight * 0.33;
-  let totalIngredientsHeight = 0;
-  
-  // Draw ingredients in a single column
-  for (let i = 0; i < processedIngredients.length; i++) {
-    const lines = processedIngredients[i].lines;
-    
-    // Calculate height of this ingredient
-    const ingredientHeight = lines.length * lineHeight + ingredientSpacing;
-    
-    // Check if adding this ingredient would exceed max height
-    if (totalIngredientsHeight + ingredientHeight > maxIngredientsHeight) {
-      break;
-    }
-    
-    // Draw each line of this ingredient
-    for (let j = 0; j < lines.length; j++) {
-      if (j === 0) {
-        // Only add bullet to the first line of each ingredient
-        text("• " + lines[j], ingredientsListX, yOffset, cardWidth * 0.32); // Use 32% of card width as requested
-      } else {
-        // Indent subsequent lines to align with text after bullet
-        text("  " + lines[j], ingredientsListX, yOffset, cardWidth * 0.32); // Use 32% of card width as requested
-      }
-      yOffset += lineHeight;
-      totalIngredientsHeight += lineHeight;
-    }
-    
-    // Add spacing between ingredients
-    yOffset += ingredientSpacing;
-    totalIngredientsHeight += ingredientSpacing;
-  }
-  
-  textStyle(NORMAL); // Reset text style
-  pop(); // End ingredients section context
   
   // Add "Make this recipe for real!" text at the bottom of the card - updated position and text
   push(); // Isolate text context for Recipe Details
   // Position at 84% of card width from left, 20% of card height from bottom
-  const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.84; // Updated to 84% from left (was 82%)
-  const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.20; // Updated to 20% from bottom (was 10%)
+  const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.84;
+  const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.20;
   
   textAlign(LEFT, CENTER);
-  textSize(min(max(playAreaWidth * 0.03, 11), 14)); // Updated minimum to 11px (was 10px)
+  textSize(min(max(playAreaWidth * 0.035, 12), 16)); // Increased font size to 3.5% (min 12px, max 16px)
+  textStyle(BOLD); // Make the text bold
   if (isMouseOverCard) {
     fill(COLORS.primary); // Green text when hovered
   } else {
     fill('#666'); // Gray text normally
   }
-  text("Make this recipe for real! →", recipeDetailsX, recipeDetailsY, cardWidth * 0.32); // Limited width to 32% of card width
-  pop(); // End Recipe Details context
-  
-  // ===== SCORE SECTION =====
-  
-  // RESET TEXT ALIGNMENT FOR SCORE SECTION - Ensure centered text
-  textAlign(CENTER, CENTER);
-  
-  // Calculate responsive position for score section - updated to 60% of screen height
-  const scoreCardPositionY = playAreaY + playAreaHeight * 0.60; // Changed back to 0.60 from 0.65
-  
-  // Calculate score card size based on play area width - updated dimensions
-  scoreWidth = min(playAreaWidth, 600); // Same max width as recipe card
-  scoreHeight = playAreaHeight * 0.28; // 28% of play area height
-  
-  // Position score card
-  scoreX = playAreaX + playAreaWidth/2; // Centered in the play area
-  scoreY = scoreCardPositionY + scoreHeight/2; // Adjusted for vertical centering
-  
-  // Draw letter score with drop shadow
-  push(); // Isolate drawing context for the score card
-  rectMode(CENTER); // Explicitly set CENTER mode for score card
-  
-  // Shadow
-  fill(0, 0, 0, 30);
-  noStroke();
-  rect(scoreX + 5, scoreY + 5, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8)); // Updated to 2% of score width, min 8px
-  
-  // Paper
-  fill(255);
-  stroke(220);
-  strokeWeight(1);
-  rect(scoreX, scoreY, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8)); // Updated to 2% of score width, min 8px
-  
-  // Check if mouse is over the letter score area
-  isMouseOverLetterScore = mouseX > scoreX - scoreWidth/2 && mouseX < scoreX + scoreWidth/2 && 
-                         mouseY > scoreY - scoreHeight/2 && mouseY < scoreY + scoreHeight/2;
-  
-  // Highlight the letter score area when hovered, similar to recipe card
-  if (isMouseOverLetterScore) {
-    // Add a subtle highlight effect
-    noFill();
-    stroke(COLORS.primary); // Green highlight
-    strokeWeight(3);
-    rect(scoreX, scoreY, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8)); // Updated to 2% of score width, min 8px
-  }
-  
-  pop(); // Restore the drawing context
-  
-  // Count black moves (incorrect attempts)
-  let blackMoves = 0;
-  
-  // Count black moves
-  for (let move of moveHistory) {
-    if (move === 'black' || move === '#333333') {
-      blackMoves++;
-    }
-  }
-  
-  // Count red hint moves
-  let redHintMoves = 0;
-  for (let move of moveHistory) {
-    if (move === '#FF5252') {
-      redHintMoves++;
-    }
-  }
-  
-  // Calculate total score (only counting red hint and black moves)
-  const totalScore = blackMoves + redHintMoves;
-  
-  // Determine letter grade and color based on ONLY blackMoves (errors)
-  // Using global letterGrade variable
-  let letterColor;
-  // Using the global isAPlus variable now
-  isAPlus = false;
-  
-  if (blackMoves === 0) {
-    letterGrade = "A";
-    letterColor = color(0, 120, 255); // Blue
-    // A+ is achieved with zero errors AND zero hints
-    // Check both redHintMoves and hintCount to ensure no hints were used
-    if (redHintMoves === 0 && hintCount === 0) {
-      isAPlus = true; // Mark as A+ for diamond decoration
-    }
-  } else if (blackMoves >= 1 && blackMoves <= 2) {
-    letterGrade = "B";
-    letterColor = COLORS.green; // Use our explicit green color
-  } else if (blackMoves >= 3 && blackMoves <= 4) {
-    letterGrade = "C";
-    letterColor = COLORS.tertiary; // Yellow from vessels
-  } else { // blackMoves >= 5
-    letterGrade = "X";
-    letterColor = COLORS.secondary; // Red from vessels
-  }
-  
-  // Updated circle position and dimensions
-  // Position: Centered horizontally at 28% from left edge, 55% from top of score card
-  const circleX = scoreX - scoreWidth/2 + scoreWidth * 0.28;
-  const circleY = scoreY - scoreHeight/2 + scoreHeight * 0.55; // Updated to 55% from top of score card
-  
-  // Height: 80% of score height (updated from 85%)
-  const circleSize = scoreHeight * 0.8;
-  
-  // Create a copy of the letter color with 30% opacity
-  let circleBgColor = color(red(letterColor), green(letterColor), blue(letterColor), 76); // 76 is 30% of 255
-  
-  // Draw the circle with the same color as the letter but with 30% opacity
-  noStroke();
-  fill(circleBgColor);
-  circle(circleX, circleY, circleSize);
-  
-  // Add "COMBO MEAL SCORE" header above the letter grade - positioned at 8% of score height from top
-  textAlign(CENTER, CENTER);
-  // Calculate font size that ensures text fits within 90% of score card width
-  let maxComboMealSize = min(max(playAreaWidth * 0.04, 14), 18);
-  // Temporarily set text size to check if it fits
-  textSize(maxComboMealSize);
-  
-  // Apply kerning to "COMBO MEAL SCORE" text
-  const comboMealText = "COMBO MEAL SCORE";
-  let comboMealWidth = 0;
-  let comboMealLetterWidths = [];
-  
-  // Calculate letter widths
-  for (let i = 0; i < comboMealText.length; i++) {
-    let letterWidth = textWidth(comboMealText[i]);
-    comboMealLetterWidths.push(letterWidth);
-    comboMealWidth += letterWidth;
-  }
-  
-  // Increase kerning by 70%
-  const comboMealKerningFactor = 0.7;
-  let comboMealTotalKerning = 0;
-  
-  // Calculate total kerning space
-  for (let i = 0; i < comboMealText.length - 1; i++) {
-    comboMealTotalKerning += comboMealLetterWidths[i] * comboMealKerningFactor;
-  }
-  
-  // Calculate total width with kerning
-  const totalComboMealWidth = comboMealWidth + comboMealTotalKerning;
-  
-  // Adjust font size if text is too wide (exceeds 90% of score card width)
-  if (totalComboMealWidth > scoreWidth * 0.9) {
-    maxComboMealSize *= (scoreWidth * 0.9) / totalComboMealWidth;
-    textSize(maxComboMealSize);
-    
-    // Recalculate widths with new font size
-    comboMealWidth = 0;
-    comboMealLetterWidths = [];
-    for (let i = 0; i < comboMealText.length; i++) {
-      let letterWidth = textWidth(comboMealText[i]);
-      comboMealLetterWidths.push(letterWidth);
-      comboMealWidth += letterWidth;
-    }
-    
-    // Recalculate kerning
-    comboMealTotalKerning = 0;
-    for (let i = 0; i < comboMealText.length - 1; i++) {
-      comboMealTotalKerning += comboMealLetterWidths[i] * comboMealKerningFactor;
-    }
-  }
-  
-  fill(0); // Black text
-  textStyle(BOLD);
-  
-  // Starting x position (centered with kerning)
-  let comboMealX = scoreX - (comboMealWidth + comboMealTotalKerning)/2;
-  
-  // Position at 8% of score height from top
-  const comboMealY = scoreY - scoreHeight/2 + scoreHeight * 0.08;
-  
-  // Draw each letter with increased spacing
-  for (let i = 0; i < comboMealText.length; i++) {
-    // Calculate letter position
-    let letterX = comboMealX + comboMealLetterWidths[i]/2;
-    
-    // Draw letter
-    text(comboMealText[i], letterX, comboMealY);
-    
-    // Move to the next letter position with kerning
-    comboMealX += comboMealLetterWidths[i] * (1 + comboMealKerningFactor);
-  }
-  
-  // Draw letter grade - with 95% of circle size (updated from 85%)
-  // Position 10% lower in Score card height than center of the circle background
-  const letterGradeY = circleY + scoreHeight * 0.1; // 10% lower than circle center
-  
-  textAlign(CENTER, CENTER);
-  textSize(circleSize * 1.1); // Updated from 0.95 to 1.1 for larger display
-  fill(letterColor);
-  textStyle(NORMAL);
-  text(letterGrade, circleX, letterGradeY); // Updated position to be 10% lower than circle
-  
-  // ------------------------------
-  // NEW SECTION: SCORE STATISTICS
-  // ------------------------------
-  
-  // Position stats block on the right side of the score card
-  const statsX = scoreX - scoreWidth/2 + scoreWidth * 0.55; // 55% from left edge
-  const statsY = scoreY - scoreHeight/2 + scoreHeight * 0.37; // 37% from top (changed from 28%)
-  const statsWidth = scoreWidth * 0.38; // 38% of score card width
-  
-  // Calculate font sizes for stats
-  const labelSize = min(max(playAreaWidth * 0.025, 10), 14); // Increased from 0.02/9/12 to 0.025/10/14
-  const valueSize = min(max(playAreaWidth * 0.03, 12), 16); // Increased from 0.025/11/14 to 0.03/12/16
-  
-  // Get recipe information
-  let recipeNumber = "###";
-  let formattedDate = "##/##/##";
-  
-  // Extract recipe number and date from recipe data
-  if (typeof recipe !== 'undefined' && recipe) {
-    if (recipe.day_number) recipeNumber = recipe.day_number;
-    
-    // Format the date if available
-    if (recipe.date) {
-      try {
-        const dateParts = recipe.date.split('-');
-        if (dateParts.length === 3) {
-          formattedDate = `${dateParts[1]}/${dateParts[2]}/${dateParts[0].substring(2)}`;
-        }
-      } catch (e) {
-        console.error("Error formatting date:", e);
-      }
-    }
-  }
-  
-  // Format recipe value with recipe number and date
-  const recipeValue = `${recipeNumber} (${formattedDate})`;
-  
-  // Draw the three stat lines
-  let lineY = statsY;
-  
-  // Recipe number line
-  const recipeLineHeight = drawStatLine("Recipe No.", recipeValue, statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += recipeLineHeight;
-  
-  // Mistakes line
-  const mistakesLineHeight = drawStatLine("Mistakes:", blackMoves.toString(), statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += mistakesLineHeight;
-  
-  // Hints used line
-  const hintsLineHeight = drawStatLine("Hints Used:", hintCount.toString(), statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += hintsLineHeight;
-  
-  // Center Share Score text under the stats block
-  const shareScoreY = lineY + valueSize * 1.5; // Add some space after the last stat line
-  
-  // Draw Share Score link
-  textAlign(CENTER, CENTER);
-  textSize(min(max(playAreaWidth * 0.03, 10), 14));
-  if (isMouseOverLetterScore) {
-    fill(COLORS.primary); // Green text when hovered
-  } else {
-    fill('#666'); // Gray text normally
-  }
-  // Center it under the stats block
-  text("Share Score →", statsX + statsWidth/2, shareScoreY);
-  
-  // Check if Easter Egg was found
-  let eggFound = moveHistory.some(move => 
-    typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')
-  );
-  
-  // Draw sunny-side-up egg indicator if an Easter egg was found
-  if (eggFound) {
-    push();
-    // Position the egg in the top left corner of the letter grade
-    const eggSize = circleSize * 0.25; // 25% of circle size
-    const eggX = circleX - circleSize * 0.3; // Updated to use circleX
-    const eggY = circleY - circleSize * 0.3;
-    const sizeMultiplier = 1.25; // Increase size by 25%
-    
-    // Draw drop shadow for the entire egg
-    fill(0, 0, 0, 40);
-    noStroke();
-    // Offset shadow by 4px
-    translate(4, 4);
-    
-    // Draw egg white (soft blob shape from Design 3)
-    beginShape();
-    vertex(eggX - 30 * sizeMultiplier, eggY * sizeMultiplier);
-    bezierVertex(
-        eggX - 45 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX - 20 * sizeMultiplier, eggY - 45 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY - 30 * sizeMultiplier  // end point
-    );
-    bezierVertex(
-        eggX + 40 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX + 30 * sizeMultiplier, eggY + 20 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY + 30 * sizeMultiplier  // end point
-    );
-    // Create a soft, rounded blob shape with no pointiness
-    bezierVertex(
-        eggX - 5 * sizeMultiplier, eggY + 35 * sizeMultiplier,  // control point 1 (moved inward and up)
-        eggX - 20 * sizeMultiplier, eggY + 15 * sizeMultiplier, // control point 2 (moved significantly upward)
-        eggX - 30 * sizeMultiplier, eggY * sizeMultiplier       // end point (connects to start)
-    );
-    endShape(CLOSE);
-    
-    // Reset translation for the actual egg
-    translate(-4, -4);
-    
-    // Draw the egg white (soft blob shape)
-    fill(255, 255, 255); // Pure white
-    noStroke();
-    
-    beginShape();
-    vertex(eggX - 30 * sizeMultiplier, eggY * sizeMultiplier);
-    bezierVertex(
-        eggX - 45 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX - 20 * sizeMultiplier, eggY - 45 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY - 30 * sizeMultiplier  // end point
-    );
-    bezierVertex(
-        eggX + 40 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX + 30 * sizeMultiplier, eggY + 20 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY + 30 * sizeMultiplier  // end point
-    );
-    // Create a soft, rounded blob shape with no pointiness
-    bezierVertex(
-        eggX - 5 * sizeMultiplier, eggY + 35 * sizeMultiplier,  // control point 1 (moved inward and up)
-        eggX - 20 * sizeMultiplier, eggY + 15 * sizeMultiplier, // control point 2 (moved significantly upward)
-        eggX - 30 * sizeMultiplier, eggY * sizeMultiplier       // end point (connects to start)
-    );
-    endShape(CLOSE);
-    
-    // Draw the yolk - positioned higher up and slightly to the left
-    const yolkSize = 36 * sizeMultiplier;
-    for (let i = 5; i >= 0; i--) {
-      const currentYolkSize = yolkSize * (1 - i * 0.05);
-      const alpha = 255 - i * 10;
-      fill(255, 204, 0, alpha); // Bright egg yolk yellow with gradient
-      noStroke();
-      ellipse(eggX - 5 * sizeMultiplier, eggY - 20 * sizeMultiplier, currentYolkSize, currentYolkSize * 0.9); // Slightly oval
-    }
-    
-    // Add highlight to the yolk
-    fill(255, 255, 255, 100);
-    noStroke();
-    ellipse(eggX - 12 * sizeMultiplier, eggY - 25 * sizeMultiplier, yolkSize * 0.4, yolkSize * 0.3);
-    
-    // Add a thin outline to the yolk
-    noFill();
-    stroke(200, 150, 0, 100);
-    strokeWeight(1);
-    ellipse(eggX - 5 * sizeMultiplier, eggY - 20 * sizeMultiplier, yolkSize, yolkSize * 0.9);
-    pop();
-  }
-  
-  // Draw star stickers for A+ grade
-  if (isAPlus) {
-    // Star parameters
-    const starLargeSize = circleSize * 0.3; // 30% of circle size for larger stars
-    const starSmallSize = circleSize * 0.24; // 24% of circle size for smaller stars
-    const outerRadius = starLargeSize * 0.5;
-    const innerRadius = outerRadius * 0.5; // Increased inner radius for rounder appearance
-    const roundness = outerRadius * 0.25; // Increased roundness for more cartoonish look
-    
-    // Function to draw a star sticker
-    const drawStarSticker = (x, y, size) => {
-      push();
-      translate(x, y);
-      
-      // Calculate radius based on size (large or small)
-      const currentOuterRadius = size === 'large' ? outerRadius : outerRadius * 0.8;
-      const currentInnerRadius = size === 'large' ? innerRadius : innerRadius * 0.8;
-      const currentRoundness = size === 'large' ? roundness : roundness * 0.8;
-      
-      // Draw drop shadow
-      fill(0, 0, 0, 40);
-      noStroke();
-      translate(2, 2);
-      starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
-      
-      // Draw white outline
-      translate(-2, -2);
-      fill(255);
-      strokeWeight(3);
-      stroke(255);
-      starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
-      
-      // Draw yellow star with yolk color (255, 204, 0) instead of COLORS.tertiary
-      fill(255, 204, 0);
-      strokeWeight(1);
-      stroke(255, 255, 255, 200);
-      starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
-      
-      pop();
-    };
-    
-    // Top right corner - two stars (updated positions to use circleX and circleY)
-    drawStarSticker(circleX + circleSize * 0.35, circleY - circleSize * 0.35, 'large');
-    drawStarSticker(circleX + circleSize * 0.5, circleY - circleSize * 0.2, 'small');
-    
-    // Bottom left corner - two stars (updated positions to use circleX and circleY)
-    drawStarSticker(circleX - circleSize * 0.35, circleY + circleSize * 0.35, 'large');
-    drawStarSticker(circleX - circleSize * 0.5, circleY + circleSize * 0.2, 'small');
-  }
-  
-  // Draw hint indicators if hints were used
-  if (hintCount > 0) {
-    // Function to draw a hint indicator sticker
-    const drawHintIndicator = (x, y, size) => {
-      push();
-      translate(x, y);
-      
-      // Calculate hint indicator size - 25% of circle size
-      const hintSize = circleSize * 0.25 * size;
-      
-      // Draw drop shadow
-      fill(0, 0, 0, 40);
-      noStroke();
-      translate(4, 4);
-      ellipse(0, 0, hintSize, hintSize);
-      
-      // Draw white outline
-      translate(-4, -4);
-      fill(255);
-      strokeWeight(4);
-      stroke(255);
-      ellipse(0, 0, hintSize, hintSize);
-      
-      // Draw white background
-      fill(255);
-      strokeWeight(1);
-      stroke(255, 255, 255, 200);
-      ellipse(0, 0, hintSize, hintSize);
-      
-      // Draw red circle outline (closer to the edge)
-      noFill();
-      strokeWeight(3);
-      stroke('#FF5252');
-      ellipse(0, 0, hintSize * 0.8, hintSize * 0.8);
-      
-      // Draw red question mark using Helvetica font
-      fill('#FF5252');
-      noStroke();
-      textSize(hintSize * 0.6);
-      textFont('Helvetica, Arial, sans-serif');
-      textStyle(NORMAL);
-      textAlign(CENTER, CENTER);
-      text("?", 0, 0);
-      
-      pop();
-    };
-    
-    // HINT INDICATORS TEMPORARILY DISABLED
-    /*
-    // Draw hint indicators based on hint count (updated positions to use circleX and circleY)
-    if (hintCount >= 1) {
-      // First hint indicator - bottom right
-      drawHintIndicator(circleX + circleSize * 0.4, circleY + circleSize * 0.4, 1);
-    }
-    
-    if (hintCount >= 2) {
-      // Second hint indicator - top right
-      drawHintIndicator(circleX + circleSize * 0.4, circleY - circleSize * 0.4, 1);
-    }
-    
-    if (hintCount >= 3) {
-      // Third hint indicator - with minimal overlap
-      drawHintIndicator(circleX + circleSize * 0.4 + 25, circleY + circleSize * 0.4 - 25, 1);
-    }
-    */
-  }
-  
-  textStyle(NORMAL);
-  
-  // Add "Share Score" text at the bottom of the letter score area
-  // REMOVED AS REQUESTED - Removing "Share Score" language at the bottom
-  /*
-  textAlign(CENTER, CENTER);
-  textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Same size as before
-  if (isMouseOverLetterScore) {
-    fill(COLORS.primary); // Green text when hovered
-  } else {
-    fill('#666'); // Gray text normally
-  }
-  text("Share Score →", scoreX, scoreY + scoreHeight/2 - scoreHeight * 0.07); // 7% of score height from bottom
-  */
-  
-  // Helper function to draw a stat line with label and value
-  function drawStatLine(label, value, x, y, width, labelSize, valueSize) {
-    push();
-    
-    // Calculate line height and spacing
-    const lineHeight = valueSize * 1.2;
-    const underlineWidth = width * 0.7; // 70% of provided width
-    
-    // Draw label (smaller, normal weight)
-    textAlign(LEFT, CENTER);
-    textSize(labelSize);
-    textStyle(NORMAL);
-    fill('#333');
-    text(label, x, y);
-    
-    // Draw underline
-    const labelWidth = textWidth(label) + 5; // Add a small space after the label
-    const underlineY = y + lineHeight * 0.2; // Slightly below the text baseline
-    stroke('#666');
-    strokeWeight(1);
-    line(x + labelWidth, underlineY, x + labelWidth + underlineWidth, underlineY);
-    
-    // Draw value (larger, bold)
-    textAlign(CENTER, CENTER);
-    textSize(valueSize);
-    textStyle(BOLD);
-    fill('#333');
-    // Position value in the center of the underline
-    const valueX = x + labelWidth + underlineWidth / 2;
-    text(value, valueX, y);
-    
-    // Reset text style
-    textStyle(NORMAL);
-    pop();
-    
-    // Return height of line for positioning subsequent elements
-    return lineHeight * 1.5; // Add some extra space between lines
-  }
-  
-  // Add "NEW RECIPE DAILY" text at the bottom - updated to 94% from bottom of screen
-  textAlign(CENTER, CENTER);
-  textSize(min(max(playAreaWidth * 0.04, 14), 18)); // Same size as before
-  fill('#333');
-  textStyle(BOLD);
-  text("NEW RECIPE DAILY – COME BACK SOON!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.94);
-  textStyle(NORMAL);
-  
-  // Add "Say hi!" link text below the main text - updated to 97.5% from bottom of screen
-  textSize(min(max(playAreaWidth * 0.025, 10), 14)); // Same size as before
-  fill(COLORS.primary); // Green color for the link
-  text("Say hi!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.975); // Updated to 97.5%
-  
-  // Store position and dimensions for hit detection
-  sayHiLinkX = playAreaX + playAreaWidth/2;
-  sayHiLinkY = playAreaY + playAreaHeight * 0.975; // Updated to 97.5%
-  sayHiLinkWidth = textWidth("Say hi!") * 1.2; // Add some padding
-  sayHiLinkHeight = textAscent() + textDescent();
-  
-  // Check if mouse is over the Say hi link
-  isMouseOverSayHi = mouseX > sayHiLinkX - sayHiLinkWidth/2 && 
-                     mouseX < sayHiLinkX + sayHiLinkWidth/2 && 
-                     mouseY > sayHiLinkY - sayHiLinkHeight/2 && 
-                     mouseY < sayHiLinkY + sayHiLinkHeight/2;
-  
-  // Change cursor to pointer if over the link
-  if (isMouseOverSayHi) {
-    cursor(HAND);
-  }
-  
-  // Check if mouse is over the recipe card
-  isMouseOverCard = mouseX > cardX - cardWidth/2 && mouseX < cardX + cardWidth/2 && 
-                   mouseY > cardY - cardHeight/2 && mouseY < cardY + cardHeight/2;
-  
-  // Change cursor to pointer if over the card or letter score area
-  if (isMouseOverCard || isMouseOverLetterScore) {
-    cursor(HAND);
-  }
-  
-  // TEMPORARY - TEST BUTTON FOR LETTER SCORE INTERACTION
-  // Add this at the very end of the function before the closing brace
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    // Only show test UI in local development
-    push();
-    fill(200, 50, 50);
-    rect(playAreaX + 20, playAreaY + 20, 120, 30);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(12);
-    text("Test Letter Score", playAreaX + 20 + 60, playAreaY + 20 + 15);
-    pop();
-    
-    // Check if test button is clicked
-    if (mouseIsPressed && 
-        mouseX > playAreaX + 20 && mouseX < playAreaX + 20 + 120 &&
-        mouseY > playAreaY + 20 && mouseY < playAreaY + 20 + 30) {
-      console.log("Test button clicked - calling handleLetterScoreInteraction");
-      // Call the handler with score coordinates instead of mouse coordinates
-      if (scoreX && scoreY) {
-        handleLetterScoreInteraction(scoreX, scoreY);
-      }
-    }
-  }
-  
-  // After drawing all win screen content, draw the flower animation on top if it's active
-  if (persistentFlowerAnimation && persistentFlowerAnimation.active) {
-    persistentFlowerAnimation.draw();
-    persistentFlowerAnimation.update();
-  }
-  
-  // At the end of the drawWinScreen function, restore the drawing context
-  pop();
-}
-
-// New function to draw the tutorial-specific win screen - APlasker
-function drawTutorialWinScreen() {
-  // Isolate drawing context for the entire win screen
-  push();
-  
-  // Calculate the play area dimensions and position (if not already set)
-  if (!playAreaWidth) {
-    calculatePlayAreaDimensions();
-  }
-  
-  // Center all content within the play area
-  textAlign(CENTER, CENTER);
-  textFont(bodyFont);
-  textStyle(NORMAL);
-  
-  // Calculate responsive dimensions based on screen size
-  const isMobile = width < 768;
-  
-  // Determine layout approach based on screen size
-  const useVerticalLayout = isMobile;
-  
-  // Calculate the available space for content
-  const contentWidth = playAreaWidth * 0.9;
-  
-  // ===== RECIPE CARD SECTION =====
-  
-  // Calculate recipe card size based on viewport dimensions
-  const cardWidth = min(playAreaWidth, 600);  // Changed to 100% of play area width, max 600px
-  const cardHeight = playAreaHeight * 0.45; // Updated to 45% of screen height
-  
-  // Position card based on adjusted spacing - header at 6%, recipe card at 10%
-  const cardX = playAreaX + playAreaWidth / 2;
-  let cardY = playAreaY + playAreaHeight * 0.10 + cardHeight / 2;
-  
-  // RESET TEXT ALIGNMENT FOR REWARD MESSAGE - Ensure consistent centered text
-  textAlign(CENTER, CENTER);
-  
-  // Draw reward message with multicolor treatment (like COMBO MEAL)
-  const rewardMessage = "WOW DELICIOUS!";
-  const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36); // Changed from width to playAreaWidth with adjusted coefficient
-  textSize(rewardMessageSize);
-  textStyle(BOLD);
-  
-  // Calculate the total width of the title to center each letter
-  let totalWidth = 0;
-  let letterWidths = [];
-  
-  // First calculate individual letter widths
-  for (let i = 0; i < rewardMessage.length; i++) {
-    let letterWidth = textWidth(rewardMessage[i]);
-    letterWidths.push(letterWidth);
-    totalWidth += letterWidth;
-  }
-  
-  // Add kerning (50% increase in spacing)
-  const kerningFactor = 0.5; // 50% extra space
-  let totalKerning = 0;
-  
-  // Calculate total kerning space (only between letters, not at the ends)
-  for (let i = 0; i < rewardMessage.length - 1; i++) {
-    totalKerning += letterWidths[i] * kerningFactor;
-  }
-  
-  // Starting x position (centered with kerning)
-  let x = playAreaX + playAreaWidth/2 - (totalWidth + totalKerning)/2;
-  
-  // Bubble Pop effect parameters
-  const outlineWeight = useVerticalLayout ? 1.5 : 2; // Thinner outline for bubble style
-  const bounceAmount = 2 * Math.sin(frameCount * 0.05); // Subtle bounce animation
-  
-  // Draw each letter with alternating colors
-  for (let i = 0; i < rewardMessage.length; i++) {
-    // Choose color based on position (cycle through green, yellow, red)
-    let letterColor;
-    switch (i % 3) {
-      case 0:
-        letterColor = COLORS.primary; // Green
-        break;
-      case 1:
-        letterColor = COLORS.tertiary; // Yellow
-        break;
-      case 2:
-        letterColor = COLORS.secondary; // Red
-        break;
-    }
-    
-    // Calculate letter position with bounce effect
-    // Even and odd letters bounce in opposite directions for playful effect
-    let offsetY = (i % 2 === 0) ? bounceAmount : -bounceAmount;
-    let letterX = x + letterWidths[i]/2;
-    let letterY = playAreaY + playAreaHeight * 0.06 + offsetY;
-    
-    // Draw black outline - thinner for bubble style
-    fill('black');
-    noStroke();
-    
-    // Draw the letter with a thinner outline
-    text(rewardMessage[i], letterX - outlineWeight, letterY); // Left
-    text(rewardMessage[i], letterX + outlineWeight, letterY); // Right
-    text(rewardMessage[i], letterX, letterY - outlineWeight); // Top
-    text(rewardMessage[i], letterX, letterY + outlineWeight); // Bottom
-    text(rewardMessage[i], letterX - outlineWeight, letterY - outlineWeight); // Top-left
-    text(rewardMessage[i], letterX + outlineWeight, letterY - outlineWeight); // Top-right
-    text(rewardMessage[i], letterX - outlineWeight, letterY + outlineWeight); // Bottom-left
-    text(rewardMessage[i], letterX + outlineWeight, letterY + outlineWeight); // Bottom-right
-    
-    // Draw letter fill with color
-    fill(letterColor);
-    text(rewardMessage[i], letterX, letterY);
-    
-    // Move to the next letter position with kerning
-    x += letterWidths[i] * (1 + kerningFactor);
-  }
-  
-  textStyle(NORMAL);
-  
-  // Draw Recipe Card with drop shadow
-  // Shadow
-  push(); // Isolate drawing context for the recipe card
-  rectMode(CENTER); // Explicitly set CENTER mode for recipe card
-  fill(0, 0, 0, 30);
-  noStroke();
-  rect(cardX + 5, cardY + 5, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px
-  
-  // Card - make it look slightly interactive with a subtle hover effect
-  if (isMouseOverCard) {
-    fill(255); // Keep white background
-    // Add a green outline when hovered, matching the letter score hover effect
-    stroke(COLORS.primary); // Green outline when hovered
-    strokeWeight(3); // Thicker stroke to match letter score hover effect
-  } else {
-    fill(255);
-    stroke(220);
-    strokeWeight(1);
-  }
-  rect(cardX, cardY, cardWidth, cardHeight, max(cardWidth * 0.02, 8)); // 2% of card width, min 8px
-  pop(); // Restore the drawing context
-  
-  // Draw flowers in the corners of the recipe card - 1% of card width, min 2px
-  const flowerSize = max(cardWidth * 0.01, 2); // Updated to 1% of card width, min 2px
-  const cornerOffset = cardWidth * 0.04; // Updated to 4% of card width
-  
-  // Draw flowers in each corner
-  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
-  drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
-  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.tertiary); // Bottom-left
-  drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
-  
-  // RESET TEXT ALIGNMENT FOR RECIPE NAME - Ensure centered text
-  textAlign(CENTER, CENTER);
-  
-  // Draw recipe name with scaling to fit within 95% of card width - increased max font size to 32px
-  const recipeNameSize = min(max(playAreaWidth * 0.06, 18), 32); // Updated max size to 32px
-  const maxTitleWidth = cardWidth * 0.95; // Updated to 95% of card width
-  
-  // Measure the title width at the default font size
-  textSize(recipeNameSize);
-  fill(COLORS.secondary);
-  textStyle(BOLD);
-  
-  // Calculate how wide the title would be at the default size
-  const titleWidth = textWidth(final_combination.name);
-  
-  // Calculate a scaling factor if the title exceeds max width
-  let scaleFactor = 1.0;
-  if (titleWidth > maxTitleWidth) {
-    scaleFactor = maxTitleWidth / titleWidth;
-    
-    // Apply the calculated scale factor to the font size
-    const scaledFontSize = recipeNameSize * scaleFactor;
-    textSize(scaledFontSize);
-  }
-  
-  // Now draw the title with appropriate scaling
-  text(final_combination.name, cardX, cardY - cardHeight/2 + cardHeight * 0.09); // Adjusted to 9% of card height from top
-  textStyle(NORMAL);
-  
-  // RESET TEXT ALIGNMENT FOR AUTHOR - Ensure centered text
-  textAlign(CENTER, CENTER);
-  
-  // Add author information if it exists
-  if (recipeAuthor && recipeAuthor.trim() !== "") {
-    textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
-    fill('#333333');
-    textStyle(BOLD); // Make author text bold
-    text(`By ${recipeAuthor}`, cardX, cardY - cardHeight/2 + cardHeight * 0.16); // Adjusted to 16% of card height from top
-    textStyle(NORMAL); // Reset text style
-  }
-  
-  // Resize image dimensions for responsive layout
-  const imageWidth = cardWidth * 0.60;  // Updated to 60% of card width, no max size limit
-  const imageHeight = imageWidth; // Keep square
-  
-  // Update image position based on new metrics - 35% from left edge, 56% from top
-  let imageX = cardX - cardWidth/2 + cardWidth * 0.35; // 35% of card width from left edge
-  let imageY = cardY - cardHeight/2 + cardHeight * 0.56; // Updated to 56% of card height from top
-  
-  // Isolate drawing context for the image section
-  push();
-  // Set modes specifically for image rendering
-  rectMode(CENTER);
-  imageMode(CENTER);
-  // RESET TEXT ALIGNMENT FOR IMAGE PLACEHOLDER - Ensure centered text
-  textAlign(CENTER, CENTER);
-  
-  // Only draw the placeholder if there's no image to display
-  if (typeof recipeImage === 'undefined' || !recipeImage) {
-    // Draw recipe image placeholder (square)
-    fill(240);
-    stroke(220);
-    strokeWeight(1);
-    rect(imageX, imageY, imageWidth, imageHeight, max(cardWidth * 0.02, 8)); // Add rounded corners matching the card
-    
-    // Draw placeholder text
-    fill(180);
-    textSize(min(max(playAreaWidth * 0.025, 10), 14)); // Changed from width to playAreaWidth with adjusted coefficient
-    text("Recipe Image", imageX, imageY);
-  } else {
-    // Image exists - draw it directly in place of the placeholder
-    // Calculate scaling factors for "crop to fill" approach
-    const imgRatio = recipeImage.width / recipeImage.height;
-    const boxRatio = imageWidth / imageHeight;
-    
-    // Variables for the source (original image) rectangle
-    let sx = 0, sy = 0, sw = recipeImage.width, sh = recipeImage.height;
-    
-    // Crop to fill approach
-    if (imgRatio > boxRatio) {
-      // Image is wider than box - crop sides
-      sw = recipeImage.height * boxRatio;
-      sx = (recipeImage.width - sw) / 2; // Center horizontally
-    } else if (imgRatio < boxRatio) {
-      // Image is taller than box - crop top/bottom
-      sh = recipeImage.width / boxRatio;
-      sy = (recipeImage.height - sh) / 2; // Center vertically
-    }
-    
-    // Create rounded corners using a clipping region
-    // The corner radius matches the card's corner radius
-    const cornerRadius = max(cardWidth * 0.02, 8);
-    
-    // Save the drawing state before creating the clip
-    push();
-    // Draw a rounded rectangle as a mask
-    noStroke();
-    fill(255);
-    rect(imageX, imageY, imageWidth, imageHeight, cornerRadius);
-    // Enable clipping to this shape
-    drawingContext.clip();
-    
-    // Draw the image using the calculated crop area in place of the placeholder
-    image(recipeImage, imageX, imageY, imageWidth, imageHeight, sx, sy, sw, sh);
-    
-    // Restore drawing state after clipped drawing
-    pop();
-    
-    // Draw a border around the image to match the placeholder style
-    noFill();
-    stroke(220);
-    strokeWeight(1);
-    rect(imageX, imageY, imageWidth, imageHeight, cornerRadius);
-  }
-  
-  // Restore the previous drawing context
-  pop();
-  
-  // Draw recipe description - updated position and width
-  // Move description right by using 82% of card width from left
-  const descriptionX = cardX - cardWidth/2 + cardWidth * 0.82; // 82% of card width from left
-  const descriptionWidth = cardWidth * 0.30; // Updated to 30% of card width (was 32%)
-  
-  // Update description Y position - 40% card height from top (was 30%)
-  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.40; // Updated to 40% of card height from top
-  
-  // Isolate text context for description
-  push();
-  fill(0);
-  // RESET TEXT ALIGNMENT FOR DESCRIPTION - Ensure left-aligned text
-  textAlign(LEFT, TOP);
-  textSize(min(max(playAreaWidth * 0.022, 10), 14)); // Increased font size by approximately 2pts
-  fill('#666');
-  
-  // Limit description height to 33% of card height
-  const maxDescriptionHeight = cardHeight * 0.33;
-  
-  text(recipeDescription, descriptionX, descriptionY, descriptionWidth, maxDescriptionHeight); // Added max height constraint
-  pop(); // End description text context
-  
-  // Position ingredients at a fixed 50% from the top of the card, regardless of description height
-  const ingredientsY = cardY - cardHeight/2 + cardHeight * 0.50;
-  
-  // Isolate text context for ingredients section
-  push();
-  
-  // Display up to 6 ingredients in a single column, without a header
-  textSize(min(max(playAreaWidth * 0.022, 10), 12)); // Updated font size to 2.2% (min 10px, max 12px)
-  fill('#666');
-  textAlign(LEFT, TOP); // Explicitly set top alignment
-  textStyle(BOLD); // Make ingredients text bold
-  
-  // Take only the first 6 ingredients (updated from 4)
-  const ingredientsToShow = ingredients.slice(0, 6);
-  
-  // Function to process ingredients for display
-  function processIngredientsForColumn(ingredientsList, charLimit) {
-    return ingredientsList.map(ingredient => {
-      let lines = [];
-      let words = ingredient.split(' ');
-      let currentLine = "";
-      
-      for (let word of words) {
-        if (currentLine === "") {
-          currentLine = word;
-        } else if ((currentLine + " " + word).length <= charLimit) {
-          currentLine += " " + word;
-        } else {
-          lines.push(currentLine);
-          currentLine = word;
-        }
-      }
-      
-      if (currentLine !== "") {
-        lines.push(currentLine);
-      }
-      
-      return {
-        original: ingredient,
-        lines: lines
-      };
-    });
-  }
-  
-  // Character limit for ingredients, adjust for screen size
-  const charLimit = useVerticalLayout ? 15 : 20;
-  
-  // Process ingredients for the single column
-  const processedIngredients = processIngredientsForColumn(ingredientsToShow, charLimit);
-  
-  // Calculate spacing
-  const lineHeight = useVerticalLayout ? 8 : 10;
-  const ingredientSpacing = useVerticalLayout ? 2 : 3;
-  
-  // Position ingredients list at 84% from left of card
-  const ingredientsListX = cardX - cardWidth/2 + cardWidth * 0.84; // Updated to 84% from left
-  let yOffset = ingredientsY;
-  
-  // Maximum height for ingredients
-  const maxIngredientsHeight = cardHeight * 0.33;
-  let totalIngredientsHeight = 0;
-  
-  // Draw ingredients in a single column
-  for (let i = 0; i < processedIngredients.length; i++) {
-    const lines = processedIngredients[i].lines;
-    
-    // Calculate height of this ingredient
-    const ingredientHeight = lines.length * lineHeight + ingredientSpacing;
-    
-    // Check if adding this ingredient would exceed max height
-    if (totalIngredientsHeight + ingredientHeight > maxIngredientsHeight) {
-      break;
-    }
-    
-    // Draw each line of this ingredient
-    for (let j = 0; j < lines.length; j++) {
-      if (j === 0) {
-        // Only add bullet to the first line of each ingredient
-        text("• " + lines[j], ingredientsListX, yOffset, cardWidth * 0.32); // Use 32% of card width as requested
-      } else {
-        // Indent subsequent lines to align with text after bullet
-        text("  " + lines[j], ingredientsListX, yOffset, cardWidth * 0.32); // Use 32% of card width as requested
-      }
-      yOffset += lineHeight;
-      totalIngredientsHeight += lineHeight;
-    }
-    
-    // Add spacing between ingredients
-    yOffset += ingredientSpacing;
-    totalIngredientsHeight += ingredientSpacing;
-  }
-  
+  text("View the full recipe", recipeDetailsX, recipeDetailsY, cardWidth * 0.32);
   textStyle(NORMAL); // Reset text style
-  pop(); // End ingredients section context
-  
-  // Add "Tutorial recipe!" text at the bottom of the card - tutorial specific message
-  push(); // Isolate text context for Recipe Details
-  // Position at 84% of card width from left, 20% of card height from bottom
-  const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.84; // Updated to 84% from left (was 82%)
-  const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.20; // Updated to 20% from bottom (was 10%)
-  
-  textAlign(LEFT, CENTER);
-  textSize(min(max(playAreaWidth * 0.03, 11), 14)); // Updated minimum to 11px (was 10px)
-  if (isMouseOverCard) {
-    fill(COLORS.primary); // Green text when hovered
-  } else {
-    fill('#666'); // Gray text normally
-  }
-  // Use same CTA text as regular win screen instead of "Tutorial recipe!" - APlasker
-  text("View the full recipe", recipeDetailsX, recipeDetailsY, cardWidth * 0.32); // Limited width to 32% of card width
   pop(); // End Recipe Details context
   
   // ===== SCORE SECTION (Tutorial Version) =====
@@ -2503,29 +1382,49 @@ function drawTutorialWinScreen() {
   textStyle(NORMAL);
   text("Now that you made a pizza, you're ready to make anything! Put your skills to the test!", messageX, messageY + 15, messageWidth);
   
-  // Draw the "Solve today's recipe" button on the right side
-  const buttonX = scoreX + scoreWidth * 0.25; // 25% from center to right (moved left)
-  const buttonY = scoreY;
-  const buttonSize = scoreHeight * 0.6; // 60% of score height
+  // Replace the circular button with a pink rounded rectangle - APlasker
+  const ctaWidth = scoreWidth * 0.96; // 96% of the score card width
+  const ctaHeight = scoreHeight * 0.65; // 65% of score card height
+  const ctaX = scoreX; // Center horizontally
+  const ctaY = scoreY; // Center vertically (changed from scoreY + scoreHeight * 0.2)
+  const ctaRadius = min(ctaWidth, ctaHeight) * 0.1; // 10% of the smaller dimension for rounded corners
   
-  // Draw circular button with orange-red color - Added black outline with subtle opacity - APlasker
-  fill(COLORS.secondary); // Red-orange color
+  // Draw pink rounded rectangle
+  rectMode(CENTER);
+  fill(COLORS.secondary); // Pink color from COLORS.secondary (#cf6d88)
   stroke(0, 50); // Added black outline with 50 opacity to match hint button style
   strokeWeight(2); // Match strokeWeight used in vessels and hint button
-  circle(buttonX, buttonY, buttonSize);
+  rect(ctaX, ctaY, ctaWidth, ctaHeight, ctaRadius);
   
-  // Add text to the button - one word per line
+  // Add the two lines of text
   textAlign(CENTER, CENTER);
-  textSize(min(max(playAreaWidth * 0.035, 14), 18)); // Larger font for button text
+  
+  // Top line (smaller) - Increased size
+  textSize(min(max(playAreaWidth * 0.035, 14), 18)); // Increased from 0.03/12/16 to 0.035/14/18
   textStyle(BOLD);
   fill(255); // White text
   noStroke(); // Remove stroke for text
+  text("YOU COMPLETED THE TUTORIAL,", ctaX, ctaY - ctaHeight * 0.2);
   
-  // Split the text into three lines
-  text("Solve", buttonX, buttonY - 20);
-  text("today's", buttonX, buttonY);
-  text("recipe", buttonX, buttonY + 20);
+  // Bottom line (larger) - Increased size and updated text
+  textSize(min(max(playAreaWidth * 0.055, 18), 28)); // Increased from 0.045/16/24 to 0.055/18/28
+  fill(255); // White text
   
+  // Calculate bottom line width to ensure it fits 90% of the card width
+  const bottomLineText = "NOW COOK TODAY'S RECIPE!"; // Changed from "PLAY" to "COOK"
+  const maxBottomLineWidth = ctaWidth * 0.9; // 90% of the CTA width
+  const bottomLineTextWidth = textWidth(bottomLineText);
+  
+  // Scale text if needed to fit 90% of width
+  if (bottomLineTextWidth > maxBottomLineWidth) {
+    const scaleFactor = maxBottomLineWidth / bottomLineTextWidth;
+    const scaledFontSize = textSize() * scaleFactor;
+    textSize(scaledFontSize);
+  }
+  
+  // Draw the bottom line text
+  text(bottomLineText, ctaX, ctaY + ctaHeight * 0.15);
+
   // Restore the drawing context
   pop();
 }

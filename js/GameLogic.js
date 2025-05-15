@@ -49,8 +49,16 @@ function combineVessels(v1, v2) {
         if (C.required.every(ing => U.includes(ing))) {
           // Only turn green if not part of an active hint (simplified)
           if (!hintActive || !hintedCombos.includes(C.name)) {
+            // Add to startedCombinations array before setting vessel properties
+            // This ensures two-ingredient combos are tracked even when immediately completed
+            if (!startedCombinations.includes(C.name)) {
+              startedCombinations.push(C.name);
+              console.log(`Added ${C.name} to startedCombinations (direct completion):`, startedCombinations);
+            }
+            
             new_v.name = C.name;
-            new_v.color = COLORS.green; // Use COLORS.green instead of string 'green'
+            // Use unique color for completed vessel instead of green - APlasker
+            new_v.color = getNextCompletedVesselColor(C.name);
             new_v.ingredients = []; // Clear ingredients since this is now a complete combination
             
             // Call success message for completed combination (green vessel) - APlasker
@@ -84,7 +92,7 @@ function combineVessels(v1, v2) {
               console.log(`Removed ${C.name} from partialCombinations:`, partialCombinations);
             }
             
-            console.log(`Created green vessel for ${C.name} with ingredients: ${U.join(', ')}`);
+            console.log(`Created colored vessel for ${C.name} with ingredients: ${U.join(', ')}`);
             
             // Track collected ingredients for all combinations
             if (new_v.name) {
@@ -113,7 +121,7 @@ function combineVessels(v1, v2) {
             }
           }
         } else {
-          console.log(`Created yellow vessel with ingredients: ${U.join(', ')}`);
+          console.log(`Created white vessel with ingredients: ${U.join(', ')}`);
           console.log(`Missing ingredients for ${C.name}: ${C.required.filter(ing => !U.includes(ing)).join(', ')}`);
           
           // Call partial combo message for yellow vessel (partial combination) - APlasker
@@ -130,6 +138,12 @@ function combineVessels(v1, v2) {
           if (!partialCombinations.includes(C.name)) {
             partialCombinations.push(C.name);
             console.log(`Added ${C.name} to partialCombinations:`, partialCombinations);
+            
+            // Also add to startedCombinations array to track it was ever started - APlasker
+            if (!startedCombinations.includes(C.name)) {
+              startedCombinations.push(C.name);
+              console.log(`Added ${C.name} to startedCombinations:`, startedCombinations);
+            }
           }
           
           // Update collectedIngredients for hinted combos
@@ -197,12 +211,14 @@ function combineVessels(v1, v2) {
     } 
     // Case 2: Both vessels are completed combinations (green vessels)
     else if ((v1.name || v1.complete_combinations.length > 0) && (v2.name || v2.complete_combinations.length > 0)) {
-      // Handle combining completed combinations (green vessels)
+      // SIMPLIFIED LOGIC: Use parent-child relationships as source of truth
+      
+      // Extract vessel names
       let set1 = v1.complete_combinations.length > 0 ? v1.complete_combinations : (v1.name ? [v1.name] : []);
       let set2 = v2.complete_combinations.length > 0 ? v2.complete_combinations : (v2.name ? [v2.name] : []);
-      let U = [...new Set([...set1, ...set2])];
+      let combinedSet = [...new Set([...set1, ...set2])];
       
-      console.log("Combining completed combinations:", U);
+      console.log("Attempting to combine green vessels:", combinedSet);
       
       // APlasker - Easter Egg Check for combining named vessels
       if (typeof checkForEasterEgg === 'function' && easter_eggs && easter_eggs.length > 0) {
@@ -222,15 +238,14 @@ function combineVessels(v1, v2) {
         }
       }
       
-      // Find the combinations in our intermediate_combinations array
-      let combo1 = null;
-      let combo2 = null;
+      // Find the vessel objects in our combinations
+      let vessel1Combo = null, vessel2Combo = null;
       
-      // Find the combination objects for the vessels being combined
+      // Find corresponding objects in intermediate combinations
       for (let name of set1) {
         const found = intermediate_combinations.find(c => c.name === name);
         if (found) {
-          combo1 = found;
+          vessel1Combo = found;
           break;
         }
       }
@@ -238,126 +253,181 @@ function combineVessels(v1, v2) {
       for (let name of set2) {
         const found = intermediate_combinations.find(c => c.name === name);
         if (found) {
-          combo2 = found;
+          vessel2Combo = found;
           break;
         }
       }
-          
-          // Calculate appropriate vessel dimensions based on play area size
-          const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
-          const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
-          
-      // Create a new vessel with all the combined combinations
-          let new_v = new Vessel([], U, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
-          // Explicitly set isAdvanced property for correct positioning
-          new_v.isAdvanced = true;
-          
-      // Check if this is the final combination
-      const isFinalCombo = final_combination.required.length === U.length && 
-        final_combination.required.every(req => U.includes(req));
+      
+      // Variable to store the resulting combination
+      let resultingCombo = null;
+      let isValidCombination = false;
+      
+      // First, check if this matches the final combination
+      const isFinalCombo = final_combination.required.length === combinedSet.length && 
+                          final_combination.required.every(req => combinedSet.includes(req)) &&
+                          combinedSet.every(item => final_combination.required.includes(item));
       
       if (isFinalCombo) {
-        console.log("Final combination created!");
-        // Set vessel properties for the final combination
-        new_v.name = final_combination.name;
-        new_v.color = COLORS.green;
-        new_v.verb = final_combination.verb || "Complete!";
-        new_v.verbDisplayTime = 120;
+        console.log("This combination matches the final recipe!");
+        resultingCombo = final_combination;
+        isValidCombination = true;
+      } 
+      // If not the final combo, check if they share the same parent
+      else if (vessel1Combo && vessel2Combo && 
+               vessel1Combo.parent_combo && vessel2Combo.parent_combo && 
+               vessel1Combo.parent_combo === vessel2Combo.parent_combo) {
+        
+        // Find the parent combination
+        const parentCombo = intermediate_combinations.find(c => c.combo_id === vessel1Combo.parent_combo);
+        if (parentCombo) {
+          console.log(`Found shared parent combination: ${parentCombo.name}`);
+          
+          // Count how many combos have this same parent
+          const siblingsCount = intermediate_combinations.filter(c => 
+            c.parent_combo === parentCombo.combo_id
+          ).length;
+          
+          // Check if these two vessels constitute all the children needed for the parent
+          if (siblingsCount === 2) {
+            // Simple case: Only these two vessels are needed to create the parent
+            console.log(`These two vessels are sufficient to create: ${parentCombo.name}`);
+            resultingCombo = parentCombo;
+            isValidCombination = true;
+          } else {
+            // Complex case: We need to check if these two vessels plus any already combined vessels 
+            // fulfill the parent's requirements
             
-        // Add to completedGreenVessels when creating the final vessel
-        if (!completedGreenVessels.some(vessel => vessel.name === final_combination.name)) {
-          completedGreenVessels.push({name: final_combination.name});
-            }
+            // Get all the vessels that have been combined into these two vessels
+            const allCombinedIngredients = [...combinedSet];
             
-        // Track collected ingredients for the final combination
-        if (new_v.name) {
-          let createdCombo;
-          // Find which combo was created
-          for (let combo of intermediate_combinations) {
-            if (combo.name === new_v.name) {
-              createdCombo = combo;
-              break;
+            // Check if we have all the required ingredients for the parent
+            const hasAllRequired = parentCombo.required.every(req => 
+              allCombinedIngredients.includes(req)
+            );
+            
+            if (hasAllRequired) {
+              new_v.name = parentCombo.name;
+              // Use unique color for completed vessel instead of green - APlasker
+              new_v.color = getNextCompletedVesselColor(parentCombo.name);
+              new_v.complete_combinations = []; // Clear since this is now a complete combination
+              
+              // Set the verb from the parent combination and display it
+              if (parentCombo.verb) {
+                new_v.verb = parentCombo.verb;
+                new_v.verbDisplayTime = 120; // Display for 120 frames (about 2 seconds)
+              }
+              
+              // Add parent combo to completed vessels - APlasker
+              if (!completedGreenVessels.some(vessel => vessel.name === parentCombo.name)) {
+                completedGreenVessels.push({name: parentCombo.name});
+              }
+              
+              console.log(`Created colored vessel for ${parentCombo.name}`);
+            } else {
+              console.log(`Created white vessel with combinations: ${U.join(', ')}`);
+              console.log(`Missing combinations for ${parentCombo.name}: ${requiredCombos.filter(name => !U.includes(name)).join(', ')}`);
             }
           }
-          if (final_combination.name === new_v.name) {
-            createdCombo = final_combination;
+        }
+      }
+      // Check if one vessel is the parent of the other
+      else if (vessel1Combo && vessel2Combo) {
+        if (vessel1Combo.combo_id && vessel1Combo.combo_id === vessel2Combo.parent_combo) {
+          console.log(`${vessel1Combo.name} is the parent of ${vessel2Combo.name}`);
+          
+          // Find any recipe that requires these two specifically
+          const matchingRecipe = intermediate_combinations.find(combo => 
+            combo.required.length === combinedSet.length &&
+            combo.required.every(req => combinedSet.includes(req)) &&
+            combinedSet.every(item => combo.required.includes(item))
+          );
+          
+          if (matchingRecipe) {
+            console.log(`Found recipe that requires these vessels: ${matchingRecipe.name}`);
+            resultingCombo = matchingRecipe;
+            isValidCombination = true;
+          }
+        }
+        else if (vessel2Combo.combo_id && vessel2Combo.combo_id === vessel1Combo.parent_combo) {
+          console.log(`${vessel2Combo.name} is the parent of ${vessel1Combo.name}`);
+          
+          // Find any recipe that requires these two specifically
+          const matchingRecipe = intermediate_combinations.find(combo => 
+            combo.required.length === combinedSet.length &&
+            combo.required.every(req => combinedSet.includes(req)) &&
+            combinedSet.every(item => combo.required.includes(item))
+          );
+          
+          if (matchingRecipe) {
+            console.log(`Found recipe that requires these vessels: ${matchingRecipe.name}`);
+            resultingCombo = matchingRecipe;
+            isValidCombination = true;
+          }
+        }
+      }
+      
+      // If no relationship found via parent-child, check if there's a direct recipe match
+      if (!isValidCombination) {
+        // Look for any recipe that requires exactly these vessels
+        const matchingRecipe = intermediate_combinations.find(combo => 
+          combo.required.length === combinedSet.length &&
+          combo.required.every(req => combinedSet.includes(req)) &&
+          combinedSet.every(item => combo.required.includes(item))
+        );
+        
+        if (matchingRecipe) {
+          console.log(`Found direct recipe match: ${matchingRecipe.name}`);
+          resultingCombo = matchingRecipe;
+          isValidCombination = true;
+        } else {
+          // No valid combination found
+          console.log("These vessels cannot be combined according to the recipe structure");
+          console.log("No matching recipe or parent-child relationship found for:", combinedSet);
+          return null;
+        }
+      }
+      
+      // If we've determined this is a valid combination, create the new vessel
+      if (isValidCombination) {
+        // Calculate appropriate vessel dimensions based on play area size
+        const vesselWidth = Math.max(playAreaWidth * 0.25, 150);
+        const vesselHeight = vesselWidth * 0.5;
+        
+        // Create a new vessel
+        let new_v = new Vessel([], combinedSet, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
+        new_v.isAdvanced = true;
+        
+        // If we have a resulting combination, set the vessel properties
+        if (resultingCombo) {
+          new_v.name = resultingCombo.name;
+          // Use unique color for completed vessel instead of green - APlasker
+          new_v.color = getNextCompletedVesselColor(resultingCombo.name);
+          new_v.verb = resultingCombo.verb || "Mix";
+          new_v.verbDisplayTime = 120;
+          
+          // Add to completedGreenVessels
+          if (!completedGreenVessels.some(vessel => vessel.name === resultingCombo.name)) {
+            completedGreenVessels.push({name: resultingCombo.name});
           }
           
-          // Track collected ingredients for all combinations
-          if (createdCombo) {
-            // Update the progress for this combination
-            for (let combo of intermediate_combinations.concat([final_combination])) {
-              if (combo.required.includes(new_v.name) && combo.collectedIngredients) {
-                combo.collectedIngredients.push(new_v.name);
-                console.log(`Added ${new_v.name} to ${combo.name}'s collected ingredients: ${combo.collectedIngredients.length}/${combo.required.length}`);
-              }
+          // Update collected ingredients tracking
+          for (let combo of intermediate_combinations.concat([final_combination])) {
+            if (combo.required.includes(new_v.name) && combo.collectedIngredients) {
+              combo.collectedIngredients.push(new_v.name);
+              console.log(`Added ${new_v.name} to ${combo.name}'s collected ingredients: ${combo.collectedIngredients.length}/${combo.required.length}`);
             }
           }
+          
+          console.log(`Created colored vessel: ${new_v.name}`);
+        } else {
+          // This should not happen with our current logic, but just in case
+          console.log("Created white vessel for partial combination");
         }
         
         return new_v;
       }
       
-      // Check if there's a possible intermediate combination that matches
-      const possibleCombos = intermediate_combinations.filter(combo => {
-        // Check if the combo's required ingredients are a subset of U
-        let required = combo.required;
-        return required.every(ing => U.includes(ing)) && required.length <= U.length;
-      });
-      
-      if (possibleCombos.length > 0) {
-        // Sort by length (descending) to prioritize more specific combinations
-        possibleCombos.sort((a, b) => b.required.length - a.required.length);
-      
-        // Get the most specific matching combination
-        const matchingCombo = possibleCombos[0];
-        console.log(`Found matching intermediate combination: ${matchingCombo.name}`);
-      
-        // Set vessel properties for this combination
-        new_v.name = matchingCombo.name;
-        new_v.color = COLORS.green;
-        
-        // Set the verb from the combination and display it
-        new_v.verb = matchingCombo.verb || "Mix";
-        new_v.verbDisplayTime = 120;
-        
-        // Add to completedGreenVessels when creating a green vessel
-        if (!completedGreenVessels.some(vessel => vessel.name === matchingCombo.name)) {
-          completedGreenVessels.push({name: matchingCombo.name});
-        }
-        
-        // Track collected ingredients for this combination
-        if (new_v.name) {
-          let createdCombo;
-          // Find which combo was created
-        for (let combo of intermediate_combinations) {
-            if (combo.name === new_v.name) {
-              createdCombo = combo;
-            break;
-          }
-          }
-          if (final_combination.name === new_v.name) {
-            createdCombo = final_combination;
-          }
-          
-          // Track collected ingredients for all combinations
-          if (createdCombo) {
-            // Update the progress for this combination
-            for (let combo of intermediate_combinations.concat([final_combination])) {
-              if (combo.required.includes(new_v.name) && combo.collectedIngredients) {
-                combo.collectedIngredients.push(new_v.name);
-                console.log(`Added ${new_v.name} to ${combo.name}'s collected ingredients: ${combo.collectedIngredients.length}/${combo.required.length}`);
-              }
-            }
-          }
-        }
-        
-        return new_v;
-        } else {
-        // No matching combination found - stay yellow
-        // But still create a vessel with combined combinations
-        return new_v;
-        }
+      return null; // Shouldn't reach here with current logic, but just in case
     }
     // Case 3: Mix and match - one vessel is a combination, one is ingredients
     else {
@@ -450,7 +520,7 @@ function combineVessels(v1, v2) {
         return; // Exit early
       }
       
-      hintCount++; // Increment hint counter
+      // hintCount increment moved lower, will only happen when a new hint is shown
       
       // Add a bright blue counter for creating a hint vessel
       moveHistory.push(COLORS.vesselHint); // Red color for hint creation (matching hint vessels)
@@ -549,6 +619,9 @@ function combineVessels(v1, v2) {
         
         // Check if this combo is already hinted - if so, just add to list without animation
         if (!hintedCombos.includes(selectedCombo.name)) {
+          // Increment hint counter only when a new hint is actually shown
+          hintCount++; 
+          
           // Add the combo to the hinted combos list
           hintedCombos.push(selectedCombo.name);
           
@@ -1516,8 +1589,8 @@ function combineVessels(v1, v2) {
             arrangeVessels();
             
             // Use appropriate pulse animation based on vessel type
-            if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary) {
-              console.log("Using bounce pulse for auto-combined green vessel");
+            if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary || COMPLETED_VESSEL_COLORS.includes(new_v.color)) {
+              console.log("Using bounce pulse for auto-combined completed vessel");
               new_v.bouncePulse(); // Use new bounce pulse animation
             } else {
               // Use regular pulse for intermediate combinations

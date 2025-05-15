@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v0.0505.03
+ * Culinary Logic Puzzle v20250515.1545
  * Created by APlasker
- * Last Updated: May 5, 2025 (00:03 EDT) by APlasker
+ * Last Updated: May 15, 2025 (15:45 EDT) by APlasker
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -34,8 +34,10 @@ let intermediate_combinations = [
   let displayedVessels = []; // Track all vessels to display
   let usedIngredients = new Set(); // Track ingredients used in combinations
   let combine_animations = [];
-  let playingTime = 0;
-  let startTime = 0;
+  let playingTime = 0; // Total time played in seconds
+  let startTime = 0; // Timestamp when game started
+  let gameTimer = 0; // Current game time in seconds
+  let gameTimerActive = false; // Whether the timer is currently running
   let tutorialStep = 1;
   let tutorialVessels = [];
   let startButton;
@@ -61,6 +63,7 @@ let intermediate_combinations = [
   let finalCombinationVessels = []; // Track vessels that are part of the final combination - APlasker
   let autoFinalCombinationCenter = {x: 0, y: 0}; // Center point for vessels to move toward - APlasker
   let autoFinalCombinationShakeDuration = 30; // 0.5 seconds at 60fps for shake animation - APlasker
+  let startedCombinations = []; // Track all combos that have ever been started (partial or completed) - APlasker
   
   // Byline state variables - APlasker
   let currentByline = "Drop one ingredient on to another to combine!"; // Updated default byline - APlasker
@@ -148,18 +151,94 @@ let intermediate_combinations = [
   
   // Color palette
   const COLORS = {
-    background: '#F5F1E8',    // Soft cream background
-    primary: '#778F5D',       // Avocado green
-    secondary: '#D96941',     // Burnt orange
-    tertiary: '#E2B33C',      // Mustard yellow
+    background: '#f2efee',    // Soft cream background
+    primary: '#9a9832',       // Changed from avocado green to olive green - APlasker
+    secondary: '#cf6d88',     // Changed from burnt orange to bright yellow - APlasker
+    tertiary: '#FFFFFF',      // White (previously changed from mustard yellow)
     accent: '#7A9BB5',        // Dusty blue
     text: '#333333',          // Dark gray for text
     vesselBase: '#F9F5EB',    // Cream white for base ingredients
-    vesselYellow: '#E2B33C',  // Mustard yellow for partial combinations
-    vesselGreen: '#778F5D',   // Avocado green for complete combinations
-    vesselHint: '#D96941',    // Burnt orange for hint vessels
-    green: '#778F5D'          // Explicit avocado green for all green elements
+    vesselYellow: '#FFFFFF',  // White for partial combinations
+    vesselGreen: '#9a9832',   // Updated to match new primary color - APlasker
+    vesselHint: '#f7dc30',    // Changed from burnt orange to bright yellow - APlasker
+    green: '#9a9832',         // Updated to match new primary color - APlasker
+    peach: '#dd9866'          // Added peach/orange color for tertiary elements - APlasker
   };
+  
+  // Array of colors for completed vessels - APlasker
+  const COMPLETED_VESSEL_COLORS = [
+    '#f3a9b2', // Light pink
+    '#cfc23f', // Mustard yellow
+    '#f7dc30', // Bright yellow
+    '#cf6d88', // Pink
+    '#dd9866'  // Peach/orange - Updated to be tertiary color - APlasker
+  ];
+  
+  // Track which colors have been used for completed vessels - APlasker
+  let usedCompletedVesselColors = [];
+  
+  // Function to get the next available color for completed vessels - APlasker
+  function getNextCompletedVesselColor(comboName) {
+    // Position-based color assignment: Find the position of this combo in the recipe steps
+    if (comboName) {
+      let position = -1;
+      
+      // Find position in intermediate combinations
+      for (let i = 0; i < intermediate_combinations.length; i++) {
+        if (intermediate_combinations[i].name === comboName) {
+          position = i;
+          break;
+        }
+      }
+      
+      // If it's the final combination, use the last position
+      if (comboName === final_combination.name) {
+        position = intermediate_combinations.length;
+      }
+      
+      // Use position to select the color if found
+      if (position >= 0) {
+        const color = COMPLETED_VESSEL_COLORS[position % COMPLETED_VESSEL_COLORS.length];
+        
+        // Don't log or modify usedCompletedVesselColors when called for highlight lookups
+        // This function can be called either for:
+        // 1. Creating a new vessel (where we track used colors)
+        // 2. Just getting the color for recipe card highlight (where we don't track)
+        
+        // Check if this is a direct vessel creation call or just a preview/highlight call
+        if (typeof gameWon !== 'undefined' && gameStarted && !gameWon) {
+          // Only track used colors when game is actively running and we're creating actual vessels
+          if (!usedCompletedVesselColors.includes(color)) {
+            // Only add to used colors during actual vessel creation, not for highlights
+            console.log(`Assigned position-based color for ${comboName}: ${color} (position ${position})`);
+          }
+        }
+        
+        return color;
+      }
+    }
+    
+    // Fallback to original color cycling behavior if no combo name provided or position not found
+    // If all colors have been used, reset the used colors array
+    if (usedCompletedVesselColors.length >= COMPLETED_VESSEL_COLORS.length) {
+      console.log("All vessel colors have been used, recycling colors");
+      usedCompletedVesselColors = [];
+    }
+    
+    // Find the first unused color
+    for (let color of COMPLETED_VESSEL_COLORS) {
+      if (!usedCompletedVesselColors.includes(color)) {
+        // Mark this color as used
+        usedCompletedVesselColors.push(color);
+        console.log(`Assigned vessel color (fallback method): ${color}`);
+        return color;
+      }
+    }
+    
+    // Fallback to the first color if something goes wrong
+    console.log("Fallback to first color in vessel color array");
+    return COMPLETED_VESSEL_COLORS[0];
+  }
   
   // Animation class for combining ingredients
   class CombineAnimation {
@@ -505,6 +584,8 @@ let intermediate_combinations = [
       this.textBold = false; // New property for bold text
       this.isCircular = false; // New property to determine if button is circular
       this.textSizeMultiplier = 1.0; // New property to adjust text size (default: normal size)
+      this.useVesselStyle = false; // New property to use vessel-style three-layer outline - APlasker
+      this.outlineColor = COLORS.peach; // Default outline color for vessel style - APlasker
     }
     
     draw() {
@@ -515,35 +596,71 @@ let intermediate_combinations = [
       const cornerRadius = Math.max(this.w * 0.06, 4); // Border radius as 6% of width, min 4px
       const strokeW = Math.max(this.w * 0.025, 2); // Stroke weight as 2.5% of width, min 2px
       
-      // Draw button
-      rectMode(CENTER);
-      if (this.disabled) {
-        // Use 50% opacity for disabled state
-        let buttonColor = color(this.color);
-        buttonColor.setAlpha(128); // 128 is 50% opacity (0-255)
-        fill(buttonColor);
-      } else if (this.hovered) {
-        fill(lerpColor(color(this.color), color(255), 0.2));
+      if (this.useVesselStyle) {
+        // Draw button with vessel-style three-layer outline - APlasker
+        rectMode(CENTER);
+        
+        // Calculate stroke weights for the three-layer outline
+        const thinBlackOutline = Math.max(this.w * 0.01, 1); // Very thin black line (1% of button width, min 1px)
+        const thickColoredOutline = Math.max(this.w * 0.03, 3); // Thicker colored line (3% of button width, min 3px)
+        const outerBlackOutline = Math.max(this.w * 0.015, 1.5); // Outer black line (1.5% of button width, min 1.5px)
+        
+        // Set fill color based on state
+        if (this.disabled) {
+          let buttonColor = color(this.color);
+          buttonColor.setAlpha(128); // 50% opacity
+          fill(buttonColor);
+        } else if (this.hovered) {
+          fill(lerpColor(color(this.color), color(255), 0.2));
+        } else {
+          fill(this.color);
+        }
+        
+        // First, draw the outer thin black outline
+        stroke(0);
+        strokeWeight(outerBlackOutline);
+        rect(this.x, this.y, this.w + thinBlackOutline * 4, this.h + thinBlackOutline * 4, cornerRadius);
+        
+        // Next, draw the middle thick colored outline
+        stroke(this.outlineColor);
+        strokeWeight(thickColoredOutline);
+        rect(this.x, this.y, this.w + thinBlackOutline * 2, this.h + thinBlackOutline * 2, cornerRadius);
+        
+        // Finally, draw the inner thin black outline
+        stroke(0);
+        strokeWeight(thinBlackOutline);
+        rect(this.x, this.y, this.w, this.h, cornerRadius);
       } else {
-        fill(this.color);
-      }
-      
-      // Use borderColor if specified, otherwise use default subtle border
-      if (this.borderColor) {
-        stroke(this.borderColor);
-        strokeWeight(strokeW); // Relative stroke weight
-      } else {
-      stroke(0, 50);
-      strokeWeight(strokeW); // Relative stroke weight
-      }
-      
-      // Draw either a circle or rounded rectangle based on isCircular property
-      if (this.isCircular) {
-        // For circular buttons, use the width as diameter
-        circle(this.x, this.y, this.w);
-      } else {
-        // For rectangular buttons, use the standard rectangle
-      rect(this.x, this.y, this.w, this.h, cornerRadius);
+        // Draw button with standard style
+        rectMode(CENTER);
+        if (this.disabled) {
+          // Use 50% opacity for disabled state
+          let buttonColor = color(this.color);
+          buttonColor.setAlpha(128); // 128 is 50% opacity (0-255)
+          fill(buttonColor);
+        } else if (this.hovered) {
+          fill(lerpColor(color(this.color), color(255), 0.2));
+        } else {
+          fill(this.color);
+        }
+        
+        // Use borderColor if specified, otherwise use default subtle border
+        if (this.borderColor) {
+          stroke(this.borderColor);
+          strokeWeight(strokeW); // Relative stroke weight
+        } else {
+          stroke(0, 50);
+          strokeWeight(strokeW); // Relative stroke weight
+        }
+        
+        // Draw either a circle or rounded rectangle based on isCircular property
+        if (this.isCircular) {
+          // For circular buttons, use the width as diameter
+          circle(this.x, this.y, this.w);
+        } else {
+          // For rectangular buttons, use the standard rectangle
+          rect(this.x, this.y, this.w, this.h, cornerRadius);
+        }
       }
       
       // Calculate font size relative to button height, applying the text size multiplier
@@ -623,6 +740,9 @@ let intermediate_combinations = [
         this.color = color; // Use provided color if it doesn't match any of our mappings
       }
       
+      // Add an outline color property - get a random color from the COMPLETED_VESSEL_COLORS array - APlasker
+      this.outlineColor = getRandomOutlineColor();
+      
       this.x = x;
       this.y = y;
       this.w = w || 150; // Default width
@@ -659,7 +779,7 @@ let intermediate_combinations = [
       // Determine if this is an advanced vessel based on mapped color
       if (this.color === COLORS.vesselYellow || this.color === COLORS.green || 
           this.color === COLORS.vesselGreen || this.color === COLORS.primary ||
-          this.color === COLORS.vesselHint) {
+          this.color === COLORS.vesselHint || COMPLETED_VESSEL_COLORS.includes(this.color)) {
         this.isAdvanced = true;
       }
       
@@ -754,9 +874,11 @@ let intermediate_combinations = [
         vesselColor = 'white'; // Use pure white instead of cream for base vessels
       }
       
-      // MODIFIED - Use screen height as reference for stroke weight
-      // Calculate stroke weight as a percentage of screen height with minimum value
-      const strokeW = Math.max(windowHeight * 0.0025, 2);
+      // MODIFIED - Calculate stroke weights for the three-layer sandwich outline - APlasker
+      // Calculate minimum dimensions based on screen height
+      const thinBlackOutline = Math.max(windowHeight * 0.001, 1); // Very thin black line (0.1% of height, min 1px)
+      const thickColoredOutline = Math.max(windowHeight * 0.005, 3); // Thicker colored line (0.5% of height, min 3px)
+      const outerBlackOutline = Math.max(windowHeight * 0.005, 1.5); // Outer black line slightly thicker than inner (0.2% of height, min 1.5px) - APlasker
       
       // Draw vessel body with bodyScale
       if (this.isAdvanced) {
@@ -766,30 +888,61 @@ let intermediate_combinations = [
           // Green vessel now using two circular handles like yellow vessels - APlasker
           // Draw handles BEHIND the main shape
           fill('#888888');
-          stroke(0, 50); // Use the same subtle border as buttons
-          strokeWeight(strokeW);
+          // Use the three-layer outline effect on handles - APlasker
+          stroke(0); // Outer thin black line
+          strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+          
           // Position handles slightly lower and half-overlapping with the main shape
           // Move handles a bit past the edge of the pot
           const handleSize = this.h * 0.2;
+          
+          // First the outer thin black outlines of the handles
+          circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 4);
+          circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 4);
+          
+          // Then the colored middle layer
+          stroke(this.outlineColor);
+          strokeWeight(thickColoredOutline);
+          circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 2);
+          circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 2);
+          
+          // Then the inner thin black lines
+          stroke(0);
+          strokeWeight(thinBlackOutline);
           circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
           circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
+          
         } else if (this.color === COLORS.vesselYellow || this.color === COLORS.vesselHint) {
           // Yellow or Red vessel (pot with two handles) - UNIFIED IMPLEMENTATION
           // Draw handles BEHIND the main shape
           fill('#888888');
-          stroke(0, 50); // Use the same subtle border as buttons
-          strokeWeight(strokeW);
+          // Use the three-layer outline effect on handles - APlasker
+          stroke(0); // Outer thin black line
+          strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+          
           // Position handles slightly lower and half-overlapping with the main shape
           // Move handles a bit past the edge of the pot
           const handleSize = this.h * 0.2;
+          
+          // First the outer thin black outlines of the handles
+          circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 4);
+          circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 4);
+          
+          // Then the colored middle layer
+          stroke(this.outlineColor);
+          strokeWeight(thickColoredOutline);
+          circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 2);
+          circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize + thinBlackOutline * 2);
+          
+          // Then the inner thin black lines
+          stroke(0);
+          strokeWeight(thinBlackOutline);
           circle(-this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
           circle(this.w * 0.4, -this.h * 0.15 - this.h * 0.1, handleSize);
         }
         
-        // Draw vessel body
+        // Draw vessel body with the three-layer outline - APlasker
         fill(vesselColor);
-        stroke(0, 50); // Use the same subtle border as buttons
-        strokeWeight(strokeW);
         
         // Calculate border radius to match basic vessels
         const topCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px for top corners
@@ -797,21 +950,53 @@ let intermediate_combinations = [
         
         // Draw vessel body with rounded corners matching basic vessel style
         rectMode(CENTER);
-        rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+        
+        // First, draw the outer thin black outline
+        stroke(0);
+        strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+        rect(0, -this.h * 0.1, this.w * 0.8 + thinBlackOutline * 4, this.h * 0.6 + thinBlackOutline * 4, 
+             topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+        
+        // Next, draw the middle thick colored outline
+        stroke(this.outlineColor);
+        strokeWeight(thickColoredOutline);
+        rect(0, -this.h * 0.1, this.w * 0.8 + thinBlackOutline * 2, this.h * 0.6 + thinBlackOutline * 2, 
+             topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+        
+        // Finally, draw the inner thin black outline
+        stroke(0);
+        strokeWeight(thinBlackOutline);
+        rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, 
+             topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
         
       } else {
         // Basic ingredient vessel (rectangle with extremely rounded bottom corners)
         fill(vesselColor);
-        stroke(0, 50); // Use the same subtle border as buttons
-        strokeWeight(strokeW);
         
         // Calculate border radius relative to vessel height
         const topCornerRadius = Math.max(this.h * 0.05, 3); // 5% of height, min 3px
         const bottomCornerRadius = Math.max(this.h * 0.3, 15); // 30% of height, min 15px
         
-        // Draw rounded rectangle
+        // Draw vessel body with the three-layer outline - APlasker
         rectMode(CENTER);
-        rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+        
+        // First, draw the outer thin black outline
+        stroke(0);
+        strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+        rect(0, -this.h * 0.1, this.w * 0.8 + thinBlackOutline * 4, this.h * 0.6 + thinBlackOutline * 4, 
+             topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+        
+        // Next, draw the middle thick colored outline
+        stroke(this.outlineColor);
+        strokeWeight(thickColoredOutline);
+        rect(0, -this.h * 0.1, this.w * 0.8 + thinBlackOutline * 2, this.h * 0.6 + thinBlackOutline * 2, 
+             topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+        
+        // Finally, draw the inner thin black outline
+        stroke(0);
+        strokeWeight(thinBlackOutline);
+        rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, 
+             topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
       }
       
       // Reset scale to apply textScale for text
@@ -825,7 +1010,7 @@ let intermediate_combinations = [
       
       // MODIFIED - Use screen height as reference for font size
       // Calculate text size as a percentage of screen height with minimum value
-      const fontSize = Math.max(windowHeight * 0.015, 10); // 1.5% of screen height, minimum 10px
+      const fontSize = Math.max(windowHeight * 0.018, 10); // 1.5% of screen height, minimum 10px
       textSize(fontSize);
       textStyle(BOLD); // Make text bold
       
@@ -1296,6 +1481,12 @@ let intermediate_combinations = [
         return;
       }
       
+      // Check if tutorial button was pressed - APlasker
+      if (tutorialButton.isInside(mouseX, mouseY)) {
+        tutorialButton.handleClick();
+        return;
+      }
+      
       // Add playtest date selector logic only in playtest mode
       if (typeof isPlaytestMode !== 'undefined' && isPlaytestMode) {
         // Check if date button was pressed
@@ -1562,7 +1753,7 @@ let intermediate_combinations = [
         
         if (new_v) {
           // Create animation particles
-          if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary) {
+          if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary || COMPLETED_VESSEL_COLORS.includes(new_v.color)) {
             // Check if this is the final combination
             const isFinalCombination = (vessels.length === 1 || vessels.length - 2 + 1 === 1) && new_v.name === final_combination.name;
             
@@ -1622,12 +1813,12 @@ let intermediate_combinations = [
           console.log("Triggering pulse animation for newly created vessel");
           
           // Use bouncePulse for green vessels (completed combinations)
-          if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary) {
-            console.log("Using bounce pulse for completed green combination");
+          if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary || COMPLETED_VESSEL_COLORS.includes(new_v.color)) {
+            console.log("Using bounce pulse for completed combination");
             new_v.bouncePulse(); // Use new bounce pulse animation
           } else {
             // Use regular pulse for yellow vessels (intermediate combinations)
-            console.log("Using regular pulse for yellow intermediate combination");
+            console.log("Using regular pulse for intermediate combination");
             new_v.pulse(500); // Changed from 1000ms to 500ms (2x faster)
           }
           
@@ -1778,6 +1969,11 @@ let intermediate_combinations = [
     }
     
     gameStarted = true;
+    
+    // Initialize timer
+    startTime = Date.now();
+    gameTimer = 0;
+    gameTimerActive = true;
     
     // Trigger help button animation from rectangular to circular
     helpButtonAnimating = true;
@@ -2036,6 +2232,12 @@ let intermediate_combinations = [
           touchHandled = true;
         }
         
+        // Check if tutorial button was touched - APlasker
+        if (tutorialButton.isInside(touchX, touchY)) {
+          startTutorial();
+          touchHandled = true;
+        }
+        
         // Tutorial screen - check if Say hi link was touched
         if (typeof tutorialSayHiLinkX !== 'undefined') {
           const isOverTutorialSayHi = (
@@ -2287,7 +2489,7 @@ let intermediate_combinations = [
     buttonHeight = Math.max(buttonHeight, 30);
     
     // Start button - larger call to action
-    let startButtonWidth = playAreaWidth * 0.2; // 20% of play area width (was 30%)
+    let startButtonWidth = playAreaWidth * 0.25; // 25% of play area width (increased from 20%)
     let startButtonHeight = startButtonWidth * 0.4; // Maintain aspect ratio
     // Enforce minimum sizes
     startButtonWidth = Math.max(startButtonWidth, 100);
@@ -2308,23 +2510,46 @@ let intermediate_combinations = [
     // Set text to bold
     hintButton.textBold = true;
     
-    // Create start button
+    // Create tutorial button - APlasker
+    tutorialButton = new Button(
+      playAreaX + playAreaWidth * 0.3, // Position at 30% of play area width (left of center)
+      playAreaY + playAreaHeight * 0.88, // Position at 88% down the play area (lowered from 85%)
+      startButtonWidth,  // Same size as start button
+      startButtonHeight, 
+      "First Time", // Changed from "Tutorial" to "First Time" - APlasker
+      startTutorial, 
+      'white', // Changed from green to white background - APlasker
+      COLORS.secondary, // Changed from white to pink text - APlasker
+      null // No border color needed as we're using vessel style - APlasker
+    );
+    
+    // Set text to bold for Tutorial button
+    tutorialButton.textBold = true;
+    // Enable vessel-style outline - APlasker
+    tutorialButton.useVesselStyle = true;
+    tutorialButton.outlineColor = COLORS.peach; // Use peach color for outline
+    
+    // Create start button - repositioned to the right
     startButton = new Button(
-      playAreaX + playAreaWidth * 0.5, // Center horizontally
-      playAreaY + playAreaHeight * 0.85, // Position at 85% down the play area
+      playAreaX + playAreaWidth * 0.7, // Position at 70% of play area width (right of center)
+      playAreaY + playAreaHeight * 0.88, // Position at 88% down the play area (lowered from 85%)
       startButtonWidth, 
       startButtonHeight, 
       "Cook!", 
       startGame, 
-      COLORS.secondary, 
-      'white'
+      COLORS.primary, // Changed from pink to green - APlasker
+      'white',
+      null // No border color needed as we're using vessel style - APlasker
     );
     
     // Set text to bold for Cook! button
     startButton.textBold = true;
+    // Enable vessel-style outline - APlasker
+    startButton.useVesselStyle = true;
+    startButton.outlineColor = COLORS.peach; // Use peach color for outline
     
     // Set tutorialButton to null (removed button)
-    tutorialButton = null;
+    // tutorialButton = null;
     
     // Reset game state
     gameWon = false;
@@ -2337,8 +2562,8 @@ let intermediate_combinations = [
     hintCount = 0; // Reset hint count when game starts
     completedGreenVessels = []; // Reset completed green vessels - APlasker
     partialCombinations = []; // Reset partial combinations
+    startedCombinations = []; // Reset started combinations tracking - APlasker
     hintedCombos = []; // Track which combos have been hinted
-    hintedCombo = null; // Currently highlighted combo for recipe card
     lastHintTime = 0; // Track when the last hint was requested
     hintCooldown = 500; // 0.5 second cooldown between hints (in milliseconds)
     
@@ -2606,10 +2831,24 @@ let intermediate_combinations = [
     
     // Set helpIconX to be the final circle position
     helpIconX = finalCircleX;
-    helpIconY = playAreaY + (playAreaHeight * 0.0225); // 2.25% of play area height from the top (updated from 1.5%)
     
-    // Update animation progress if animating
-    if (helpButtonAnimating) {
+    // MODIFICATION - APlasker - Move the button down by 2% of the screen height on narrow screens,
+    // but only when on the title screen (not during gameplay)
+    if (!gameStarted && windowWidth <= maxPlayWidth + 2 * playAreaPadding) {
+      // On title screen with narrow display (floral pattern at top/bottom), move button down
+      helpIconY = playAreaY + (playAreaHeight * 0.0425); // 4.25% from top (additional 2%)
+    } else {
+      // Regular position for gameplay or wider screens
+      helpIconY = playAreaY + (playAreaHeight * 0.0225); // 2.25% of play area height from the top
+    }
+    
+    // Skip animation on title screen - always show circular help icon
+    // This is because we now have a dedicated Tutorial button - APlasker
+    if (!gameStarted) {
+      helpButtonAnimationProgress = 1; // Always fully circular on title screen
+    }
+    // Update animation progress if animating during gameplay
+    else if (helpButtonAnimating) {
       helpButtonAnimationProgress += 1 / helpButtonAnimationDuration;
       if (helpButtonAnimationProgress >= 1) {
         helpButtonAnimationProgress = 1;
@@ -2617,85 +2856,25 @@ let intermediate_combinations = [
       }
     }
     
-    // Calculate interpolated values for animation
-    const progress = helpButtonAnimationProgress;
-    
-    // Define dimensions for rectangular button mode
-    const rectWidth = Math.max(playAreaWidth * 0.15, 90); // Width for "How to Play" text (updated from 15% to 18%)
-    const rectHeight = helpIconSize; // Same height as circle
-    const cornerRadius = rectHeight / 2;
-    
-    // Calculate the position for the circle
-    const circleX = finalCircleX; // Circle is always at the 90% mark
-    
-    // Calculate the rectangle center position
-    // For right edges to align: rectangle's right edge (rectX + rectWidth/2) = circle's right edge (circleX + circleSize/2)
-    // So rectX = circleX + circleSize/2 - rectWidth/2
-    const rectX = circleX + helpIconSize/2 - rectWidth/2;
-    
-    // Calculate interpolated width based on animation progress
-    const currentWidth = rectWidth - (rectWidth - helpIconSize) * progress;
-    
-    // Calculate current center X position (transitions from rectangle center to circle center)
-    const currentCenterX = rectX + (circleX - rectX) * progress;
-    
-    // Check if mouse is over the button - different hit detection based on shape
-    if (progress < 0.5) {
-      // More rectangular - use rectangle hit detection
-      isHelpIconHovered = (
-        mouseX > currentCenterX - currentWidth/2 &&
-        mouseX < currentCenterX + currentWidth/2 &&
-        mouseY > helpIconY - rectHeight/2 &&
-        mouseY < helpIconY + rectHeight/2
-      );
-    } else {
-      // More circular - use circle hit detection
-      isHelpIconHovered = dist(mouseX, mouseY, circleX, helpIconY) < helpIconSize/2;
-    }
+    // Always use circle hit detection now that we're always in circular mode
+    isHelpIconHovered = dist(mouseX, mouseY, helpIconX, helpIconY) < helpIconSize/2;
     
     // Get the appropriate color (green normally, red when hovered)
     const buttonColor = isHelpIconHovered ? COLORS.secondary : COLORS.primary;
     
-    // Draw the button shape
+    // Draw the button shape - always circular
     fill('white'); // Use white fill like base vessels
     strokeWeight(2);
     stroke(buttonColor);
+    circle(helpIconX, helpIconY, helpIconSize);
     
-    if (progress < 0.001) {
-      // Fully rectangular button
-      rectMode(CENTER);
-      rect(rectX, helpIconY, currentWidth, rectHeight, cornerRadius);
-    } else if (progress > 0.999) {
-      // Fully circular button
-      circle(circleX, helpIconY, helpIconSize);
-    } else {
-      // Transitioning - draw rounded rectangle with animated width and position
-      rectMode(CENTER);
-      rect(currentCenterX, helpIconY, currentWidth, rectHeight, cornerRadius);
-    }
-    
-    // Draw the text with proper fade effect - no outline for better legibility
-    if (progress < 0.5) {
-      // Show "First Time?" text with fadeout
-      const textOpacity = 1 - (progress * 2); // Fade out from 1 to 0 during first half
-      fill(red(buttonColor), green(buttonColor), blue(buttonColor), 255 * textOpacity);
-      noStroke(); // Remove outline for better legibility
-      textAlign(CENTER, CENTER);
-      textSize(Math.max(helpIconSize * 0.3, 12)); // Smaller text size for "First Time?"
-      textStyle(NORMAL);
-      text("First Time?", currentCenterX, helpIconY);
-    } 
-    
-    if (progress > 0.5) {
-      // Show "?" with fadein
-      const textOpacity = (progress - 0.5) * 2; // Fade in from 0 to 1 during second half
-      fill(red(buttonColor), green(buttonColor), blue(buttonColor), 255 * textOpacity);
-      noStroke(); // Remove outline for better legibility
-      textAlign(CENTER, CENTER);
-      textSize(helpIconSize * 0.6);
-      textStyle(NORMAL);
-      text("?", circleX, helpIconY + helpIconSize * 0.05);
-    }
+    // Draw the "?" text
+    fill(buttonColor);
+    noStroke(); // Remove outline for better legibility
+    textAlign(CENTER, CENTER);
+    textSize(helpIconSize * 0.6);
+    textStyle(NORMAL);
+    text("?", helpIconX, helpIconY + helpIconSize * 0.05);
     
     // Reset text style
     textStyle(NORMAL);
@@ -2714,6 +2893,9 @@ let intermediate_combinations = [
       moveHistory.push(COLORS.vesselYellow);
     } else if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary) {
       moveHistory.push(COLORS.green); // Use our explicit green color for all green vessels
+    } else if (COMPLETED_VESSEL_COLORS.includes(new_v.color)) {
+      // For our new colored vessels, add the actual color - APlasker
+      moveHistory.push(new_v.color);
     } else if (new_v.color === COLORS.vesselBase) {
       moveHistory.push(COLORS.vesselBase);
     } else if (new_v.color === COLORS.vesselHint) {
@@ -2735,15 +2917,48 @@ let intermediate_combinations = [
     
     push();
     
-    // Determine the vessel outline color based on the fill color - now using subtle border for all
-    let outlineColor = color === COLORS.vesselYellow || color === COLORS.vesselHint ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.5)';
+    // Apply shake effect if enabled
+    if (isShaking) {
+      const shakeAmount = size * 0.05;
+      x += sin(frameCount * 0.8) * shakeAmount;
+    }
     
-    // Set the stroke properties
-    stroke(outlineColor);
-    strokeWeight(size * 0.05); // Scale stroke weight with size
+    // Use peach color for the middle layer outline instead of random color - APlasker
+    const outlineColor = COLORS.peach;
     
-    // Draw the vessel handle
+    // Calculate relative stroke weights for outlines - APlasker
+    const thinBlackOutline = size * 0.01; // Very thin black line (1% of vessel size)
+    const thickColoredOutline = size * 0.03; // Thicker colored line (3% of vessel size)
+    const outerBlackOutline = size * 0.015; // Thicker outer black line (1.5% of vessel size) - APlasker
+    
+    // Draw the vessel handle with the three-layer outline - APlasker
     fill(color);
+    
+    // First draw the outer thin black outline
+    stroke(0);
+    strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+    rect(
+      x - (handleWidth + thinBlackOutline * 4) / 2,
+      y - bodyHeight / 2 - (handleHeight + thinBlackOutline * 4),
+      handleWidth + thinBlackOutline * 4,
+      handleHeight + thinBlackOutline * 4,
+      cornerRadius, cornerRadius, 0, 0
+    );
+    
+    // Then draw the middle thick colored outline
+    stroke(outlineColor);
+    strokeWeight(thickColoredOutline);
+    rect(
+      x - (handleWidth + thinBlackOutline * 2) / 2,
+      y - bodyHeight / 2 - (handleHeight + thinBlackOutline * 2),
+      handleWidth + thinBlackOutline * 2,
+      handleHeight + thinBlackOutline * 2,
+      cornerRadius, cornerRadius, 0, 0
+    );
+    
+    // Finally draw the inner thin black outline
+    stroke(0);
+    strokeWeight(thinBlackOutline);
     rect(
       x - handleWidth / 2,
       y - bodyHeight / 2 - handleHeight,
@@ -2752,7 +2967,32 @@ let intermediate_combinations = [
       cornerRadius, cornerRadius, 0, 0
     );
     
-    // Draw the vessel body
+    // Draw the vessel body with the three-layer outline - APlasker
+    // First draw the outer thin black outline
+    stroke(0);
+    strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+    rect(
+      x - (bodyWidth + thinBlackOutline * 4) / 2,
+      y - (bodyHeight + thinBlackOutline * 4) / 2,
+      bodyWidth + thinBlackOutline * 4,
+      bodyHeight + thinBlackOutline * 4,
+      cornerRadius
+    );
+    
+    // Then draw the middle thick colored outline
+    stroke(outlineColor);
+    strokeWeight(thickColoredOutline);
+    rect(
+      x - (bodyWidth + thinBlackOutline * 2) / 2,
+      y - (bodyHeight + thinBlackOutline * 2) / 2,
+      bodyWidth + thinBlackOutline * 2,
+      bodyHeight + thinBlackOutline * 2,
+      cornerRadius
+    );
+    
+    // Finally draw the inner thin black outline
+    stroke(0);
+    strokeWeight(thinBlackOutline);
     rect(
       x - bodyWidth / 2,
       y - bodyHeight / 2,
@@ -2810,6 +3050,9 @@ let intermediate_combinations = [
     // Configure for tutorial context
     vessel.isTutorial = true;
     vessel.isComplete = isComplete;
+    
+    // Ensure tutorial vessels have peach outline color - APlasker
+    vessel.outlineColor = COLORS.peach;
     
     // Ensure text formatting is consistent with game vessels
     vessel.getDisplayText = function() {
@@ -2896,5 +3139,43 @@ let intermediate_combinations = [
     firstComboCompletedShown: false
   }; // Tracking which messages have been shown
   let tutorialErrorCount = 0; // Track incorrect combination attempts in tutorial
+  
+  // Function to format time as MM:SS
+  function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+  
+  function draw() {
+    // ... existing code ...
+
+    // Set background color
+    background(COLORS.background);
+    
+    // Update and display timer if game is active
+    if (gameStarted && !gameWon && gameTimerActive) {
+      gameTimer = Math.floor((Date.now() - startTime) / 1000);
+      // Cap at 59:59
+      gameTimer = Math.min(gameTimer, 3599);
+      
+      // Draw timer in top right corner
+      push();
+      textAlign(RIGHT, TOP);
+      textSize(Math.max(playAreaWidth * 0.02, 12)); // 2% of play area width, minimum 12px
+      fill(COLORS.text);
+      text(formatTime(gameTimer), width - 20, 20);
+      pop();
+    }
+    
+    // Draw the play area
+    // ... existing code ...
+  }
+  
+  // Function to get a random color from COMPLETED_VESSEL_COLORS - APlasker
+  function getRandomOutlineColor() {
+    // Always return peach color instead of random color
+    return COLORS.peach;
+  }
   
   
