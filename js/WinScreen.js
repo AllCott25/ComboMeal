@@ -339,12 +339,12 @@ function drawWinScreen() {
   pop();
   
   // Draw recipe description - updated position and width
-  // Move description right by using 82% of card width from left
-  const descriptionX = cardX - cardWidth/2 + cardWidth * 0.82; // 82% of card width from left
-  const descriptionWidth = cardWidth * 0.30; // Updated to 30% of card width (was 32%)
+  // Move description right by using 67% of card width from left (changed from 66%)
+  const descriptionX = cardX - cardWidth/2 + cardWidth * 0.67; // Changed from 66% to 67% of card width from left
+  const descriptionWidth = cardWidth * 0.3; // 30% of card width
   
-  // Update description Y position - 50% card height from top (changed from 40% to 50%)
-  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.50; // Updated to 50% of card height from top
+  // Update description Y position - 25% card height from top
+  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.25; // 25% of card height from top
   
   // Isolate text context for description
   push();
@@ -362,9 +362,9 @@ function drawWinScreen() {
   
   // Add "Make this recipe for real!" text at the bottom of the card - updated position and text
   push(); // Isolate text context for Recipe Details
-  // Position at 84% of card width from left, 20% of card height from bottom
-  const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.84; // Updated to 84% from left (was 82%)
-  const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.20; // Updated to 20% from bottom (was 10%)
+  // Position at 67% of card width from left (changed from 66%), 15% of card height from bottom
+  const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.67; // Changed from 66% to 67% from left
+  const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.15; // 15% from bottom
   
   textAlign(LEFT, CENTER);
   textSize(min(max(playAreaWidth * 0.035, 12), 16)); // Increased font size to 3.5% (min 12px, max 16px)
@@ -374,7 +374,7 @@ function drawWinScreen() {
   } else {
     fill('#666'); // Gray text normally
   }
-  text("Make this recipe for real! →", recipeDetailsX, recipeDetailsY, cardWidth * 0.32); // Limited width to 32% of card width
+  text("Make this recipe for real! →", recipeDetailsX, recipeDetailsY, cardWidth * 0.3); // Decreased width from 32% to 30% of card width
   textStyle(NORMAL); // Reset text style
   pop(); // End Recipe Details context
   
@@ -1267,12 +1267,12 @@ function drawTutorialWinScreen() {
   pop();
   
   // Draw recipe description - updated position and width
-  // Move description right by using 82% of card width from left
-  const descriptionX = cardX - cardWidth/2 + cardWidth * 0.82; // 82% of card width from left
-  const descriptionWidth = cardWidth * 0.30; // Updated to 30% of card width
+  // Move description right by using 67% of card width from left (changed from 66%)
+  const descriptionX = cardX - cardWidth/2 + cardWidth * 0.67; // Changed from 66% to 67% of card width from left
+  const descriptionWidth = cardWidth * 0.3; // 30% of card width
   
-  // Update description Y position to 50% card height from top (changed from 40%)
-  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.50; // Updated to 50% of card height from top
+  // Update description Y position - 25% card height from top
+  const descriptionY = cardY - cardHeight/2 + cardHeight * 0.25; // 25% of card height from top
   
   // Isolate text context for description
   push();
@@ -1285,14 +1285,14 @@ function drawTutorialWinScreen() {
   // Limit description height to 60% of card height (increased from 33%)
   const maxDescriptionHeight = cardHeight * 0.60;
   
-  text(recipeDescription, descriptionX, descriptionY, descriptionWidth, maxDescriptionHeight);
+  text(recipeDescription, descriptionX, descriptionY, descriptionWidth, maxDescriptionHeight); // Added max height constraint
   pop(); // End description text context
   
   // Add "Make this recipe for real!" text at the bottom of the card - updated position and text
   push(); // Isolate text context for Recipe Details
-  // Position at 84% of card width from left, 20% of card height from bottom
-  const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.84;
-  const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.20;
+  // Position at 67% of card width from left (changed from 66%), 15% of card height from bottom
+  const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.67; // Changed from 66% to 67% from left
+  const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.15; // 15% from bottom
   
   textAlign(LEFT, CENTER);
   textSize(min(max(playAreaWidth * 0.035, 12), 16)); // Increased font size to 3.5% (min 12px, max 16px)
@@ -1302,7 +1302,7 @@ function drawTutorialWinScreen() {
   } else {
     fill('#666'); // Gray text normally
   }
-  text("View the full recipe", recipeDetailsX, recipeDetailsY, cardWidth * 0.32);
+  text("Make this recipe for real! →", recipeDetailsX, recipeDetailsY, cardWidth * 0.3); // Decreased width from 32% to 30% of card width
   textStyle(NORMAL); // Reset text style
   pop(); // End Recipe Details context
   

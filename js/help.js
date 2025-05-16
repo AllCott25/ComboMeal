@@ -1,7 +1,7 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: May 15, 2025 (10:34) - APlasker
+ * Last Updated: May 28, 2025 (11:45) - APlasker
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
@@ -18,6 +18,7 @@
  * - Fine-tuned vertical spacing of title and content (May 7, 2025, 22:34) - APlasker
  * - Implemented variable spacing to better utilize modal height (May 8, 2025, 15:21) - APlasker
  * - Updated row 2-5 text and colors to match latest game version (May 15, 2025, 10:34) - APlasker
+ * - Moved drawSimpleTutorialVessel function from sketch.js to help.js (May 28, 2025, 11:45) - APlasker
  */
 
 // Global variable to track help modal state
@@ -330,6 +331,103 @@ function wrapTextToWidth(text, maxWidth) {
   }
   
   return lines;
+}
+
+// Draw a vessel for the tutorial with a specific color
+function drawSimpleTutorialVessel(x, y, size, color, isShaking = false) {
+  const handleWidth = size * 0.3;
+  const handleHeight = size * 0.25;
+  const bodyWidth = size * 0.8;
+  const bodyHeight = size * 0.65;
+  const cornerRadius = size * 0.12;
+  
+  push();
+  
+  // Apply shake effect if enabled
+  if (isShaking) {
+    const shakeAmount = size * 0.05;
+    x += sin(frameCount * 0.8) * shakeAmount;
+  }
+  
+  // Use peach color for the middle layer outline instead of random color - APlasker
+  const outlineColor = COLORS.peach;
+  
+  // Calculate relative stroke weights for outlines - APlasker
+  const thinBlackOutline = size * 0.01; // Very thin black line (1% of vessel size)
+  const thickColoredOutline = size * 0.03; // Thicker colored line (3% of vessel size)
+  const outerBlackOutline = size * 0.015; // Thicker outer black line (1.5% of vessel size) - APlasker
+  
+  // Draw the vessel handle with the three-layer outline - APlasker
+  fill(color);
+  
+  // First draw the outer thin black outline
+  stroke(0);
+  strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+  rect(
+    x - (handleWidth + thinBlackOutline * 4) / 2,
+    y - bodyHeight / 2 - (handleHeight + thinBlackOutline * 4),
+    handleWidth + thinBlackOutline * 4,
+    handleHeight + thinBlackOutline * 4,
+    cornerRadius, cornerRadius, 0, 0
+  );
+  
+  // Then draw the middle thick colored outline
+  stroke(outlineColor);
+  strokeWeight(thickColoredOutline);
+  rect(
+    x - (handleWidth + thinBlackOutline * 2) / 2,
+    y - bodyHeight / 2 - (handleHeight + thinBlackOutline * 2),
+    handleWidth + thinBlackOutline * 2,
+    handleHeight + thinBlackOutline * 2,
+    cornerRadius, cornerRadius, 0, 0
+  );
+  
+  // Finally draw the inner thin black outline
+  stroke(0);
+  strokeWeight(thinBlackOutline);
+  rect(
+    x - handleWidth / 2,
+    y - bodyHeight / 2 - handleHeight,
+    handleWidth,
+    handleHeight,
+    cornerRadius, cornerRadius, 0, 0
+  );
+  
+  // Draw the vessel body with the three-layer outline - APlasker
+  // First draw the outer thin black outline
+  stroke(0);
+  strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
+  rect(
+    x - (bodyWidth + thinBlackOutline * 4) / 2,
+    y - (bodyHeight + thinBlackOutline * 4) / 2,
+    bodyWidth + thinBlackOutline * 4,
+    bodyHeight + thinBlackOutline * 4,
+    cornerRadius
+  );
+  
+  // Then draw the middle thick colored outline
+  stroke(outlineColor);
+  strokeWeight(thickColoredOutline);
+  rect(
+    x - (bodyWidth + thinBlackOutline * 2) / 2,
+    y - (bodyHeight + thinBlackOutline * 2) / 2,
+    bodyWidth + thinBlackOutline * 2,
+    bodyHeight + thinBlackOutline * 2,
+    cornerRadius
+  );
+  
+  // Finally draw the inner thin black outline
+  stroke(0);
+  strokeWeight(thinBlackOutline);
+  rect(
+    x - bodyWidth / 2,
+    y - bodyHeight / 2,
+    bodyWidth,
+    bodyHeight,
+    cornerRadius
+  );
+  
+  pop();
 }
 
 // Create a tutorial vessel with the same appearance as a game vessel but ensuring correct colors

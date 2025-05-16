@@ -1386,8 +1386,7 @@ function drawWinMoveHistory(x, y, width, height) {
         // This ensures we don't have another loading animation phase
         drawTitle();
         
-        // Draw the help icon even during loading
-        drawHelpIcon();
+        // Help icon removed from title screen - APlasker
       }
     } else if (gameWon) {
       // Draw win screen
@@ -1751,8 +1750,9 @@ function drawWinMoveHistory(x, y, width, height) {
     // Use styling that matches the "How to Play" button style
     push();
     textAlign(CENTER, CENTER);
-    // Use the same text size as "How to Play" button text
-    textSize(Math.max(helpIconSize * 0.3, 12));
+    // Use a fixed size based on play area width instead of relying on helpIconSize
+    const statsTextSize = Math.max(playAreaWidth * 0.03, 12); // 3% of play area width, min 12px
+    textSize(statsTextSize);
     textFont('Arial, Helvetica, sans-serif');
     textStyle(NORMAL);
     
@@ -1763,7 +1763,7 @@ function drawWinMoveHistory(x, y, width, height) {
     const statsX = playAreaX + playAreaWidth / 2;
     
     // Draw each line of stats
-    let lineHeight = 22; // Increased from 18 to 22 for better spacing with the new size
+    let lineHeight = 22;
     text(`Recipe No.${recipeNumber} (${formattedDate})`, statsX, statsY);
     text(`Adapted from ${recipeAuthor}`, statsX, statsY + lineHeight);
     text(`Ingredients: ${ingredientCount}`, statsX, statsY + lineHeight * 2);
@@ -1812,8 +1812,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // ENHANCEMENT - APlasker - Update version to reflect vessel-style button outlines
-    const versionText = "v20250515.1545 - APlasker";
+    // ENHANCEMENT - APlasker - Update version to reflect recipe stats fix
+    const versionText = "v20250516.0820 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
