@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v20250516.0820
+ * Culinary Logic Puzzle v20250516.1111
  * Created by APlasker
- * Last Updated: May 16, 2025 (08:20 EDT) by APlasker
+ * Last Updated: May 16, 2025 (11:11 EDT) by APlasker
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -162,7 +162,8 @@ let intermediate_combinations = [
     vesselGreen: '#9a9832',   // Updated to match new primary color - APlasker
     vesselHint: '#f7dc30',    // Changed from burnt orange to bright yellow - APlasker
     green: '#9a9832',         // Updated to match new primary color - APlasker
-    peach: '#dd9866'          // Added peach/orange color for tertiary elements - APlasker
+    peach: '#dd9866',          // Added peach/orange color for tertiary elements - APlasker
+    HintPink: '#cf6d88' 
   };
   
   // Array of colors for completed vessels - APlasker
@@ -2450,28 +2451,36 @@ let intermediate_combinations = [
     startButtonWidth = Math.max(startButtonWidth, 100);
     startButtonHeight = Math.max(startButtonHeight, 40);
     
-    // Create hint button with white background and black border (changed from grey outline)
-    hintButton = new Button(
-      playAreaX + playAreaWidth * 0.5, // Center horizontally
-      hintButtonY, 
-      buttonWidth, 
-      buttonHeight, 
-      "Hint", 
-      showHint, 
-      'white', 
-      '#FF5252'
+    // Create start button - positioned in the center
+    startButton = new Button(
+      playAreaX + playAreaWidth * 0.5, // Position at 50% of play area width (center)
+      playAreaY + playAreaHeight * 0.88, // Position at 88% down the play area
+      startButtonWidth, 
+      startButtonHeight, 
+      "Cook!", 
+      startGame, 
+      COLORS.primary, // Green background (swapped from white)
+      'white', // White text (swapped from green)
+      null // No border color needed as we're using vessel style
     );
     
-    // Set text to bold
-    hintButton.textBold = true;
+    // Set text to bold for Cook! button
+    startButton.textBold = true;
+    // Enable vessel-style outline - APlasker
+    startButton.useVesselStyle = true;
+    startButton.outlineColor = COLORS.peach; // Use peach color for outline
     
-    // Create tutorial button - APlasker
+    // Create tutorial button - APlasker - AFTER creating the start button so we can reference its position
+    // Calculate tutorial button position to be to the left of the start button with appropriate spacing
+    const tutorialButtonWidth = startButtonWidth * 0.5; // Half the width of the start button
+    const tutorialButtonX = startButton.x - startButtonWidth/2 - tutorialButtonWidth/2 - 20; // Position to the left with 20px gap
+    
     tutorialButton = new Button(
-      playAreaX + playAreaWidth * 0.3, // Position at 30% of play area width (left of center)
-      playAreaY + playAreaHeight * 0.88, // Position at 88% down the play area (lowered from 85%)
-      startButtonWidth,  // Same size as start button
-      startButtonHeight, 
-      "First Time?", // Updated to include question mark
+      tutorialButtonX, // Position to the left of the Cook button with spacing
+      playAreaY + playAreaHeight * 0.88, // Same vertical position as Cook button
+      tutorialButtonWidth, // Half the width of the start button
+      startButtonHeight, // Same height as start button
+      "First\nTime?", // Stack text on two lines
       startTutorial, 
       'white', // White background 
       COLORS.secondary, // Pink text
@@ -2483,28 +2492,8 @@ let intermediate_combinations = [
     // Enable vessel-style outline - APlasker
     tutorialButton.useVesselStyle = true;
     tutorialButton.outlineColor = COLORS.peach; // Use peach color for outline
-    
-    // Create start button - repositioned to the right
-    startButton = new Button(
-      playAreaX + playAreaWidth * 0.7, // Position at 70% of play area width (right of center)
-      playAreaY + playAreaHeight * 0.88, // Position at 88% down the play area (lowered from 85%)
-      startButtonWidth, 
-      startButtonHeight, 
-      "Cook!", 
-      startGame, 
-      'white', // Changed from green to white background
-      COLORS.primary, // Changed from white to green text
-      null // No border color needed as we're using vessel style
-    );
-    
-    // Set text to bold for Cook! button
-    startButton.textBold = true;
-    // Enable vessel-style outline - APlasker
-    startButton.useVesselStyle = true;
-    startButton.outlineColor = COLORS.peach; // Use peach color for outline
-    
-    // Set tutorialButton to null (removed button)
-    // tutorialButton = null;
+    // Reduce text size for the stacked text
+    tutorialButton.textSizeMultiplier = 0.8;
     
     // Reset game state
     gameWon = false;
@@ -2537,6 +2526,25 @@ let intermediate_combinations = [
     usedErrorMessages = [];
     firstInactivityMessageShown = false; // Added to track first inactivity message - APlasker
     inactivityReminderCount = 0;
+    
+    // Enforce minimum sizes
+    startButtonWidth = Math.max(startButtonWidth, 100);
+    startButtonHeight = Math.max(startButtonHeight, 40);
+    
+    // Create hint button with white background and black border (changed from grey outline)
+    hintButton = new Button(
+      playAreaX + playAreaWidth * 0.5, // Center horizontally
+      hintButtonY, 
+      buttonWidth, 
+      buttonHeight, 
+      "Hint", 
+      showHint, 
+      'white', 
+      '#FF5252'
+    );
+    
+    // Set text to bold
+    hintButton.textBold = true;
   }
   
   // Function to get current time in EST for debugging
@@ -2838,13 +2846,15 @@ let intermediate_combinations = [
     circle(helpIconX, helpIconY, helpIconSize);
     
     // Draw the "?" text - adjust size proportionally and make it bold
-    fill(buttonColor);
+    fill('black'); // Changed from buttonColor to black
     noStroke(); // Remove outline for better legibility
     textAlign(CENTER, CENTER);
-    textSize(helpIconSize * 0.6); // Keep the same proportion to the icon size
-    textStyle(BOLD); // Changed from NORMAL to BOLD
-    text("?", helpIconX, helpIconY + helpIconSize * 0.05);
     
+    // Use the same font size calculation as vessels (from line ~1014)
+    const fontSize = Math.max(windowHeight * 0.018, 10); // 1.8% of screen height, minimum 10px
+    textSize(fontSize); // Use the same size as vessel text
+    textStyle(BOLD); // Keep bold style
+    text("?", helpIconX, helpIconY + helpIconSize * 0.05);
     
     // Reset text style
     textStyle(NORMAL);

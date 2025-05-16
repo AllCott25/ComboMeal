@@ -867,24 +867,25 @@ function drawWinMoveHistory(x, y, width, height) {
         if (isAnimationTarget) {
           // If animation is active and this is the target combo, handle color transition
           if (hintAnimationProgress > hintAnimationTextRevealDuration) {
-            // Calculate color blend from red to black after text reveal is complete
+            // Calculate color blend from pink to black after text reveal is complete
             const colorTransitionProgress = (hintAnimationProgress - hintAnimationTextRevealDuration) / (1 - hintAnimationTextRevealDuration);
-            const r = lerp(255, 0, colorTransitionProgress);  // Red from 255 to 0
-            const g = lerp(82, 0, colorTransitionProgress);   // Green from 82 to 0
-            const b = lerp(82, 0, colorTransitionProgress);   // Blue from 82 to 0
+            // Pink color (#cf6d88) RGB values: 207, 109, 136
+            const r = lerp(207, 0, colorTransitionProgress);  // Red from 207 to 0
+            const g = lerp(109, 0, colorTransitionProgress);  // Green from 109 to 0
+            const b = lerp(136, 0, colorTransitionProgress);  // Blue from 136 to 0
             
             // Create blended color
             fill(r, g, b);
           } else {
-            // During text reveal, use hint color (red)
-            fill(COLORS.vesselHint);
+            // During text reveal, use pink hint button color instead of red
+            fill(COLORS.secondary);
           }
         } else if (hasCompletedAnimation) {
           // For combos that have completed animation, use black
           fill(0);
         } else {
-          // For non-animated hinted combos that haven't been through animation, use hint color (red)
-          fill(COLORS.vesselHint);
+          // For non-animated hinted combos that haven't been through animation, use pink hint button color
+          fill(COLORS.secondary);
         }
         
         // Draw prefix with same font
@@ -1780,21 +1781,28 @@ function drawWinMoveHistory(x, y, width, height) {
     const margin = Math.max(playAreaWidth * 0.0125, 3); // 1.25% of play area width, min 3px
     
     // Calculate button sizes relative to play area
-    const buttonWidth = Math.max(playAreaWidth * 0.25, 120); // Reduced from 30% to 25% of play area width - APlasker
+    const cookButtonWidth = Math.max(playAreaWidth * 0.25, 120); // 25% of play area width
     const buttonHeight = Math.max(playAreaHeight * 0.08, 40);
     
-    // Update button dimensions for both buttons
-    startButton.w = buttonWidth;
+    // First Time button should be half the width of Cook button
+    const tutorialButtonWidth = cookButtonWidth * 0.5;
+    
+    // Position Cook button in the center of the screen
+    startButton.x = playAreaX + playAreaWidth * 0.5; // Center horizontally (50%)
+    startButton.y = playAreaY + playAreaHeight * 0.88; // 88% down the play area
+    startButton.w = cookButtonWidth;
     startButton.h = buttonHeight;
     
-    // Position both buttons properly - APlasker
-    tutorialButton.x = playAreaX + playAreaWidth * 0.3; // 30% of play area width
-    tutorialButton.y = playAreaY + playAreaHeight * 0.88; // Lowered from 85% to 88% - APlasker
-    tutorialButton.w = buttonWidth;
+    // Position First Time button to the left of the Cook button with appropriate spacing
+    // Calculate position based on Cook button position and sizes
+    tutorialButton.x = startButton.x - (cookButtonWidth/2) - (tutorialButtonWidth/2) - 20; // 20px gap between buttons
+    tutorialButton.y = startButton.y; // Same vertical position
+    tutorialButton.w = tutorialButtonWidth;
     tutorialButton.h = buttonHeight;
     
-    startButton.x = playAreaX + playAreaWidth * 0.7; // 70% of play area width
-    startButton.y = playAreaY + playAreaHeight * 0.88; // Lowered from 85% to 88% - APlasker
+    // Ensure text is stacked for tutorial button
+    tutorialButton.label = "First\nTime?";
+    tutorialButton.textSizeMultiplier = 0.8; // Reduce text size for stacked text
     
     // Draw both buttons after positioning them
     tutorialButton.draw();
@@ -1812,8 +1820,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // ENHANCEMENT - APlasker - Update version to reflect recipe stats fix
-    const versionText = "v20250516.0820 - APlasker";
+    // Update version to reflect button positioning fix
+    const versionText = "v20250516.1111 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
