@@ -92,9 +92,9 @@ function showHelpModal() {
       // Calculate title height for positioning the underline
       const titleHeight = textAscent() + textDescent();
       
-      // Add underline 15px below the title (not fixed from top edge)
+      // Add underline below the title at 120% of title height
       const titleWidth = textWidth(titleText);
-      const underlineY = titleY + 15; // Position underline 15px below title
+      const underlineY = titleY + (titleHeight * 1.2); // Position underline at 120% of title height
       stroke(0); // Black line
       strokeWeight(1.5);
       line(this.x - titleWidth/2, underlineY, this.x + titleWidth/2, underlineY);

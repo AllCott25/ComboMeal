@@ -2997,7 +2997,7 @@ let intermediate_combinations = [
     const fontSize = Math.max(windowHeight * 0.018, 10); // 1.8% of screen height, minimum 10px
     textSize(fontSize); // Use the same size as vessel text
     textStyle(BOLD); // Keep bold style
-    text("?", helpIconX, helpIconY + helpIconSize * 0.05);
+    text("?", helpIconX, helpIconY);
     
     // Reset text style
     textStyle(NORMAL);
