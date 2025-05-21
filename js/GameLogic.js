@@ -1080,8 +1080,8 @@ function combineVessels(v1, v2) {
       playAreaX + margin + 2 * (columnWidth + margin) + columnWidth/2 // Right column center
     ];
 
-    // Calculate the starting Y position (already at 19% from previous changes)
-    let startY = playAreaY + playAreaHeight * 0.19;
+    // Calculate the starting Y position based on layout type
+    let startY = playAreaY + playAreaHeight * getCurrentLayout().vesselsStart;
     
     // Define vessel area lower bound at 72% from top
     const vesselAreaLowerBound = playAreaY + playAreaHeight * 0.72;
@@ -1591,8 +1591,8 @@ function combineVessels(v1, v2) {
     const advanced_w = basic_w * 2 + margin;
     const advanced_h = basic_h;
     
-    // Calculate the starting Y position
-    const startY = playAreaY + playAreaHeight * 0.2;
+    // Calculate the starting Y position based on layout type
+    const startY = playAreaY + playAreaHeight * getCurrentLayout().vesselsStart;
     
     // Calculate the row height
     const rowHeight = basic_h * 0.83 + vertical_margin; // Adjusted to use 83% of vessel height

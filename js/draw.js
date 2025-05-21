@@ -1,22 +1,36 @@
 // Enhanced move history display for win screen
-function drawWinMoveHistory(x, y, width, height) {
-    // This function is no longer called, but we'll keep it for future reference
-    const circleSize = 18;
-    const margin = 6;
-    const maxPerRow = 8;
-    const maxRows = 4;
-    
-    // Make these variables accessible to the parent function
-    window.winMoveHistory = {
-      circleSize: circleSize,
-      margin: margin,
-      maxRows: maxRows
-    };
+
+// Layout configuration for different recipe sizes
+const LAYOUT = {
+  small: {
+    titlePosition: 0.08,      // 8% from top
+    bylinePosition: 0.13,     // 13% from top (adjusted to match title drop)
+    vesselsStart: 0.23,       // 23% from top (increased from 20%)
+    mistakeCounter: 0.70,     // 70% from top
+    recipeCard: 0.85,         // 85% from top
+    vesselMarginMultiplier: 1.2 // 20% more vertical space between vessels
+  },
+  big: {
+    titlePosition: 0.06,      // 6% from top (shifted up 2% total)
+    bylinePosition: 0.11,     // 11% from top (shifted up 2% total)
+    vesselsStart: 0.205,      // 20.5% from top (shifted up 2.5% total)
+    mistakeCounter: 0.77,    // 77% from top (shifted up 2.5% total)
+    recipeCard: 0.905,        // 90.5% from top (maintained)
+    vesselMarginMultiplier: 1.0 // Standard vessel spacing
   }
-  
-  // Declare the firstInactivityMessageShown variable as external reference - APlasker
-  // This is defined in sketch.js but referenced here
-  let firstInactivityMessageShown = false;
+};
+
+// Global variable to store current layout type
+let currentLayoutType = 'big'; // Default to big layout
+
+// Helper function to get current layout settings
+function getCurrentLayout() {
+  return LAYOUT[currentLayoutType];
+}
+
+// Declare the firstInactivityMessageShown variable as external reference - APlasker
+// This is defined in sketch.js but referenced here
+let firstInactivityMessageShown = false;
   
   // Keep the regular move history for during gameplay
   function drawMoveHistory() {
@@ -216,8 +230,8 @@ function drawWinMoveHistory(x, y, width, height) {
     // Isolate drawing context for game counters
     push();
     
-    // Position counters at 89% from the top of the play area (updated from 87%)
-    const counterY = playAreaY + playAreaHeight * 0.905; // Updated from 0.89 to 0.905 (1.5% lower)
+      // Position recipe card based on layout type
+  const counterY = playAreaY + playAreaHeight * getCurrentLayout().recipeCard;
     
     // Position card horizontally at the center of the screen
     const centerX = playAreaX + playAreaWidth / 2;
@@ -966,8 +980,8 @@ function drawWinMoveHistory(x, y, width, height) {
     // Isolate drawing context for mistake counters
     push();
     
-    // Position mistake counters at 75% from the top of the play area
-    const counterY = playAreaY + playAreaHeight * 0.75;
+      // Position mistake counters based on layout type
+  const counterY = playAreaY + playAreaHeight * getCurrentLayout().mistakeCounter;
     
     // Center of the play area for overall positioning
     const centerX = playAreaX + playAreaWidth / 2;
@@ -1139,10 +1153,10 @@ function drawWinMoveHistory(x, y, width, height) {
     const flowersNeeded = Math.ceil(width / flowerSpacing) + 2; // Add extra to ensure coverage
     
     // Calculate y positions for top and bottom rows
-    // Position flowers at the very top with just enough space to not be cut off
-    const topY = smallerPetalSize * 1.5; // Just enough space from the top edge
+    // Position flowers to just barely show full pattern at top
+    const topY = smallerPetalSize * 2.75; // Split the difference between 1.5 and 4
     // Position flowers at the very bottom with just enough space to not be cut off
-    const bottomY = windowHeight - (smallerPetalSize * 1.5); // Just enough space from the bottom edge
+    const bottomY = windowHeight - (smallerPetalSize * 1.5);
     
     // Draw on the top edge of the screen
     // Start from center and work outward
@@ -1625,12 +1639,12 @@ function drawWinMoveHistory(x, y, width, height) {
     const outlineWeight = 2; // Thinner outline for bubble style
     const bounceAmount = 2 * Math.sin(frameCount * 0.05); // Subtle bounce animation
     
-    // Calculate title Y position based on game state
-    // For title screen: positioned at 35% of play area height (changed from 40%)
-    // For game screen: positioned at 8% of play area height (increased from 6.5%)
-    const titleY = gameStarted ? 
-      playAreaY + (playAreaHeight * 0.05) : // Game screen position (reduced from 8% to 5%)
-      playAreaY + (playAreaHeight * 0.32);   // Title screen position (reduced from 0.35 to 0.32)
+      // Calculate title Y position based on game state and layout
+  // For title screen: positioned at 32% of play area height
+  // For game screen: position varies by layout type
+  const titleY = gameStarted ? 
+    playAreaY + (playAreaHeight * getCurrentLayout().titlePosition) : // Position based on layout
+    playAreaY + (playAreaHeight * 0.32);   // Title screen position
     
     // Draw each letter with alternating colors
     for (let i = 0; i < title.length; i++) {
@@ -1734,8 +1748,8 @@ function drawWinMoveHistory(x, y, width, height) {
     // Only draw byline on game screen (not tutorial or win screens)
     if (!gameStarted || gameWon) return;
     
-    // Position byline at 10% of play area height from the top (moved up by 3%)
-    const bylineY = playAreaY + (playAreaHeight * 0.10); // Changed from 13% to 10% of play area height
+      // Position byline based on layout type
+  const bylineY = playAreaY + (playAreaHeight * getCurrentLayout().bylinePosition);
     
     // Calculate byline size based on play area dimensions - match tutorial text
     const bylineSize = Math.max(playAreaWidth * 0.035, 14); // Same as description size in tutorial

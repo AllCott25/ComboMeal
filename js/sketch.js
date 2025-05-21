@@ -151,7 +151,7 @@ let intermediate_combinations = [
   
   // Color palette
   const COLORS = {
-    background: '#f2efee',    // Soft cream background
+    background: '#f2f2f7',    // iOS system background color
     primary: '#9a9832',       // Changed from avocado green to olive green - APlasker
     secondary: '#cf6d88',     // Changed from burnt orange to bright yellow - APlasker
     tertiary: '#FFFFFF',      // White (previously changed from mustard yellow)
@@ -710,6 +710,10 @@ let intermediate_combinations = [
       this.w = w || 150; // Default width
       this.h = h || 50; // Default height
       
+      // Initialize drag offset properties
+      this.dragOffsetX = 0;
+      this.dragOffsetY = 0;
+      
       // Legacy scale property - kept for backward compatibility
       this.scale = 1;
       this.targetScale = 1;
@@ -776,25 +780,39 @@ let intermediate_combinations = [
     }
     
     update() {
-      // Legacy scale animation - kept for backward compatibility
-      this.scale = lerp(this.scale, this.targetScale, 0.2);
-      
-      // New separate scale animations for body and text
-      this.bodyScale = lerp(this.bodyScale, this.targetBodyScale, 0.2);
-      this.textScale = lerp(this.textScale, this.targetTextScale, 0.2);
-      
-      // Update text margin based on scale - APlasker
-      // When vessel is being dragged or returning from being dragged,
-      // ensure margin transitions smoothly
-      if (this.targetTextScale === 1 && this.textMargin > 0.7) {
-        // If we're returning to normal size, gradually reduce margin
-        this.textMargin = lerp(this.textMargin, 0.7, 0.1);
-      } else if (this.textMargin === 0.85) {
-        // If margin was set to expanded (0.85) directly, maintain it during dragging
-        this.textMargin = 0.85;
+      if (this === draggedVessel) {
+        // Update position to follow mouse/touch using stored offsets
+        const currentX = touches.length > 0 ? touches[0].x : mouseX;
+        const currentY = touches.length > 0 ? touches[0].y : mouseY;
+        this.x = currentX - this.dragOffsetX;
+        this.y = currentY - this.dragOffsetY;
       } else {
-        // Default transition based on text scale
-        this.textMargin = map(this.textScale, 1, 1.1, 0.7, 0.85);
+        // Calculate vertical margin based on vessel height and layout type
+        const verticalMargin = this.h * 0.2 * getCurrentLayout().vesselMarginMultiplier;
+        
+        // Calculate starting Y position based on layout type
+        const startY = playAreaY + (playAreaHeight * getCurrentLayout().vesselsStart);
+        
+        // Legacy scale animation - kept for backward compatibility
+        this.scale = lerp(this.scale, this.targetScale, 0.2);
+        
+        // New separate scale animations for body and text
+        this.bodyScale = lerp(this.bodyScale, this.targetBodyScale, 0.2);
+        this.textScale = lerp(this.textScale, this.targetTextScale, 0.2);
+        
+        // Update text margin based on scale - APlasker
+        // When vessel is being dragged or returning from being dragged,
+        // ensure margin transitions smoothly
+        if (this.targetTextScale === 1 && this.textMargin > 0.7) {
+          // If we're returning to normal size, gradually reduce margin
+          this.textMargin = lerp(this.textMargin, 0.7, 0.1);
+        } else if (this.textMargin === 0.85) {
+          // If margin was set to expanded (0.85) directly, maintain it during dragging
+          this.textMargin = 0.85;
+        } else {
+          // Default transition based on text scale
+          this.textMargin = map(this.textScale, 1, 1.1, 0.7, 0.85);
+        }
       }
       
       // Update verb display time
@@ -1480,16 +1498,19 @@ let intermediate_combinations = [
       
       // Check if a vessel was clicked
       for (let v of vessels) {
-        if (v.isInside(mouseX, mouseY)) {
-          // Set initial vessel for dragging
-          draggedVessel = v;
-          // Store original position for proper snapback
-          draggedVessel.originalX = v.x;
-          draggedVessel.originalY = v.y;
+              if (v.isInside(mouseX, mouseY)) {
+        // Set initial vessel for dragging
+        draggedVessel = v;
+        // Store original position for proper snapback
+        draggedVessel.originalX = v.x;
+        draggedVessel.originalY = v.y;
+        // Store drag offsets
+        draggedVessel.dragOffsetX = mouseX - v.x;
+        draggedVessel.dragOffsetY = mouseY - v.y;
           
           // Store offset to maintain relative mouse position
-          offsetX = mouseX - v.x;
-          offsetY = mouseY - v.y;
+          draggedVessel.dragOffsetX = mouseX - v.x;
+          draggedVessel.dragOffsetY = mouseY - v.y;
           
           // IMMEDIATELY expand text margin before scale animation starts - APlasker
           // This prevents visual glitching during the transition
@@ -1567,8 +1588,8 @@ let intermediate_combinations = [
     }
     
     if (draggedVessel) {
-      draggedVessel.x = mouseX - offsetX;
-      draggedVessel.y = mouseY - offsetY;
+      draggedVessel.x = mouseX - draggedVessel.dragOffsetX;
+      draggedVessel.y = mouseY - draggedVessel.dragOffsetY;
       // Update last action time
       lastAction = frameCount;
     }
@@ -2481,6 +2502,11 @@ let intermediate_combinations = [
   
   // New function to initialize the game after data is loaded
   function initializeGame() {
+    // Determine layout type based on number of ingredients
+    // Use small layout for recipes with 11 or fewer ingredients
+    currentLayoutType = ingredients.length <= 11 ? 'small' : 'big';
+    console.log(`Setting layout type to ${currentLayoutType} based on ${ingredients.length} ingredients`);
+
     // Create vessels for each ingredient
     ingredients.forEach((ing) => {
       let v = new Vessel([ing], [], null, 'white', 0, 0, 0, 0); // Size will be set in arrangeVessels
@@ -3631,8 +3657,8 @@ let intermediate_combinations = [
     
     // Update drag position if we have a dragged vessel
     if (draggedVessel) {
-      draggedVessel.x = touchX - offsetX;
-      draggedVessel.y = touchY - offsetY;
+      draggedVessel.x = touchX - draggedVessel.dragOffsetX;
+      draggedVessel.y = touchY - draggedVessel.dragOffsetY;
       
       // Ensure vessel scale is maintained during dragging
       draggedVessel.targetScale = 1.05;
