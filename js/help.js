@@ -286,13 +286,20 @@ function drawHintButtonIcon(x, y, size) {
   // Draw circular button
   circle(x, y, size);
   
-  // Draw "Hint" text
+  // Draw "Hint" text using the same font size calculation as vessels
   fill('white');
   noStroke();
   textAlign(CENTER, CENTER);
-  textSize(size * 0.22); // Reduced from 0.30 to 0.22 to match the Recipe Card Hint button
+  
+  // Calculate font size to match vessel text (1.8% of screen height)
+  const fontSize = Math.max(windowHeight * 0.018, 10);
+  textSize(fontSize);
   textStyle(BOLD);
-  text("Hint", x, y);
+  
+  // Calculate text metrics for proper centering
+  const textHeight = textAscent() + textDescent();
+  const baselineOffset = (textAscent() - textHeight/2) * 0.1; // Small baseline adjustment
+  text("Hint", x, y + baselineOffset);
   
   pop();
 }

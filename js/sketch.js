@@ -2934,46 +2934,31 @@ let intermediate_combinations = [
       return;
     }
     
-    // Calculate the 93% horizontal position in the play area (moved from 90% to 93%)
+    // Calculate the 93% horizontal position in the play area
     const finalCircleX = playAreaX + (playAreaWidth * 0.93);
     
-    // Position vertically at 2.25% of play area height from the top (updated from 1.5%)
-    // Reduce the size by 20%
-    helpIconSize = Math.max(playAreaWidth * 0.032, 20); // Reduced from 0.04 to 0.032, min from 25px to 20px
+    // Position vertically at 2.25% of play area height from the top
+    helpIconSize = Math.max(playAreaWidth * 0.032, 20); // 3.2% of play area width, min 20px
     
     // Set helpIconX to be the final circle position
     helpIconX = finalCircleX;
-    
-    // Regular position for gameplay
     helpIconY = playAreaY + (playAreaHeight * 0.0225); // 2.25% of play area height from the top
     
-    // Update animation progress if animating during gameplay
-    if (helpButtonAnimating) {
-      helpButtonAnimationProgress += 1 / helpButtonAnimationDuration;
-      if (helpButtonAnimationProgress >= 1) {
-        helpButtonAnimationProgress = 1;
-        helpButtonAnimating = false;
-      }
-    } else {
-      // Always fully circular when not animating
-      helpButtonAnimationProgress = 1;
-    }
-    
-    // Always use circle hit detection now that we're always in circular mode
+    // Always use circle hit detection
     isHelpIconHovered = dist(mouseX, mouseY, helpIconX, helpIconY) < helpIconSize/2;
     
-    // Get the appropriate color (green normally, red when hovered)
+    // Get the appropriate color (pink when hovered, green normally)
     const buttonColor = isHelpIconHovered ? COLORS.secondary : COLORS.primary;
     
-    // Calculate stroke weights for the three-layer outline - similar to Button class
-    const thinBlackOutline = Math.max(helpIconSize * 0.01, 1); // Very thin black line (1% of icon size, min 1px)
-    const thickColoredOutline = Math.max(helpIconSize * 0.06, 3); // Increased from 3% to 6% to match CTA buttons, min 3px
-    const outerBlackOutline = Math.max(helpIconSize * 0.05, 3); // Increased from 3% to 5%, min from 2px to 3px
+    // Calculate stroke weights for the three-layer outline
+    const thinBlackOutline = Math.max(helpIconSize * 0.01, 1); // 1% of icon size, min 1px
+    const thickColoredOutline = Math.max(helpIconSize * 0.06, 3); // 6% of icon size, min 3px
+    const outerBlackOutline = Math.max(helpIconSize * 0.05, 3); // 5% of icon size, min 3px
     
-    // Draw the button shape with three-layer outline - always circular
-    fill('white'); // Use white fill like base vessels
+    // Draw the button shape with three-layer outline
+    fill('white');
     
-    // First, draw the outer thin black outline
+    // First, draw the outer black outline
     stroke(0);
     strokeWeight(outerBlackOutline);
     circle(helpIconX, helpIconY, helpIconSize + thinBlackOutline * 4);
@@ -2988,21 +2973,27 @@ let intermediate_combinations = [
     strokeWeight(thinBlackOutline);
     circle(helpIconX, helpIconY, helpIconSize);
     
-    // Draw the "?" text - adjust size proportionally and make it bold
-    fill('black'); // Changed from buttonColor to black
-    noStroke(); // Remove outline for better legibility
+    // Draw the "?" text
+    fill('black');
+    noStroke();
     textAlign(CENTER, CENTER);
     
-    // Use the same font size calculation as vessels (from line ~1014)
-    const fontSize = Math.max(windowHeight * 0.018, 10); // 1.8% of screen height, minimum 10px
-    textSize(fontSize); // Use the same size as vessel text
-    textStyle(BOLD); // Keep bold style
-    text("?", helpIconX, helpIconY);
+    // Use the same font size calculation as vessels (1.8% of screen height)
+    const fontSize = Math.max(windowHeight * 0.018, 10);
+    textSize(fontSize);
+    textStyle(BOLD);
+    
+    // Calculate text metrics for perfect centering
+    const textHeight = textAscent() + textDescent();
+    const baselineOffset = (textAscent() - textHeight/2) * 0.1; // Small baseline adjustment
+    
+    // Draw the question mark with baseline adjustment
+    text("?", helpIconX, helpIconY + baselineOffset);
     
     // Reset text style
     textStyle(NORMAL);
     
-    // Change cursor when hovering over the button
+    // Change cursor when hovering
     if (isHelpIconHovered) {
       cursor(HAND);
     }
