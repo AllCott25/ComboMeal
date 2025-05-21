@@ -216,8 +216,8 @@ function drawWinScreen() {
   
   // Draw flowers in each corner
   drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
-  drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
-  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left - Changed from tertiary to peach - APlasker
+  drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.peach); // Top-right (was COLORS.secondary)
+  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left
   drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
   
   // RESET TEXT ALIGNMENT FOR RECIPE NAME - Ensure centered text
@@ -464,7 +464,7 @@ function drawWinScreen() {
     letterColor = COLORS.green; // Use our explicit green color
   } else if (blackMoves >= 3 && blackMoves <= 4) {
     letterGrade = "C";
-    letterColor = COLORS.tertiary; // Yellow from vessels
+    letterColor = '#f7dc30'; // Yellow - updated from COLORS.tertiary
   } else { // blackMoves >= 5
     letterGrade = "X";
     letterColor = COLORS.secondary; // Red from vessels
@@ -1144,8 +1144,8 @@ function drawTutorialWinScreen() {
   
   // Draw flowers in each corner
   drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
-  drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
-  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left - Changed from tertiary to peach - APlasker
+  drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.peach); // Top-right (was COLORS.secondary)
+  drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left
   drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
   
   // RESET TEXT ALIGNMENT FOR RECIPE NAME - Ensure centered text
@@ -1580,8 +1580,7 @@ function clipboardShareFallback(text) {
         });
       } catch (clipErr) {
         console.log('Silent clipboard copy failed on iOS, showing modal as fallback');
-        // Last resort - show alert
-        alert("Please copy this score manually:\n\n" + text);
+        // Removed the manual copy alert message
       }
     } else {
       // For non-iOS, use clipboard API with toast
@@ -1610,14 +1609,12 @@ function clipboardShareFallback(text) {
         })
         .catch(err => {
           console.error('Error copying to clipboard:', err);
-          // Only show modal as absolute last resort
-          alert("Please copy this score manually:\n\n" + text);
+          // Removed the manual copy alert message
         });
     }
   } catch (error) {
     console.error('Fallback share error:', error);
-    // Last resort
-    alert("Please copy this score manually:\n\n" + text);
+    // Removed the manual copy alert message
   }
 }
 
@@ -2347,8 +2344,26 @@ function handleLetterScoreInteraction(x, y) {
       vessels = [];
       animations = [];
       
-      // Load today's recipe (reload the page to get the default recipe)
-      window.location.reload();
+      // Set loading state
+      isLoadingRecipe = true;
+      
+      // Load today's recipe and start the game
+      console.log("Loading today's recipe from tutorial (handleLetterScoreInteraction)");
+      loadRecipeData().then(() => {
+        // Reset auto-combination flags to ensure final animation works properly
+        autoFinalCombination = false;
+        autoFinalCombinationStarted = false;
+        autoFinalCombinationTimer = 0;
+        autoFinalCombinationState = "WAITING";
+        finalCombinationVessels = [];
+        
+        // Start the game automatically once recipe is loaded
+        startGame();
+      }).catch(error => {
+        console.error("Error loading today's recipe:", error);
+        isLoadingRecipe = false;
+        loadingError = true;
+      });
       
       return true; // Interaction was handled
     }

@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v20250516.1111
+ * Culinary Logic Puzzle v20250516.1654
  * Created by APlasker
- * Last Updated: May 16, 2025 (11:11 EDT) by APlasker
+ * Last Updated: May 16, 2025 (16:54 EDT) by APlasker
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -580,13 +580,15 @@ let intermediate_combinations = [
       this.color = color;
       this.textColor = textColor;
       this.hovered = false;
-      this.disabled = false; // Add disabled state
-      this.borderColor = borderColor; // New property for custom border color
-      this.textBold = false; // New property for bold text
-      this.isCircular = false; // New property to determine if button is circular
-      this.textSizeMultiplier = 1.0; // New property to adjust text size (default: normal size)
-      this.useVesselStyle = false; // New property to use vessel-style three-layer outline - APlasker
-      this.outlineColor = COLORS.peach; // Default outline color for vessel style - APlasker
+      this.disabled = false;
+      this.borderColor = null; // Always null by default now
+      this.textBold = false;
+      this.isCircular = false; // Default to false for consistent rounded rectangle shape
+      this.textSizeMultiplier = 1.0;
+      this.useVesselStyle = false;
+      this.simplifiedOutline = false;
+      this.outlineColor = COLORS.peach;
+      this.customCornerRadius = null;
     }
     
     draw() {
@@ -594,74 +596,33 @@ let intermediate_combinations = [
       push();
       
       // Calculate relative values for visual elements
-      const cornerRadius = Math.max(this.w * 0.15, 10); // Increased from 0.06 to 0.15 for more pill-shaped appearance, min 10px
-      const strokeW = Math.max(this.w * 0.025, 2); // Stroke weight as 2.5% of width, min 2px
+      const cornerRadius = this.customCornerRadius !== null ? this.customCornerRadius : Math.max(this.w * 0.15, 10);
+      const strokeW = Math.max(this.w * 0.025, 2);
       
-      if (this.useVesselStyle) {
-        // Draw button with vessel-style three-layer outline - APlasker
-        rectMode(CENTER);
-        
-        // Calculate stroke weights for the three-layer outline
-        const thinBlackOutline = Math.max(this.w * 0.01, 1); // Very thin black line (1% of button width, min 1px)
-        const thickColoredOutline = Math.max(this.w * 0.03, 3); // Thicker colored line (3% of button width, min 3px)
-        const outerBlackOutline = Math.max(this.w * 0.03, 2.5); // Increased from 0.015 to 0.03 for more visible outline, min 2.5px
-        
-        // Set fill color based on state
-        if (this.disabled) {
-          let buttonColor = color(this.color);
-          buttonColor.setAlpha(128); // 50% opacity
-          fill(buttonColor);
-        } else if (this.hovered) {
-          fill(lerpColor(color(this.color), color(255), 0.2));
-        } else {
-          fill(this.color);
-        }
-        
-        // First, draw the outer thin black outline
-        stroke(0);
-        strokeWeight(outerBlackOutline);
-        rect(this.x, this.y, this.w + thinBlackOutline * 4, this.h + thinBlackOutline * 4, cornerRadius);
-        
-        // Next, draw the middle thick colored outline
-        stroke(this.outlineColor);
-        strokeWeight(thickColoredOutline);
-        rect(this.x, this.y, this.w + thinBlackOutline * 2, this.h + thinBlackOutline * 2, cornerRadius);
-        
-        // Finally, draw the inner thin black outline
-        stroke(0);
-        strokeWeight(thinBlackOutline);
-        rect(this.x, this.y, this.w, this.h, cornerRadius);
+      rectMode(CENTER);
+      if (this.disabled) {
+        let buttonColor = color(this.color);
+        buttonColor.setAlpha(128);
+        fill(buttonColor);
+      } else if (this.hovered) {
+        fill(lerpColor(color(this.color), color(255), 0.2));
       } else {
-        // Draw button with standard style
-        rectMode(CENTER);
-        if (this.disabled) {
-          // Use 50% opacity for disabled state
-          let buttonColor = color(this.color);
-          buttonColor.setAlpha(128); // 128 is 50% opacity (0-255)
-          fill(buttonColor);
-        } else if (this.hovered) {
-          fill(lerpColor(color(this.color), color(255), 0.2));
-        } else {
-          fill(this.color);
-        }
-        
-        // Use borderColor if specified, otherwise use default subtle border
-        if (this.borderColor) {
-          stroke(this.borderColor);
-          strokeWeight(strokeW); // Relative stroke weight
-        } else {
-          stroke(0, 50);
-          strokeWeight(strokeW); // Relative stroke weight
-        }
-        
-        // Draw either a circle or rounded rectangle based on isCircular property
-        if (this.isCircular) {
-          // For circular buttons, use the width as diameter
-          circle(this.x, this.y, this.w);
-        } else {
-          // For rectangular buttons, use the standard rectangle
-          rect(this.x, this.y, this.w, this.h, cornerRadius);
-        }
+        fill(this.color);
+      }
+      
+      // Handle outline based on borderColor
+      if (this.borderColor) {
+        stroke(this.borderColor);
+        strokeWeight(Math.max(this.h * 0.04, 1.5)); // Match text weight, min 1.5px
+      } else {
+        noStroke();
+      }
+      
+      // Draw either a circle or rounded rectangle based on isCircular property
+      if (this.isCircular) {
+        circle(this.x, this.y, this.w);
+      } else {
+        rect(this.x, this.y, this.w, this.h, cornerRadius);
       }
       
       // Calculate font size relative to button height, applying the text size multiplier
@@ -1009,31 +970,41 @@ let intermediate_combinations = [
       noStroke();
       textAlign(CENTER, CENTER);
       
-      // MODIFIED - Use screen height as reference for font size
-      // Calculate text size as a percentage of screen height with minimum value
-      const fontSize = Math.max(windowHeight * 0.018, 10); // 1.5% of screen height, minimum 10px
+      // Responsive font size based on vessel's DEFAULT size (not scaled)
+      const defaultW = this.w; // Use original width, not scaled
+      const defaultH = this.h;
+      const textAreaW = defaultW * 0.75; // 75% of vessel width
+      const maxLines = 3;
+      let fontSize = Math.max(windowHeight * 0.018, 10); // Start with default
       textSize(fontSize);
-      textStyle(BOLD); // Make text bold
+      textStyle(BOLD);
+      let displayText = this.getDisplayText();
+
+      // First try splitting the text to see how many lines we need
+      let lines = splitTextToLinesWithEllipsis(displayText, textAreaW, maxLines, fontSize, 10);
       
-      // Split text into lines if needed - use dynamic text margin based on scale - APlasker
-      let lines = splitTextIntoLines(this.getDisplayText(), this.w * this.textMargin);
-      
-      for (let i = 0; i < lines.length; i++) {
-        let yOffset = (i - (lines.length - 1) / 2) * (fontSize * 1.2); // Dynamic line spacing based on font size
-        
-        // Position text based on vessel type
-        if (!this.isAdvanced) {
-          // Basic ingredient vessel - position text slightly higher
-          text(lines[i], 0, yOffset - this.h * 0.1);
-        } else {
-          // Advanced vessel (pots/pans) - center text properly in the shifted vessel body
-          text(lines[i], 0, yOffset - this.h * 0.1);
-        }
+      // Now that we know the number of lines, calculate the text area height
+      const textAreaH = defaultH * (lines.length > 1 ? 0.4 : 0.25); // 40% height for multi-line, 25% for single line
+      let totalHeight = lines.length * fontSize * 1.1;
+
+      // Only reduce font size if total height exceeds available height
+      if (totalHeight > textAreaH) {
+        // Calculate the minimum font size needed to fit the height
+        const minNeededFontSize = Math.floor((textAreaH / (lines.length * 1.1)));
+        fontSize = Math.max(minNeededFontSize, 10);
+        textSize(fontSize);
+        // Try splitting again with new font size
+        lines = splitTextToLinesWithEllipsis(displayText, textAreaW, maxLines, fontSize, 10);
+        totalHeight = lines.length * fontSize * 1.1;
       }
-      
-      // Reset text style
+
+      // Vertically center block
+      let yOffsetStart = -defaultH * 0.1 - totalHeight / 2 + fontSize * 1.1 / 2;
+      for (let i = 0; i < lines.length; i++) {
+        let yOffset = yOffsetStart + i * fontSize * 1.1;
+        text(lines[i], 0, yOffset);
+      }
       textStyle(NORMAL);
-      
       pop();
       
       // Display the verb above the vessel - AFTER pop() to use screen coordinates
@@ -1195,6 +1166,9 @@ let intermediate_combinations = [
     createCanvas(windowWidth, windowHeight); // Fullscreen canvas for mobile
     textFont(bodyFont);
     
+    // Initialize the touch system
+    touchSystem.init();
+    
     // Set frame rate to 30fps for consistent animation timing across devices
     frameRate(30);
     
@@ -1207,12 +1181,10 @@ let intermediate_combinations = [
     playAreaX = (windowWidth - playAreaWidth) / 2;
     playAreaY = (windowHeight - playAreaHeight) / 2;
     
-    // The actual game initialization will happen in initializeGame()
-    // after the recipe data is loaded
-    
     // Load recipe data from Supabase if not in playtest mode
     if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
       loadRecipeData();
+      // Note: initializeGame() will be called from within loadRecipeData() now
     } else {
       console.log("Playtest mode: waiting for date selection");
       isLoadingRecipe = false; // In playtest mode, we'll load the recipe after date selection
@@ -1259,9 +1231,18 @@ let intermediate_combinations = [
       // Get author information from the database if it exists
       recipeAuthor = recipeData.author || "";
       
-      // Load the recipe image if URL is provided
+      console.log("Recipe data loaded successfully");
+      isLoadingRecipe = false;
+      
+      // Set data loaded flag to true for stats display
+      recipeDataLoadedForStats = true;
+      
+      // Initialize the game immediately with the essential data
+      initializeGame();
+      
+      // MODIFIED BY APLASKER: Load the image in the background AFTER game is initialized
       if (recipeData.imgUrl) {
-        console.log("Loading recipe image from URL:", recipeData.imgUrl);
+        console.log("Loading recipe image in background from URL:", recipeData.imgUrl);
         isLoadingImage = true;
         
         // Use loadImage with success and error callbacks
@@ -1272,27 +1253,15 @@ let intermediate_combinations = [
             console.log("Recipe image loaded successfully");
             recipeImage = img;
             isLoadingImage = false;
-            
-            // Set flag that data is loaded for stats display
-            recipeDataLoadedForStats = true;
           },
           // Error callback
           (err) => {
             console.error("Error loading recipe image:", err);
             recipeImage = null; // Set to null to indicate loading failed
             isLoadingImage = false;
-            
-            // Still set the flag even if image fails - we have the other data
-            recipeDataLoadedForStats = true;
           }
         );
-      } else {
-        // No image to load, so mark data as ready immediately
-        recipeDataLoadedForStats = true;
       }
-      
-      console.log("Recipe data loaded successfully");
-      isLoadingRecipe = false;
     } catch (error) {
       console.error("Error loading recipe data:", error);
       loadingError = true;
@@ -1349,6 +1318,16 @@ let intermediate_combinations = [
     cursor(overInteractive ? HAND : ARROW);
   }
   
+  // Add new state variables for win screen touch handling
+  let winScreenTouchState = {
+    startX: 0,
+    startY: 0,
+    element: null,
+    touchMoved: false,
+    processingTouch: false
+  };
+  
+  // Update mousePressed function to track win screen interactions but don't execute them
   function mousePressed() {
     // Add safety check for initialization state
     if (vessels.length === 0 && !isLoadingRecipe) {
@@ -1384,7 +1363,7 @@ let intermediate_combinations = [
       }
     }
     
-    // Skip all interaction if the game has been won
+    // MODIFIED: Win screen handling - track but don't execute actions yet
     if (gameWon) {
       // Check if we're clicking on the random recipe hotspot
       if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(mouseX, mouseY)) {
@@ -1405,56 +1384,50 @@ let intermediate_combinations = [
         return false;
       }
       
-      // Special handling for tutorial mode - APlasker
+      // Special handling for tutorial mode
       if (isTutorialMode) {
         console.log("Tutorial win screen click detected, isMouseOverLetterScore:", isMouseOverLetterScore);
         
-        // Check if recipe card area is clicked
+        // MODIFIED: Just track the element but don't execute action yet
+        // Set element in winScreenTouchState
         if (isMouseOverCard) {
-          console.log("Tutorial recipe card clicked - opening recipe URL");
-          viewRecipe(); // Allow recipe link functionality
-          return false;
-        }
-        
-        // Check if score card area is clicked
-        if (isMouseOverLetterScore) {
-          console.log("Tutorial score card clicked - loading today's recipe");
-          
-          // Reset tutorial mode
-          isTutorialMode = false;
-          
-          // Reset game state
-          gameStarted = false;
-          gameWon = false;
-          moveHistory = [];
-          hintCount = 0;
-          vessels = [];
-          animations = [];
-          
-          // Reload the page to get the default recipe
-          window.location.reload();
-          
-          return false;
+          console.log("Tutorial recipe card clicked - tracking for release");
+          winScreenTouchState.element = "tutorialRecipe";
+          winScreenTouchState.startX = mouseX;
+          winScreenTouchState.startY = mouseY;
+          winScreenTouchState.touchMoved = false;
+          winScreenTouchState.processingTouch = true;
+        } else if (isMouseOverLetterScore) {
+          console.log("Tutorial score card clicked - tracking for release");
+          winScreenTouchState.element = "tutorialScore";
+          winScreenTouchState.startX = mouseX;
+          winScreenTouchState.startY = mouseY;
+          winScreenTouchState.touchMoved = false;
+          winScreenTouchState.processingTouch = true;
         }
         
         return false;
       }
       
       // Regular (non-tutorial) win screen handling
-      // Check if letter score area is clicked
+      // MODIFIED: Just track the element but don't execute action yet
       if (isMouseOverLetterScore) {
-        console.log("Share Score triggered (win screen click)");
-        shareScore();
-        return false;
-      } 
-      // Check if recipe card is clicked
-      else if (isMouseOverCard) {
-        console.log("View Recipe triggered (win screen click)");
-        viewRecipe();
-        return false;
+        console.log("Share Score clicked - tracking for release");
+        winScreenTouchState.element = "shareScore";
+        winScreenTouchState.startX = mouseX;
+        winScreenTouchState.startY = mouseY;
+        winScreenTouchState.touchMoved = false;
+        winScreenTouchState.processingTouch = true;
+      } else if (isMouseOverCard) {
+        console.log("View Recipe clicked - tracking for release");
+        winScreenTouchState.element = "viewRecipe";
+        winScreenTouchState.startX = mouseX;
+        winScreenTouchState.startY = mouseY;
+        winScreenTouchState.touchMoved = false;
+        winScreenTouchState.processingTouch = true;
       }
       
-      return;
+      return false;
     }
     
     // Tutorial screen - check if Say hi link was clicked
@@ -1558,7 +1531,18 @@ let intermediate_combinations = [
     }
   }
   
+  // Update mouseDragged to track movement for win screen elements
   function mouseDragged() {
+    // Update win screen touch state if we're tracking a touch
+    if (gameWon && winScreenTouchState.processingTouch) {
+      // Check if we've moved more than the threshold to consider it a drag not a tap
+      const dragDistance = dist(mouseX, mouseY, winScreenTouchState.startX, winScreenTouchState.startY);
+      if (dragDistance > 10) { // 10px threshold
+        winScreenTouchState.touchMoved = true;
+        console.log("Win screen touch moved - will not trigger action on release");
+      }
+    }
+    
     // Check if a modal is active - selectively allow interactions with modal elements
     if (modalActive) {
       // Get the element being dragged over
@@ -1590,7 +1574,70 @@ let intermediate_combinations = [
     }
   }
   
+  // Update mouseReleased to execute win screen actions on release if no movement
   function mouseReleased() {
+    // Handle win screen touch state if we're tracking a touch
+    if (gameWon && winScreenTouchState.processingTouch) {
+      // Only execute the action if the touch didn't move much
+      if (!winScreenTouchState.touchMoved) {
+        console.log("Executing win screen action on release:", winScreenTouchState.element);
+        
+        // Execute the appropriate action based on element
+        if (winScreenTouchState.element === "viewRecipe" || 
+            winScreenTouchState.element === "tutorialRecipe") {
+          // View recipe action
+          console.log("View Recipe triggered (win screen release)");
+          viewRecipe();
+        } else if (winScreenTouchState.element === "shareScore") {
+          // Share score action
+          console.log("Share Score triggered (win screen release)");
+          shareScore();
+        } else if (winScreenTouchState.element === "tutorialScore") {
+          // Tutorial score action - load today's recipe instead of reloading page
+          console.log("Tutorial score action triggered (win screen release)");
+          
+          // Reset tutorial mode
+          isTutorialMode = false;
+          
+          // Reset game state
+          gameStarted = false;
+          gameWon = false;
+          moveHistory = [];
+          hintCount = 0;
+          vessels = [];
+          animations = [];
+          
+          // Set loading state
+          isLoadingRecipe = true;
+          
+          // Load today's recipe and start the game
+          console.log("Loading today's recipe after tutorial");
+          loadRecipeData().then(() => {
+            // Reset auto-combination flags to ensure final animation works properly
+            autoFinalCombination = false;
+            autoFinalCombinationStarted = false;
+            autoFinalCombinationTimer = 0;
+            autoFinalCombinationState = "WAITING";
+            finalCombinationVessels = [];
+            
+            // Start the game automatically once recipe is loaded
+            startGame();
+          }).catch(error => {
+            console.error("Error loading today's recipe:", error);
+            isLoadingRecipe = false;
+            loadingError = true;
+          });
+        }
+      }
+      
+      // Reset the touch state
+      winScreenTouchState.processingTouch = false;
+      winScreenTouchState.element = null;
+      winScreenTouchState.touchMoved = false;
+      
+      return false; // Prevent other handling
+    }
+    
     // Check if a modal is active - selectively allow interactions with modal elements
     if (modalActive) {
       // Get the element being released over
@@ -2112,9 +2159,16 @@ let intermediate_combinations = [
       recipeDescription = recipeData.description || "A tutorial recipe to help you learn the game!";
       recipeAuthor = recipeData.author || "Tutorial";
       
-      // Load the recipe image if URL is provided
+      // Initialize game with the tutorial recipe
+      initializeGame();
+      
+      // Set loading state to false
+      isLoadingRecipe = false;
+      recipeDataLoadedForStats = true;
+      
+      // MODIFIED BY APLASKER: Load the image in the background AFTER game is initialized
       if (recipeData.imgUrl) {
-        console.log("Loading tutorial recipe image from URL:", recipeData.imgUrl);
+        console.log("Loading tutorial recipe image in background from URL:", recipeData.imgUrl);
         isLoadingImage = true;
         
         // Use loadImage with success and error callbacks
@@ -2125,26 +2179,15 @@ let intermediate_combinations = [
             console.log("Tutorial recipe image loaded successfully");
             recipeImage = img;
             isLoadingImage = false;
-            recipeDataLoadedForStats = true;
           },
           // Error callback
           (err) => {
             console.error("Error loading tutorial recipe image:", err);
             recipeImage = null;
             isLoadingImage = false;
-            recipeDataLoadedForStats = true;
           }
         );
-      } else {
-        recipeDataLoadedForStats = true;
       }
-      
-      // Initialize game with the tutorial recipe
-      initializeGame();
-      
-      // Set loading state to false
-      isLoadingRecipe = false;
-      
     } catch (error) {
       console.error("Error loading tutorial recipe:", error);
       loadingError = true;
@@ -2177,10 +2220,30 @@ let intermediate_combinations = [
       return false;
     }
     
+    // Use the touch system to get touch position
+    const touchPos = touchSystem.getCurrentTouchPos();
+    if (!touchPos) {
+      // Fall back to p5.js touch position if our system doesn't have data
+      if (touches.length > 0) {
+        touchX = touches[0].x;
+        touchY = touches[0].y;
+      } else {
+        return false; // No touch data available
+      }
+    } else {
+      // Use our normalized touch position
+      touchX = touchPos.x;
+      touchY = touchPos.y;
+    }
+    
+    // Update mouse coordinates to match touch position
+    mouseX = touchX;
+    mouseY = touchY;
+    
     // Check if a modal is active - selectively allow interactions with modal elements
     if (modalActive) {
       // Use helper function to check if interacting with a modal element
-      if (isModalElement(touches[0].x, touches[0].y)) {
+      if (isModalElement(touchX, touchY)) {
         // Allow the event to proceed to HTML elements
         console.log('Touch interaction allowed for modal element');
         return true;
@@ -2196,15 +2259,9 @@ let intermediate_combinations = [
       return false;
     }
     
-    // Update mouse coordinates to match touch position first
-    if (touches.length > 0) {
-      mouseX = touches[0].x;
-      mouseY = touches[0].y;
-    }
-    
     // Check if any easter egg modal is active and handle the click  
     for (let i = eggModals.length - 1; i >= 0; i--) {
-      if (eggModals[i].active && eggModals[i].checkClick(mouseX, mouseY)) {
+      if (eggModals[i].active && eggModals[i].checkClick(touchX, touchY)) {
         // Modal was clicked, don't process any other clicks
         return false;
       }
@@ -2214,188 +2271,200 @@ let intermediate_combinations = [
     // Only do this if we're actually handling the touch
     let touchHandled = false;
     
-    // Get the touch coordinates
-    if (touches.length > 0) {
-      let touchX = touches[0].x;
-      let touchY = touches[0].y;
+    // Handle the same logic as mousePressed but with touch coordinates
+    if (!gameStarted) {
+      // Check if start button was touched
+      if (startButton.isInside(touchX, touchY)) {
+        startGame();
+        touchHandled = true;
+      }
       
-      // Handle the same logic as mousePressed but with touch coordinates
-      if (!gameStarted) {
-        // Check if start button was touched
-        if (startButton.isInside(touchX, touchY)) {
-          startGame();
-          touchHandled = true;
-        }
+      // Check if tutorial button was touched - APlasker
+      if (tutorialButton.isInside(touchX, touchY)) {
+        startTutorial();
+        touchHandled = true;
+      }
+      
+      // Tutorial screen - check if Say hi link was touched
+      if (typeof tutorialSayHiLinkX !== 'undefined') {
+        const isOverTutorialSayHi = (
+          touchX > tutorialSayHiLinkX - tutorialSayHiLinkWidth/2 && 
+          touchX < tutorialSayHiLinkX + tutorialSayHiLinkWidth/2 && 
+          touchY > tutorialSayHiLinkY - tutorialSayHiLinkHeight/2 && 
+          touchY < tutorialSayHiLinkY + tutorialSayHiLinkHeight/2
+        );
         
-        // Check if tutorial button was touched - APlasker
-        if (tutorialButton.isInside(touchX, touchY)) {
-          startTutorial();
-          touchHandled = true;
-        }
-        
-        // Tutorial screen - check if Say hi link was touched
-        if (typeof tutorialSayHiLinkX !== 'undefined') {
-          const isOverTutorialSayHi = (
-            touchX > tutorialSayHiLinkX - tutorialSayHiLinkWidth/2 && 
-            touchX < tutorialSayHiLinkX + tutorialSayHiLinkWidth/2 && 
-            touchY > tutorialSayHiLinkY - tutorialSayHiLinkHeight/2 && 
-            touchY < tutorialSayHiLinkY + tutorialSayHiLinkHeight/2
-          );
-          
-          if (isOverTutorialSayHi) {
-            console.log("Say hi link touched in tutorial");
-            if (typeof showFeedbackModal === 'function') {
-              showFeedbackModal();
-              touchHandled = true;
-              return false;
-            }
-          }
-        }
-      } else if (gameWon) {
-        // Check for random recipe hotspot first
-        if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
-          console.log("Random recipe hotspot touched at:", touchX, touchY);
-          isLoadingRandomRecipe = true;
-          loadRandomRecipe().finally(() => {
-            isLoadingRandomRecipe = false;
-          });
-          touchHandled = true;
-          return false;
-        }
-        
-        // Debugging log to help track touch coordinates
-        console.log("Touch on win screen:", touchX, touchY);
-        
-        // Check if the Say hi link was touched (in win screen)
-        if (typeof handleSayHiLinkInteraction === 'function' && handleSayHiLinkInteraction(touchX, touchY)) {
-          console.log("Say hi link handled in win screen");
-          touchHandled = true;
-          return false;
-        }
-        
-        // Special handling for tutorial mode - APlasker
-        if (isTutorialMode) {
-          console.log("Tutorial win screen touch detected");
-          
-          // Use simplified hover detection based on screen position
-          isMouseOverLetterScore = (touchY >= height/2);
-          isMouseOverCard = (touchY < height/2);
-          
-          // Handle recipe card clicks in tutorial mode
-          if (isMouseOverCard) {
-            console.log("Tutorial recipe card touched - opening recipe URL");
-            viewRecipe(); // Allow recipe link functionality
+        if (isOverTutorialSayHi) {
+          console.log("Say hi link touched in tutorial");
+          if (typeof showFeedbackModal === 'function') {
+            showFeedbackModal();
             touchHandled = true;
             return false;
-          }
-          
-          // Handle score card click
-          if (isMouseOverLetterScore) {
-            console.log("Tutorial score card touched - loading today's recipe");
-            
-            // Reset tutorial mode
-            isTutorialMode = false;
-            
-            // Reset game state
-            gameStarted = false;
-            gameWon = false;
-            moveHistory = [];
-            hintCount = 0;
-            vessels = [];
-            animations = [];
-            
-            // Reload the page to get the default recipe
-            window.location.reload();
-            
-            touchHandled = true;
-            return false;
-          }
-          
-          touchHandled = true;
-          return false;
-        }
-        
-        // Regular (non-tutorial) win screen handling
-        // Use simpler touch detection on win screen - top half shows recipe, bottom half shares score
-        if (touchY < height/2) {
-          // Top half = view recipe
-          console.log("View Recipe triggered (win screen touch - top half)");
-          viewRecipe();
-          touchHandled = true;
-        } else {
-          // Bottom half = share score
-          console.log("Share Score triggered (win screen touch - bottom half)");
-          shareScore();
-          touchHandled = true;
-        }
-      } else {
-        // Check if hint button was touched
-        if (!showingHint && hintButton.isInside(touchX, touchY)) {
-          showHint();
-          touchHandled = true;
-        }
-        
-        // Check if a vessel was touched
-        for (let v of vessels) {
-          if (v.isInside(touchX, touchY)) {
-            draggedVessel = v;
-            // Store original position for proper snapback
-            draggedVessel.originalX = v.x;
-            draggedVessel.originalY = v.y;
-            offsetX = touchX - v.x;
-            offsetY = touchY - v.y;
-            
-            // IMMEDIATELY expand text margin before scale animation starts - APlasker
-            // This prevents visual glitching during the transition
-            v.textMargin = 0.85;
-            
-            // Set target scales for body and text (this will happen gradually through update())
-            // Body scales to 105% while text only scales to 102.5% as per 20250413updates_final.txt
-            v.targetBodyScale = 1.05;
-            v.targetTextScale = 1.025;
-            
-            // Keep legacy targetScale for backward compatibility
-            v.targetScale = 1.05; // MODIFIED - Reduced scale up when dragging from 1.1 to 1.05
-            
-            triggerHapticFeedback('success'); // Haptic feedback on successful drag
-            touchHandled = true;
-            break;
           }
         }
       }
+    } else if (gameWon) {
+      // Check for random recipe hotspot first
+      if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
+        console.log("Random recipe hotspot touched at:", touchX, touchY);
+        isLoadingRandomRecipe = true;
+        loadRandomRecipe().finally(() => {
+          isLoadingRandomRecipe = false;
+        });
+        touchHandled = true;
+        return false;
+      }
       
-      // Update the isMouseOverLetterScore flag for consistent hover state
-      if (gameWon) {
+      // Debugging log to help track touch coordinates
+      console.log("Touch on win screen:", touchX, touchY);
+      
+      // Check if the Say hi link was touched (in win screen)
+      if (typeof handleSayHiLinkInteraction === 'function' && handleSayHiLinkInteraction(touchX, touchY)) {
+        console.log("Say hi link handled in win screen");
+        touchHandled = true;
+        return false;
+      }
+      
+      // Special handling for tutorial mode - APlasker
+      if (isTutorialMode) {
+        console.log("Tutorial win screen touch detected");
+        
         // Use simplified hover detection based on screen position
         isMouseOverLetterScore = (touchY >= height/2);
         isMouseOverCard = (touchY < height/2);
-      }
-      
-      // Check for help icon touch
-      if (!gameWon && gameStarted) { // Only check for help icon during gameplay
-        // Always use circle hit detection now that we're always in circular mode
-        const touchedHelpButton = dist(touchX, touchY, helpIconX, helpIconY) < helpIconSize/2;
         
-        if (touchedHelpButton) {
-          if (typeof showHelpModal === 'function') {
-            // In game, show help modal
-            console.log("Help button touched in game - showing help modal");
-            showHelpModal();
-            touchHandled = true;
-            return false; // Prevent other touch handling
-          }
-        }
-        
-        // Don't process other touches if help modal is open
-        if (typeof helpModal !== 'undefined' && helpModal !== null && helpModal.active) {
-          touchHandled = helpModal.checkClick(touchX, touchY);
+        // Handle recipe card clicks in tutorial mode
+        if (isMouseOverCard) {
+          console.log("Tutorial recipe card touched - opening recipe URL");
+          viewRecipe(); // Allow recipe link functionality
+          touchHandled = true;
           return false;
         }
+        
+        // Handle score card click
+        if (isMouseOverLetterScore) {
+          console.log("Tutorial score card touched - loading today's recipe");
+          
+          // Reset tutorial mode
+          isTutorialMode = false;
+          
+          // Reset game state
+          gameStarted = false;
+          gameWon = false;
+          moveHistory = [];
+          hintCount = 0;
+          vessels = [];
+          animations = [];
+          
+          // Set loading state
+          isLoadingRecipe = true;
+          
+          // Load today's recipe and start the game
+          console.log("Loading today's recipe after tutorial (direct touch)");
+          loadRecipeData().then(() => {
+            // Reset auto-combination flags to ensure final animation works properly
+            autoFinalCombination = false;
+            autoFinalCombinationStarted = false;
+            autoFinalCombinationTimer = 0;
+            autoFinalCombinationState = "WAITING";
+            finalCombinationVessels = [];
+            
+            // Start the game automatically once recipe is loaded
+            startGame();
+          }).catch(error => {
+            console.error("Error loading today's recipe:", error);
+            isLoadingRecipe = false;
+            loadingError = true;
+          });
+          
+          touchHandled = true;
+          return false;
+        }
+        
+        touchHandled = true;
+        return false;
       }
       
-      if (touchHandled) {
-        return false; // Prevent default only if we handled the touch
+      // Regular (non-tutorial) win screen handling
+      // Use simpler touch detection on win screen - top half shows recipe, bottom half shares score
+      if (touchY < height/2) {
+        // Top half = view recipe
+        console.log("View Recipe triggered (win screen touch - top half)");
+        viewRecipe();
+        touchHandled = true;
+      } else {
+        // Bottom half = share score
+        console.log("Share Score triggered (win screen touch - bottom half)");
+        shareScore();
+        touchHandled = true;
       }
+    } else {
+      // Check if hint button was touched
+      if (!showingHint && hintButton.isInside(touchX, touchY)) {
+        showHint();
+        touchHandled = true;
+      }
+      
+      // Check if a vessel was touched
+      for (let v of vessels) {
+        if (v.isInside(touchX, touchY)) {
+          draggedVessel = v;
+          // Store original position for proper snapback
+          draggedVessel.originalX = v.x;
+          draggedVessel.originalY = v.y;
+          offsetX = touchX - v.x;
+          offsetY = touchY - v.y;
+          
+          // IMMEDIATELY expand text margin before scale animation starts - APlasker
+          // This prevents visual glitching during the transition
+          v.textMargin = 0.85;
+          
+          // Set target scales for body and text (this will happen gradually through update())
+          // Body scales to 105% while text only scales to 102.5% as per 20250413updates_final.txt
+          v.targetBodyScale = 1.05;
+          v.targetTextScale = 1.025;
+          
+          // Keep legacy targetScale for backward compatibility
+          v.targetScale = 1.05;
+          
+          triggerHapticFeedback('success'); // Haptic feedback on successful drag
+          touchHandled = true;
+          break;
+        }
+      }
+    }
+    
+    // Update the isMouseOverLetterScore flag for consistent hover state
+    if (gameWon) {
+      // Use simplified hover detection based on screen position
+      isMouseOverLetterScore = (touchY >= height/2);
+      isMouseOverCard = (touchY < height/2);
+    }
+    
+    // Check for help icon touch
+    if (!gameWon && gameStarted) { // Only check for help icon during gameplay
+      // Always use circle hit detection now that we're always in circular mode
+      const touchedHelpButton = dist(touchX, touchY, helpIconX, helpIconY) < helpIconSize/2;
+      
+      if (touchedHelpButton) {
+        if (typeof showHelpModal === 'function') {
+          // In game, show help modal
+          console.log("Help button touched in game - showing help modal");
+          showHelpModal();
+          touchHandled = true;
+          return false; // Prevent other touch handling
+        }
+      }
+      
+      // Don't process other touches if help modal is open
+      if (typeof helpModal !== 'undefined' && helpModal !== null && helpModal.active) {
+        touchHandled = helpModal.checkClick(touchX, touchY);
+        return false;
+      }
+    }
+    
+    if (touchHandled) {
+      return false; // Prevent default only if we handled the touch
     }
     
     // Check for random recipe hotspot last
@@ -2451,6 +2520,23 @@ let intermediate_combinations = [
     startButtonWidth = Math.max(startButtonWidth, 100);
     startButtonHeight = Math.max(startButtonHeight, 40);
     
+    // Create hint button with white background and no border
+    hintButton = new Button(
+      playAreaX + playAreaWidth * 0.5, // Center horizontally
+      hintButtonY, 
+      buttonWidth, 
+      buttonHeight, 
+      "Hint", 
+      showHint, 
+      'white', 
+      '#FF5252',
+      null // No border color
+    );
+    
+    // Set text to bold and ensure it's not circular
+    hintButton.textBold = true;
+    hintButton.isCircular = false;
+    
     // Create start button - positioned in the center
     startButton = new Button(
       playAreaX + playAreaWidth * 0.5, // Position at 50% of play area width (center)
@@ -2469,6 +2555,10 @@ let intermediate_combinations = [
     // Enable vessel-style outline - APlasker
     startButton.useVesselStyle = true;
     startButton.outlineColor = COLORS.peach; // Use peach color for outline
+    startButton.simplifiedOutline = true; // Use simplified outline with only inner black line - APlasker
+    
+    // Calculate corner radius for Cook button
+    const cookButtonCornerRadius = Math.max(startButtonWidth * 0.15, 10);
     
     // Create tutorial button - APlasker - AFTER creating the start button so we can reference its position
     // Calculate tutorial button position to be to the left of the start button with appropriate spacing
@@ -2483,8 +2573,8 @@ let intermediate_combinations = [
       "First\nTime?", // Stack text on two lines
       startTutorial, 
       'white', // White background 
-      COLORS.secondary, // Pink text
-      null // No border color needed as we're using vessel style
+      COLORS.primary, // Green text
+      COLORS.primary // Green outline to match text
     );
     
     // Set text to NOT bold for Tutorial button
@@ -2492,8 +2582,11 @@ let intermediate_combinations = [
     // Enable vessel-style outline - APlasker
     tutorialButton.useVesselStyle = true;
     tutorialButton.outlineColor = COLORS.peach; // Use peach color for outline
+    tutorialButton.simplifiedOutline = true; // Use simplified outline with only inner black line - APlasker
     // Reduce text size for the stacked text
     tutorialButton.textSizeMultiplier = 0.8;
+    // Use the same corner radius as the Cook button for visual consistency - APlasker
+    tutorialButton.customCornerRadius = cookButtonCornerRadius;
     
     // Reset game state
     gameWon = false;
@@ -2526,25 +2619,6 @@ let intermediate_combinations = [
     usedErrorMessages = [];
     firstInactivityMessageShown = false; // Added to track first inactivity message - APlasker
     inactivityReminderCount = 0;
-    
-    // Enforce minimum sizes
-    startButtonWidth = Math.max(startButtonWidth, 100);
-    startButtonHeight = Math.max(startButtonHeight, 40);
-    
-    // Create hint button with white background and black border (changed from grey outline)
-    hintButton = new Button(
-      playAreaX + playAreaWidth * 0.5, // Center horizontally
-      hintButtonY, 
-      buttonWidth, 
-      buttonHeight, 
-      "Hint", 
-      showHint, 
-      'white', 
-      '#FF5252'
-    );
-    
-    // Set text to bold
-    hintButton.textBold = true;
   }
   
   // Function to get current time in EST for debugging
@@ -2568,14 +2642,77 @@ let intermediate_combinations = [
   
   // Add touch release support for mobile devices
   function touchEnded() {
+    // Use the touch system to get touch position
+    const touchPos = touchSystem.getCurrentTouchPos();
+    if (!touchPos && touches.length > 0) {
+      // Fall back to p5.js touch position if our system doesn't have data
+      mouseX = touches[0].x;
+      mouseY = touches[0].y;
+    } else if (touchPos) {
+      // Use our normalized touch position
+      mouseX = touchPos.x;
+      mouseY = touchPos.y;
+    }
+    
+    // Handle win screen touch state if we're tracking a touch
+    if (gameWon && winScreenTouchState.processingTouch) {
+      // Only execute the action if the touch didn't move much
+      if (!winScreenTouchState.touchMoved) {
+        console.log("Executing win screen action on release:", winScreenTouchState.element);
+        
+        // Execute the appropriate action based on element
+        if (winScreenTouchState.element === "viewRecipe" || 
+            winScreenTouchState.element === "tutorialRecipe") {
+          // View recipe action
+          console.log("View Recipe triggered (win screen release)");
+          viewRecipe();
+        } else if (winScreenTouchState.element === "shareScore") {
+          // Share score action
+          console.log("Share Score triggered (win screen release)");
+          shareScore();
+        } else if (winScreenTouchState.element === "tutorialScore") {
+          // Tutorial score action - load today's recipe instead of returning to title
+          console.log("Tutorial score action triggered (win screen touch release)");
+          
+          // Reset tutorial mode
+          isTutorialMode = false;
+          
+          // Reset game state
+          gameStarted = false;
+          gameWon = false;
+          moveHistory = [];
+          hintCount = 0;
+          vessels = [];
+          animations = [];
+          
+          // Set loading state
+          isLoadingRecipe = true;
+          
+          // Load today's recipe and start the game
+          console.log("Loading today's recipe after tutorial (touch)");
+          loadRecipeData().then(() => {
+            // Start the game automatically once recipe is loaded
+            startGame();
+          }).catch(error => {
+            console.error("Error loading today's recipe:", error);
+            isLoadingRecipe = false;
+            loadingError = true;
+          });
+        }
+      }
+      
+      // Reset the touch state
+      winScreenTouchState.processingTouch = false;
+      winScreenTouchState.element = null;
+      winScreenTouchState.touchMoved = false;
+      
+      return false; // Prevent other handling
+    }
+    
     // Check if a modal is active - selectively allow interactions with modal elements
     if (modalActive) {
-      // Get touch coordinates
-      const touchX = touches.length > 0 ? touches[0].x : mouseX;
-      const touchY = touches.length > 0 ? touches[0].y : mouseY;
-      
       // Get the element being touched
-      const target = document.elementFromPoint(touchX, touchY);
+      const target = document.elementFromPoint(mouseX, mouseY);
       
       // If the target is part of our modal (check parent chain)
       if (target && (
@@ -2583,23 +2720,24 @@ let intermediate_combinations = [
           target.tagName === 'INPUT' || 
           target.tagName === 'TEXTAREA' || 
           target.tagName === 'BUTTON' ||
-          target.tagName === 'A')) { // Add support for anchor tags - APlasker
-        // Allow the event to proceed to HTML elements
-        console.log('Touch event allowed for modal element: ' + (target.tagName || 'unknown'));
+          target.tagName === 'A')) { // Add support for anchor tags
         
-        // Special handling for anchor tags - APlasker
-        if (target.tagName === 'A') {
-          console.log('Anchor tag detected, allowing default browser behavior');
+        // Special handling for Android links
+        if (touchSystem.isAndroid && target.tagName === 'A') {
+          console.log('Android link detected, using special handling');
           
-          // For maximum compatibility, add a small timeout before allowing the event
-          // This helps ensure the default browser behavior works properly
+          // For Android, we need to manually trigger the link
           setTimeout(() => {
-            // Attempt to programmatically click the link as a fallback (for older browsers)
-            target.click();
-          }, 10);
+            // Use a small timeout to ensure the touch event completes
+            window.open(target.href, target.target || '_self');
+          }, 50);
+          
+          return false; // Prevent default to avoid double-activation
         }
         
-        return true; // Allow default behavior for the browser
+        // Allow the event to proceed to HTML elements
+        console.log('Touch event allowed for modal element: ' + (target.tagName || 'unknown'));
+        return true;
       }
       
       return false;
@@ -2607,14 +2745,9 @@ let intermediate_combinations = [
     
     // Check if help modal was active but is now inactive,
     // ensure HTML elements are properly cleaned up
-    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && helpModal.htmlElements && helpModal.htmlElements.length > 0) {
+    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && 
+        helpModal.htmlElements && helpModal.htmlElements.length > 0) {
       helpModal.removeHTMLElements();
-    }
-    
-    // Update mouse coordinates to match touch position
-    if (touches.length > 0) {
-      mouseX = touches[0].x;
-      mouseY = touches[0].y;
     }
     
     // Call the mouse event handler
@@ -2626,12 +2759,26 @@ let intermediate_combinations = [
   
   // Add touch move support for mobile devices
   function touchMoved() {
+    // Use the touch system to get touch position
+    const touchPos = touchSystem.getCurrentTouchPos();
+    if (!touchPos && touches.length > 0) {
+      // Fall back to p5.js touch position if our system doesn't have data
+      touchX = touches[0].x;
+      touchY = touches[0].y;
+    } else if (touchPos) {
+      // Use our normalized touch position
+      touchX = touchPos.x;
+      touchY = touchPos.y;
+    } else {
+      return false; // No touch data available
+    }
+    
+    // Update mouse coordinates to match touch position
+    mouseX = touchX;
+    mouseY = touchY;
+    
     // Check if a modal is active - selectively allow interactions with modal elements
     if (modalActive) {
-      // Get touch coordinates
-      const touchX = touches.length > 0 ? touches[0].x : mouseX;
-      const touchY = touches.length > 0 ? touches[0].y : mouseY;
-      
       // Get the element being touched
       const target = document.elementFromPoint(touchX, touchY);
       
@@ -2648,10 +2795,6 @@ let intermediate_combinations = [
       return false;
     }
     
-    // Get the touch coordinates
-    const touchX = touches.length > 0 ? touches[0].x : mouseX;
-    const touchY = touches.length > 0 ? touches[0].y : mouseY;
-    
     // Prevent dragging during auto-combination sequence
     if (autoFinalCombination) {
       return false;
@@ -2662,7 +2805,7 @@ let intermediate_combinations = [
       draggedVessel.x = touchX - offsetX;
       draggedVessel.y = touchY - offsetY;
       
-      // Ensure vessel scale is maintained during dragging - APlasker
+      // Ensure vessel scale is maintained during dragging
       draggedVessel.targetScale = 1.05;
       
       // Update cursor style for feedback
@@ -3190,7 +3333,7 @@ let intermediate_combinations = [
         touchHandled = true;
       }
       
-      // Check if tutorial button was touched
+      // Check if tutorial button was touched - APlasker
       if (tutorialButton.isInside(touchX, touchY)) {
         startTutorial();
         touchHandled = true;
@@ -3236,7 +3379,7 @@ let intermediate_combinations = [
         return false;
       }
       
-      // Special handling for tutorial mode
+      // Special handling for tutorial mode - APlasker
       if (isTutorialMode) {
         console.log("Tutorial win screen touch detected");
         
@@ -3267,8 +3410,26 @@ let intermediate_combinations = [
           vessels = [];
           animations = [];
           
-          // Reload the page to get the default recipe
-          window.location.reload();
+          // Set loading state
+          isLoadingRecipe = true;
+          
+          // Load today's recipe and start the game
+          console.log("Loading today's recipe after tutorial (direct touch)");
+          loadRecipeData().then(() => {
+            // Reset auto-combination flags to ensure final animation works properly
+            autoFinalCombination = false;
+            autoFinalCombinationStarted = false;
+            autoFinalCombinationTimer = 0;
+            autoFinalCombinationState = "WAITING";
+            finalCombinationVessels = [];
+            
+            // Start the game automatically once recipe is loaded
+            startGame();
+          }).catch(error => {
+            console.error("Error loading today's recipe:", error);
+            isLoadingRecipe = false;
+            loadingError = true;
+          });
           
           touchHandled = true;
           return false;
@@ -3308,10 +3469,12 @@ let intermediate_combinations = [
           offsetX = touchX - v.x;
           offsetY = touchY - v.y;
           
-          // IMMEDIATELY expand text margin before scale animation starts
+          // IMMEDIATELY expand text margin before scale animation starts - APlasker
+          // This prevents visual glitching during the transition
           v.textMargin = 0.85;
           
-          // Set target scales for body and text
+          // Set target scales for body and text (this will happen gradually through update())
+          // Body scales to 105% while text only scales to 102.5% as per 20250413updates_final.txt
           v.targetBodyScale = 1.05;
           v.targetTextScale = 1.025;
           
@@ -3590,11 +3753,11 @@ let intermediate_combinations = [
         alert('Score copied to clipboard!');
       } else {
         console.error('Failed to copy score');
-        alert('Failed to copy score. Please try again.');
+        // Removed the manual copy alert message
       }
     } catch (err) {
       console.error('Error copying score:', err);
-      alert('Error copying score. Please try again.');
+      // Removed the manual copy alert message
     }
     
     // Clean up
@@ -3632,16 +3795,139 @@ let intermediate_combinations = [
     playAreaX = (windowWidth - playAreaWidth) / 2;
     playAreaY = (windowHeight - playAreaHeight) / 2;
     
-    // The actual game initialization will happen in initializeGame()
-    // after the recipe data is loaded
-    
     // Load recipe data from Supabase if not in playtest mode
     if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
       loadRecipeData();
+      // Note: initializeGame() will be called from within loadRecipeData() now
     } else {
       console.log("Playtest mode: waiting for date selection");
       isLoadingRecipe = false; // In playtest mode, we'll load the recipe after date selection
     }
+  }
+  
+  // Helper: Truncate text with ellipsis in the middle if too long for a given width
+  function fitTextWithMiddleEllipsis(text, maxWidth, fontSize, minFontSize = 10) {
+    textSize(fontSize);
+    if (textWidth(text) <= maxWidth) return text;
+
+    // Reduce font size if needed
+    let currentFontSize = fontSize;
+    while (textWidth(text) > maxWidth && currentFontSize > minFontSize) {
+      currentFontSize -= 1;
+      textSize(currentFontSize);
+    }
+    if (textWidth(text) <= maxWidth) return text;
+
+    // If still too long at min font size, use ellipsis in the middle
+    let left = 0;
+    let right = text.length - 1;
+    let result = text;
+    // Always keep at least 2 chars on each side
+    while (right - left > 4) {
+      const leftPart = text.slice(0, Math.ceil((left + right) / 2 / 2));
+      const rightPart = text.slice(text.length - Math.floor((right - left) / 2 / 2));
+      result = leftPart + '...' + rightPart;
+      if (textWidth(result) <= maxWidth) break;
+      // Remove one more char from each side
+      left++;
+      right--;
+    }
+    return result;
+  }
+  
+  // Helper: Split text into up to maxLines lines, each fitting maxWidth. Last line can be ellipsized if needed.
+  function splitTextToLinesWithEllipsis(text, maxWidth, maxLines, fontSize, minFontSize = 10) {
+    textSize(fontSize);
+    let words = text.split(' ');
+    let lines = [];
+    let currentLine = words[0] || '';
+
+    // Calculate average word width to determine optimal line breaks
+    let avgWordWidth = words.reduce((sum, word) => sum + textWidth(word), 0) / words.length;
+    let optimalCharsPerLine = Math.floor(maxWidth / (avgWordWidth / words[0].length));
+
+    // NEW: More balanced line breaking logic
+    let hasCompoundWord = words.some(word => word.length > 6); // Check for long words
+    let shouldForceTwoLines = text.length > optimalCharsPerLine * 0.7 || // Reduced from 0.8
+                             (hasCompoundWord && text.length > optimalCharsPerLine * 0.6); // Even lower threshold for compound words
+
+    // For very short text (less than 40% of optimal line length), always use one line
+    if (text.length < optimalCharsPerLine * 0.4) { // Reduced from 0.5
+        shouldForceTwoLines = false;
+    }
+
+    // NEW: Calculate font size based on width constraints only, not line count
+    let finalFontSize = fontSize;
+    textSize(finalFontSize);
+    
+    // Only reduce font size if single-line text is too wide
+    if (textWidth(text) > maxWidth) {
+        while (textWidth(text) > maxWidth && finalFontSize > minFontSize) {
+            finalFontSize--;
+            textSize(finalFontSize);
+        }
+    }
+    
+    // Use the final font size for all subsequent text operations
+    textSize(finalFontSize);
+
+    // NEW: Try to create more balanced lines
+    if (shouldForceTwoLines && words.length > 1) {
+        // Find the midpoint that creates the most balanced lines
+        let bestBreakIndex = 1;
+        let smallestDiff = Infinity;
+        
+        for (let i = 1; i < words.length; i++) {
+            let firstPart = words.slice(0, i).join(' ');
+            let secondPart = words.slice(i).join(' ');
+            let diff = Math.abs(textWidth(firstPart) - textWidth(secondPart));
+            
+            // Check if this split creates lines that fit
+            if (textWidth(firstPart) <= maxWidth && textWidth(secondPart) <= maxWidth && diff < smallestDiff) {
+                smallestDiff = diff;
+                bestBreakIndex = i;
+            }
+        }
+        
+        // Create the two lines using the best break point
+        lines = [
+            words.slice(0, bestBreakIndex).join(' '),
+            words.slice(bestBreakIndex).join(' ')
+        ];
+    } else {
+        // Regular line breaking logic for single line or when not forcing two lines
+        for (let i = 1; i < words.length; i++) {
+            let testLine = currentLine + ' ' + words[i];
+            let shouldBreak = textWidth(testLine) > maxWidth;
+
+            if (shouldBreak) {
+                lines.push(currentLine);
+                currentLine = words[i];
+                if (lines.length === maxLines - 1) {
+                    // Add remaining words to currentLine
+                    for (i++; i < words.length; i++) {
+                        currentLine += ' ' + words[i];
+                    }
+                    break;
+                }
+            } else {
+                currentLine = testLine;
+            }
+        }
+        lines.push(currentLine);
+    }
+
+    // If we have more lines than allowed, merge extras into last line
+    if (lines.length > maxLines) {
+        lines = lines.slice(0, maxLines - 1).concat([lines.slice(maxLines - 1).join(' ')]);
+    }
+
+    // If last line is too long, use ellipsis
+    if (lines.length === maxLines && textWidth(lines[maxLines - 1]) > maxWidth) {
+        lines[maxLines - 1] = fitTextWithMiddleEllipsis(lines[maxLines - 1], maxWidth, finalFontSize, minFontSize);
+    }
+
+    return lines;
   }
   
   

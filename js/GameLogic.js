@@ -437,17 +437,163 @@ function combineVessels(v1, v2) {
       if ((v1.name || v1.complete_combinations.length > 0) && v1.ingredients.length === 0) {
         comboVessel = v1;
         ingredientVessel = v2;
-          } else {
+      } else {
         comboVessel = v2;
         ingredientVessel = v1;
       }
       
       console.log("Mix and match case - comboVessel:", comboVessel.name || "unnamed", "ingredientVessel:", ingredientVessel.name || "unnamed");
       
-      // This combination is not allowed - return null
-      console.log("Cannot combine a completed combo with ingredients.");
+      // APlasker - Enhanced fix to allow combining a completed combo with ingredients based on recipes
+      // Get combo information
+      let comboName = comboVessel.name;
+      let ingredients = ingredientVessel.ingredients;
+      
+      // If we don't have a valid combo name or ingredients, return null
+      if (!comboName || ingredients.length === 0) {
+        console.log("Invalid combination of combo vessel and ingredients");
         return null;
       }
+      
+      console.log(`Checking if ${comboName} can combine with ingredients: ${ingredients.join(', ')}`);
+      
+      // Find the combo object for the combo vessel to get its combo_id
+      const comboObj = intermediate_combinations.find(c => c.name === comboName);
+      if (!comboObj) {
+        console.log(`Could not find combo information for ${comboName}`);
+        return null;
+      }
+      
+      console.log(`Found combo object for ${comboName} with combo_id: ${comboObj.combo_id || 'undefined'}`);
+      
+      // Search for recipes that have this combo as a parent
+      let matchingRecipes = intermediate_combinations.filter(recipe => {
+        // First check: the recipe should have the combo as its parent
+        if (comboObj.combo_id && recipe.parent_combo !== comboObj.combo_id) {
+          return false;
+        }
+        
+        // Second check: the recipe should require the ingredients
+        for (let ing of ingredients) {
+          if (!recipe.required.includes(ing)) {
+            return false;
+          }
+        }
+        
+        // Also ensure the recipe requires the parent combo itself
+        if (!recipe.required.includes(comboName)) {
+          return false;
+        }
+        
+        // Calculate the total number of items required in addition to the combo
+        const requiredIngredients = recipe.required.filter(item => item !== comboName);
+        
+        // For a valid match, all required ingredients should be in our ingredient vessel
+        // and the count should match (we shouldn't have extra ingredients)
+        return requiredIngredients.length === ingredients.length && 
+               requiredIngredients.every(req => ingredients.includes(req));
+      });
+      
+      // If we found matches through parent-child relationship
+      if (matchingRecipes.length > 0) {
+        // Sort matches by number of required ingredients (most specific first)
+        matchingRecipes.sort((a, b) => b.required.length - a.required.length);
+        
+        const bestMatch = matchingRecipes[0];
+        console.log(`Found matching recipe: ${bestMatch.name} with parent combo: ${comboName}`);
+        
+        // Calculate appropriate vessel dimensions based on play area size
+        const vesselWidth = Math.max(playAreaWidth * 0.25, 150);
+        const vesselHeight = vesselWidth * 0.5;
+        
+        // Create a new vessel
+        let new_v = new Vessel([], [], bestMatch.name, 'yellow', (comboVessel.x + ingredientVessel.x) / 2, (comboVessel.y + ingredientVessel.y) / 2, vesselWidth, vesselHeight);
+        new_v.isAdvanced = true;
+        
+        // Set vessel properties
+        new_v.color = getNextCompletedVesselColor(bestMatch.name);
+        new_v.verb = bestMatch.verb || "Mix";
+        new_v.verbDisplayTime = 120;
+        
+        // Add to completedGreenVessels
+        if (!completedGreenVessels.some(vessel => vessel.name === bestMatch.name)) {
+          completedGreenVessels.push({name: bestMatch.name});
+        }
+        
+        // Show success message
+        if (typeof Byline !== 'undefined' && Byline.showSuccessMessage) {
+          Byline.showSuccessMessage();
+        } else if (typeof window.Byline !== 'undefined' && window.Byline.showSuccessMessage) {
+          window.Byline.showSuccessMessage();
+        }
+        
+        // Update collected ingredients tracking
+        for (let combo of intermediate_combinations.concat([final_combination])) {
+          if (combo.required.includes(new_v.name) && combo.collectedIngredients) {
+            combo.collectedIngredients.push(new_v.name);
+            console.log(`Added ${new_v.name} to ${combo.name}'s collected ingredients: ${combo.collectedIngredients.length}/${combo.required.length}`);
+          }
+        }
+        
+        console.log(`Created colored vessel: ${new_v.name}`);
+        return new_v;
+      } else {
+        // If no parent-child match found, try a simpler recipe match as fallback
+        matchingRecipes = intermediate_combinations.filter(recipe => {
+          // Check if recipe requires both the combo and all the ingredients
+          return recipe.required.includes(comboName) &&
+                 ingredients.every(ing => recipe.required.includes(ing));
+        });
+        
+        if (matchingRecipes.length > 0) {
+          console.log(`Found fallback recipe match for ${comboName} with ingredients`);
+          
+          // Sort matches by number of required ingredients (most specific first)
+          matchingRecipes.sort((a, b) => b.required.length - a.required.length);
+          
+          const bestMatch = matchingRecipes[0];
+          
+          // Calculate appropriate vessel dimensions based on play area size
+          const vesselWidth = Math.max(playAreaWidth * 0.25, 150);
+          const vesselHeight = vesselWidth * 0.5;
+          
+          // Create a new vessel
+          let new_v = new Vessel([], [], bestMatch.name, 'yellow', (comboVessel.x + ingredientVessel.x) / 2, (comboVessel.y + ingredientVessel.y) / 2, vesselWidth, vesselHeight);
+          new_v.isAdvanced = true;
+          
+          // Set vessel properties
+          new_v.color = getNextCompletedVesselColor(bestMatch.name);
+          new_v.verb = bestMatch.verb || "Mix";
+          new_v.verbDisplayTime = 120;
+          
+          // Add to completedGreenVessels
+          if (!completedGreenVessels.some(vessel => vessel.name === bestMatch.name)) {
+            completedGreenVessels.push({name: bestMatch.name});
+          }
+          
+          // Show success message
+          if (typeof Byline !== 'undefined' && Byline.showSuccessMessage) {
+            Byline.showSuccessMessage();
+          } else if (typeof window.Byline !== 'undefined' && window.Byline.showSuccessMessage) {
+            window.Byline.showSuccessMessage();
+          }
+          
+          // Update collected ingredients tracking
+          for (let combo of intermediate_combinations.concat([final_combination])) {
+            if (combo.required.includes(new_v.name) && combo.collectedIngredients) {
+              combo.collectedIngredients.push(new_v.name);
+              console.log(`Added ${new_v.name} to ${combo.name}'s collected ingredients: ${combo.collectedIngredients.length}/${combo.required.length}`);
+            }
+          }
+          
+          console.log(`Created colored vessel: ${new_v.name}`);
+          return new_v;
+        } else {
+          console.log(`No recipe found that combines ${comboName} with these ingredients`);
+          return null;
+        }
+      }
+    }
   }
   
   // Global variables for hinted combo animation
@@ -819,10 +965,29 @@ function combineVessels(v1, v2) {
     const relativeDropY = Math.max(0, dropY - startY);
     const dropRowIndex = Math.floor(relativeDropY / rowHeight);
     
+    // Add detailed debugging for row calculation
+    console.log("=== ROW CALCULATION DETAILS ===");
+    console.log("startY =", startY);
+    console.log("dropY =", dropY);
+    console.log("relativeDropY =", relativeDropY);
+    console.log("rowHeight =", rowHeight);
+    console.log("calculated rowIndex =", dropRowIndex);
+    console.log("vessel.isNewlyCombined =", !!newVessel.isNewlyCombined);
+    
     // Set preferred row, clamping to a reasonable range
     // We estimate the maximum number of rows based on vessel count
     const maxRows = Math.ceil(vessels.length / 3); // At most 3 basic vessels per row
-    newVessel.preferredRow = Math.min(dropRowIndex, maxRows);
+    
+    // Check if this is a newly combined vessel to apply correction
+    if (newVessel.isNewlyCombined) {
+      console.log("APPLYING ROW CORRECTION FOR NEWLY COMBINED VESSEL");
+      // Apply +1 correction to fix the "one row above" issue
+      newVessel.preferredRow = Math.min(dropRowIndex + 1, maxRows);
+    } else {
+      newVessel.preferredRow = Math.min(dropRowIndex, maxRows);
+    }
+    
+    console.log("final assigned row =", newVessel.preferredRow);
     
     // Determine preferred column based on drop X position
     // First calculate the potential column positions in a typical 3-column row

@@ -228,14 +228,33 @@ function drawWinMoveHistory(x, y, width, height) {
     // --- CALCULATE RESPONSIVE SIZING BASED ON AVAILABLE SPACE - APlasker ---
     // Use playAreaWidth to calculate responsive sizes
     
-    // Calculate card dimensions (updated height)
+    // Calculate card dimensions with responsive layout
     const cardPadding = Math.max(playAreaWidth * 0.03, 15); // Padding inside card (3% of play area width, min 15px)
-    const cardWidth = Math.max(playAreaWidth * 0.95, 200); // 95% of play area width, min 200px
+    const minCardWidth = 180; // Minimum width for recipe card
+    const hintButtonWidthPercent = 0.25; // 25% of play area for hint button
+    const gutterPercent = 0.05; // 5% gutter
+    
+    // Calculate available width for recipe card (remaining space after hint button and gutter)
+    const standardCardWidth = playAreaWidth * (1 - hintButtonWidthPercent - gutterPercent); // Use remaining space
+    const isNarrowScreen = standardCardWidth < minCardWidth;
+    
+    // Set card width based on screen size
+    const cardWidth = isNarrowScreen ? 
+        Math.max(playAreaWidth * 0.95, minCardWidth) : // Narrow screen: 95% width
+        standardCardWidth; // Normal screen: use remaining space
+    
     const cardHeight = playAreaHeight * 0.23; // 23% of play area height
     
-    // Position card (centered horizontally and at 89% from top vertically)
-    const cardX = centerX;
+    // Position card (adjusted horizontally for side-by-side layout)
+    const cardX = isNarrowScreen ?
+        centerX : // Centered on narrow screens
+        playAreaX + (cardWidth / 2); // Align to left edge of play area
     const cardY = counterY;
+    
+    // Calculate margins for text (reduced to 3% for more text space)
+    const textMarginPercent = 0.03; // 3% margin instead of 4%
+    const textLeftMargin = cardX - cardWidth/2 + (cardWidth * textMarginPercent);
+    const textRightMargin = cardX + cardWidth/2 - (cardWidth * textMarginPercent);
     
     // --- DRAW RECIPE CARD BACKGROUND ---
     // Draw card drop shadow
@@ -256,8 +275,8 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // Draw flowers in each corner
     drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary); // Top-left
-    drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.secondary); // Top-right
-    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left - Changed from tertiary to peach - APlasker
+    drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.peach); // Top-right (was COLORS.secondary)
+    drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach); // Bottom-left
     drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary); // Bottom-right
     
     // Create an array of combo information objects with ingredient counts
@@ -265,30 +284,51 @@ function drawWinMoveHistory(x, y, width, height) {
     
     // --- MOVE HINT BUTTON TO NEW POSITION ON TOP OF RECIPE CARD AND CHANGE TO CIRCLE ---
     if (hintButton) {
-      // Calculate circular hint button size - 66% of the recipe card height
-      const hintButtonDiameter = cardHeight * 0.66 * 0.8; // Reduced to 80% of original size
+      // Calculate hint button dimensions based on screen size
+      const hintButtonHeight = cardHeight; // Match recipe card height
+      const hintButtonWidth = isNarrowScreen ?
+          cardWidth : // Full width in narrow screen mode
+          playAreaWidth * 0.25; // 25% of play area width in side-by-side mode
       
-      // Position hint button on top of the recipe card
-      // Positioned 55% from the top edge and 82% from the left edge of the card (moved 2% right)
-      const newHintButtonX = cardX - cardWidth/2 + (cardWidth * 0.82); // 82% from the left edge of the card (moved from 80%)
-      const newHintButtonY = cardY - cardHeight/2 + (cardHeight * 0.55); // 55% from the top edge of the card
+      // Position hint button based on layout
+      const newHintButtonX = isNarrowScreen ?
+          cardX : // Centered in narrow screen mode
+          cardX + (cardWidth/2) + (playAreaWidth * 0.05) + (hintButtonWidth/2); // Side-by-side with 5% gutter
+      
+      const newHintButtonY = isNarrowScreen ?
+          cardY + cardHeight + 10 : // Below card with 10px gap in narrow mode
+          cardY; // Aligned with card in side-by-side mode
       
       // Update hint button position
       hintButton.x = newHintButtonX;
       hintButton.y = newHintButtonY;
     
-      // Update hint button size and shape
-      hintButton.w = hintButtonDiameter;
-      hintButton.h = hintButtonDiameter;
-      // Set isCircular flag to true for circle shape
-      hintButton.isCircular = true;
+      // Update hint button size
+      hintButton.w = hintButtonWidth;
+      hintButton.h = hintButtonHeight;
+      // Ensure hint button remains a rounded rectangle
+      hintButton.isCircular = false;
       
-      // Change hint button color to match Cook! button (pink) and text to white
-      hintButton.color = COLORS.secondary;
+      // Set fixed corner radius of 12px
+      hintButton.customCornerRadius = 12;
+      
+      // Use green color to match Cook button
+      hintButton.color = COLORS.primary;
       hintButton.textColor = 'white';
       
-      // Reduce hint text size to 50% of current size
-      hintButton.textSizeMultiplier = 0.5;
+      // Calculate text size for new button dimensions
+      const verticalMargin = hintButtonHeight * 0.25; // 25% vertical margin for taller button
+      const horizontalMargin = hintButtonWidth * 0.2; // 20% horizontal margin
+      const availableHeight = hintButtonHeight - (verticalMargin * 2);
+      const availableWidth = hintButtonWidth - (horizontalMargin * 2);
+      
+      // Set text size based on both width and height constraints
+      textSize(availableHeight * 0.2); // Start with 20% of available height for larger button
+      const widthBasedSize = (availableWidth / textWidth("Hint")) * (availableHeight * 0.2);
+      const finalTextSize = Math.min(availableHeight * 0.2, widthBasedSize);
+      
+      // Convert to multiplier based on button height
+      hintButton.textSizeMultiplier = finalTextSize / (hintButtonHeight * 0.3);
       
       // Update global hintButtonY variable for other references
       hintButtonY = newHintButtonY;
@@ -298,6 +338,7 @@ function drawWinMoveHistory(x, y, width, height) {
       // Update hint button styling
       hintButton.borderColor = null; // Use default subtle border like Cook! button
       hintButton.textBold = true;
+
     }
     
     // Add intermediate combinations
@@ -505,72 +546,65 @@ function drawWinMoveHistory(x, y, width, height) {
     const totalLines = comboInfo.length + 1; // +1 for the "Recipe" header
     const lineHeight = Math.max(availableHeight / totalLines, 20); // Minimum line height of 20px
     
+    // Calculate the total available width for text
+    const totalAvailableWidth = textRightMargin - textLeftMargin;
+    
     // Default font size based on line height
     const defaultFontSize = Math.min(lineHeight * 0.4, 14);
     
-    // --- CALCULATE SMALLEST NECESSARY FONT SIZE FOR ALL POSSIBLE COMBOS ---
     // Only calculate this once during the game session
     if (recipeCardFontSize === null) {
-      console.log("Calculating smallest necessary font size for all possible combinations");
-      
-      // Start with the default font size
-      let smallestFontSize = defaultFontSize;
-      const maxTextWidth = cardWidth * 0.58; // Changed from 0.60 to 0.58
-      
-      // Check all possible combinations, but exclude the final combination
-      // since it won't be revealed in the recipe card during gameplay
-      const allPossibleCombos = [...intermediate_combinations];
-      
-      // First pass: Check all possible combinations with their maximum possible text length
-      for (let combo of allPossibleCombos) {
-        // Find the verb
-        let verb = combo.verb || "Mix"; // Use combo's verb or default to "Mix"
-        let name = combo.name;
+        console.log("Calculating smallest necessary font size for combinations");
         
-        // Format with the longest possible text (verb + the + name + max progress)
-        const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
+        // Start with the default font size
+        let smallestFontSize = defaultFontSize;
+        const maxTextWidth = totalAvailableWidth; // Use full width between margins
         
-        // Create text in the format with the progress counter (largest possible format)
-        const fullText = `${capitalizedVerb} the ${name} (${combo.required.length})`;
+        // Check intermediate combinations only
+        const allPossibleCombos = [...intermediate_combinations];
         
-        // Set the font size for measurement
-        textSize(defaultFontSize);
+        // Calculate scaling factor based on total number of steps
+        const totalSteps = intermediate_combinations.length + 1; // +1 for final combo
+        const scalingFactor = totalSteps <= 3 ? 0.8 : 1.0; // 20% reduction for small recipes
         
-        // Check if this text would be too long with default font size
-        if (textWidth(fullText) > maxTextWidth) {
-          // First try 90% of default font size
-          textSize(Math.max(defaultFontSize * 0.9, 8));
-          // Check if text fits at 90% size
-          if (textWidth(fullText) > maxTextWidth) {
-            // If still too long, reduce to 80% of default
-            const reducedFontSize = Math.max(defaultFontSize * 0.8, 8);
+        // First pass: Check all combinations with their maximum possible text length
+        for (let combo of allPossibleCombos) {
+            // Find the verb
+            let verb = combo.verb || "Mix"; // Use combo's verb or default to "Mix"
+            let name = combo.name;
             
-            // Update smallest font size if this is smaller
-            if (reducedFontSize < smallestFontSize) {
-              smallestFontSize = reducedFontSize;
-            }
-          } else {
-            // 90% size is sufficient
-            const reducedFontSize = Math.max(defaultFontSize * 0.9, 8);
+            // Format with standard text (verb + the + name)
+            const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
+            const fullText = `Step 1: ${capitalizedVerb} the ${name}`; // Include step prefix in calculation
             
-            // Update smallest font size if this is smaller
-            if (reducedFontSize < smallestFontSize) {
-              smallestFontSize = reducedFontSize;
+            // Set the font size for measurement
+            const adjustedFontSize = defaultFontSize * scalingFactor;
+            textSize(adjustedFontSize);
+            
+            // Check if this text would be too long with default font size
+            if (textWidth(fullText) > maxTextWidth) {
+                // Try 90% of default font size
+                const ninetyPercentSize = Math.max(adjustedFontSize * 0.9, 8);
+                textSize(ninetyPercentSize);
+                
+                if (textWidth(fullText) > maxTextWidth) {
+                    // If still too long, try 80%
+                    const eightyPercentSize = Math.max(adjustedFontSize * 0.8, 8);
+                    smallestFontSize = Math.min(smallestFontSize, eightyPercentSize);
+                } else {
+                    // 90% works
+                    smallestFontSize = Math.min(smallestFontSize, ninetyPercentSize);
+                }
             }
-          }
         }
-      }
-      
-      // Store the calculated smallest font size for the entire game session
-      recipeCardFontSize = smallestFontSize;
-      console.log(`Smallest necessary font size for all combinations: ${recipeCardFontSize}px`);
+        
+        // Store the calculated smallest font size
+        recipeCardFontSize = smallestFontSize;
+        console.log(`Smallest necessary font size for all combinations: ${recipeCardFontSize}px`);
     }
     
     // Calculate starting Y position (top margin + half line height for vertical centering)
     const startY = cardY - cardHeight/2 + verticalMargin + lineHeight/2;
-    
-    // Calculate left margin for text (6% from left edge of card)
-    const textLeftMargin = cardX - cardWidth/2 + (cardWidth * 0.06); // Changed from 0.1 to 0.06
     
     // --- RESET ALL TEXT PROPERTIES FOR CONSISTENCY - APlasker ---
     textFont(bodyFont);
@@ -581,7 +615,7 @@ function drawWinMoveHistory(x, y, width, height) {
     fill('black');
     noStroke();
     textAlign(CENTER, CENTER); // Center alignment for title
-    textSize(Math.min(lineHeight * 0.6, 18) - 2); // Text size scaled to line height, max 18px, reduced by 2px
+    textSize(Math.min(lineHeight * 0.4, 14)); // Reduced to match hint button text size
     textStyle(BOLD);
     text("Recipe", cardX, startY); // Position at card center for centered text
     
@@ -633,24 +667,29 @@ function drawWinMoveHistory(x, y, width, height) {
         const capitalizedVerb = verb.charAt(0).toUpperCase() + verb.slice(1);
         comboText = `${capitalizedVerb} the ${name}`;
         
-        // Check if text is too long and needs truncation with the smallest font size
-        const maxTextWidth = cardWidth * 0.58; // Changed from 0.60 to 0.58
+        // Calculate the actual available width (accounting for step prefix)
+        const stepPrefixWidth = textWidth(stepPrefixes[i]);
+        const actualAvailableWidth = textRightMargin - textLeftMargin - stepPrefixWidth;
         
-        if (textWidth(comboText) > maxTextWidth) {
-          // Text is too long, remove "the" instead of using ellipsis
-          comboText = `${capitalizedVerb} ${name}`;
+        // Check if text needs truncation
+        if (textWidth(comboText) > actualAvailableWidth) {
+          // First try: Keep everything but remove "the"
+          const withoutThe = `${capitalizedVerb} ${name}`;
           
-          // If it's still too long, then truncate the name
-          if (textWidth(comboText) > maxTextWidth) {
-            // Calculate how many characters we can fit
-            let charIndex = 0;
+          if (textWidth(withoutThe) <= actualAvailableWidth) {
+            // Success! Use this version
+            comboText = withoutThe;
+          } else {
+            // Still too long, we need to truncate
+            let charIndex = name.length;
+            const verbPlusSpace = `${capitalizedVerb} `;
             
-            while (textWidth(`${capitalizedVerb} ${name.slice(0, charIndex)}`) < maxTextWidth && charIndex < name.length) {
-              charIndex++;
+            // Start from the full name and work backwards
+            while (charIndex > 0 && textWidth(verbPlusSpace + name.slice(0, charIndex)) > actualAvailableWidth) {
+              charIndex--;
             }
             
-            // Go back one character to ensure we're under the limit
-            charIndex = Math.max(0, charIndex - 1);
+            // Use the truncated version
             comboText = `${capitalizedVerb} ${name.slice(0, charIndex)}`;
           }
         }
@@ -689,27 +728,29 @@ function drawWinMoveHistory(x, y, width, height) {
         // Prepare the full text (what it will be when the animation completes)
         const fullText = `${capitalizedVerb} the ${name} ${progressText}`;
         
-        // We already know the smallest font size, so just check for truncation
-        const maxTextWidth = cardWidth * 0.58; // Changed from 0.60 to 0.58
+        // Calculate available width (using full width minus step prefix)
+        const stepPrefixWidth = textWidth(stepPrefixes[i]);
+        const maxTextWidth = totalAvailableWidth - stepPrefixWidth;
         let truncatedText = fullText;
         
         if (textWidth(fullText) > maxTextWidth) {
-          // First try removing "the" instead of using ellipsis
-          truncatedText = `${capitalizedVerb} ${name} ${progressText}`;
-          
-          // If still too long, truncate the name
-          if (textWidth(truncatedText) > maxTextWidth) {
-            // Calculate how many characters of the name we can show
-            let charIndex = 0;
+            // First try removing "the" instead of using ellipsis
+            truncatedText = `${capitalizedVerb} ${name} ${progressText}`;
             
-            while (textWidth(`${capitalizedVerb} ${name.slice(0, charIndex)} ${progressText}`) < maxTextWidth && charIndex < name.length) {
-              charIndex++;
+            // If still too long, truncate the name
+            if (textWidth(truncatedText) > maxTextWidth) {
+                // Calculate how many characters of the name we can show
+                let charIndex = name.length;
+                const verbPlusSpace = `${capitalizedVerb} `;
+                
+                // Start from the end and remove characters until it fits
+                while (charIndex > 0 && 
+                       textWidth(`${verbPlusSpace}${name.slice(0, charIndex)} ${progressText}`) > maxTextWidth) {
+                    charIndex--;
+                }
+                
+                truncatedText = `${capitalizedVerb} ${name.slice(0, charIndex)} ${progressText}`;
             }
-            
-            // Go back one character to ensure we're under the limit
-            charIndex = Math.max(0, charIndex - 1);
-            truncatedText = `${capitalizedVerb} ${name.slice(0, charIndex)} ${progressText}`;
-          }
         }
         
         // Check if this combo should be animated
@@ -948,11 +989,11 @@ function drawWinMoveHistory(x, y, width, height) {
     const circleSize = Math.min(Math.max(width * 0.015, 13.5), 16.5); // 75% of original values
     
     // Update element spacing to match requested specs - APlasker
-    // Reduced to 75% of original size
-    const elementSpacing = Math.min(Math.max(width * 0.0075, 3.75), 7.5); // 75% of original values
+    // Reduced to 75% of original size, then increased by 30% for better spacing
+    const elementSpacing = Math.min(Math.max(width * 0.0075, 3.75), 7.5) * 1.3; // 75% of original values, increased by 30%
     
-    // Double the spacing between text and first counter
-    const textToFirstCounterSpacing = elementSpacing * 2;
+    // Double the spacing between text and first counter, then increase by 30%
+    const textToFirstCounterSpacing = elementSpacing * 2 * 1.3; // Doubled spacing increased by 30%
     
     // Calculate the total width of all elements with consistent spacing
     const totalWidth = (circleSize * totalErrorSlots) + (elementSpacing * (totalErrorSlots - 1)) + textToFirstCounterSpacing;
@@ -1793,12 +1834,18 @@ function drawWinMoveHistory(x, y, width, height) {
     startButton.w = cookButtonWidth;
     startButton.h = buttonHeight;
     
+    // Set fixed corner radius of 12px
+    startButton.customCornerRadius = 12;
+    
     // Position First Time button to the left of the Cook button with appropriate spacing
     // Calculate position based on Cook button position and sizes
     tutorialButton.x = startButton.x - (cookButtonWidth/2) - (tutorialButtonWidth/2) - 20; // 20px gap between buttons
     tutorialButton.y = startButton.y; // Same vertical position
     tutorialButton.w = tutorialButtonWidth;
     tutorialButton.h = buttonHeight;
+    
+    // Set fixed corner radius of 12px
+    tutorialButton.customCornerRadius = 12;
     
     // Ensure text is stacked for tutorial button
     tutorialButton.label = "First\nTime?";
@@ -1820,8 +1867,8 @@ function drawWinMoveHistory(x, y, width, height) {
     textSize(versionTextSize);
     fill(100); // Gray color for version text
 
-    // Update version to reflect button positioning fix
-    const versionText = "v20250516.1111 - APlasker";
+    // Update version to reflect font size improvements
+    const versionText = "v20250519.1200 - APlasker";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
@@ -1911,11 +1958,8 @@ function drawWinMoveHistory(x, y, width, height) {
       const startX = vessel ? vessel.x : playAreaX + playAreaWidth/2;
       const startY = vessel ? vessel.y : playAreaY + playAreaHeight/2;
       
-      // Transform verb to uppercase and add exclamation mark before calling parent constructor
-      const transformedVerb = verb.toUpperCase() + "!";
-      
-      // Call parent constructor with vessel reference
-      super(transformedVerb, startX, startY, vessel);
+      // Call parent constructor with vessel reference, only uppercase (exclamation point added in VerbAnimation)
+      super(verb.toUpperCase(), startX, startY, vessel);
       
       // Override properties for more dramatic effect
       this.maxSize = playAreaWidth; // Limit to exact play area width (was playAreaWidth * 1.2)

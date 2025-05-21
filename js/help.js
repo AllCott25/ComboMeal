@@ -135,8 +135,8 @@ function showHelpModal() {
       const vesselConfig = [
         { name: "Carrots", color: "vesselBase", text: "Drag & drop one ingredient on to another to combine them! Which ingredients go together?" },
         { name: "Carrots + Flour + Eggs", color: "yellow", text: "Complete each recipe step by combining everything needed. What else can you add?" },
-        { name: "Carrot Sheet Cake", color: "#cfc23f", text: "The combo transforms when all the step's ingredients are added. Keep combining correctly until you have one final dish." },
-        { type: "hintButton", text: "Check the recipe card and use Hints to help you figure out what to make next." },
+        { name: "Carrot Sheet Cake", color: "#cfc23f", text: "Each step in the recipe its own combo. Add all the correct ingredients together to turn them into a combo!" },
+        { type: "hintButton", text: "Keep an eye on the recipe card's question marks and highlights to clue in on what to combine. Or use the Hint button!" },
         { type: "star", text: "Combine everything together with as few mistakes as possible to make the grade!" }
       ];
       
