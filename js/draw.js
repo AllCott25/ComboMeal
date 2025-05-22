@@ -1153,10 +1153,8 @@ let firstInactivityMessageShown = false;
     const flowersNeeded = Math.ceil(width / flowerSpacing) + 2; // Add extra to ensure coverage
     
     // Calculate y positions for top and bottom rows
-    // Add extra offset for mobile status bar/notch area
-    const mobileOffset = windowWidth <= 480 ? smallerPetalSize * 4 : 0; // Doubled the offset for mobile devices
-    // Position flowers to just barely show full pattern at top, plus mobile offset
-    const topY = smallerPetalSize * 2.75 + mobileOffset;
+    // Position flowers using percentage of viewport height for better consistency across devices
+    const topY = height * 0.06; // 6% from top of viewport - should clear iPhone status bar
     // Position flowers at the very bottom with just enough space to not be cut off
     const bottomY = windowHeight - (smallerPetalSize * 1.5);
     
@@ -1884,7 +1882,7 @@ let firstInactivityMessageShown = false;
     fill(100); // Gray color for version text
 
     // Update version to reflect font size improvements
-    const versionText = "v20250519.1200 - APlasker";
+    const versionText = "v0.7 - AP";
 
     // Center the version text at the bottom of the play area
     text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
