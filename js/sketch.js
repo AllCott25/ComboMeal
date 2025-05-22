@@ -151,7 +151,7 @@ let intermediate_combinations = [
   
   // Color palette
   const COLORS = {
-    background: '#f2f2f7',    // iOS system background color
+    background: '#f8f5f2',    // New unified background color
     primary: '#9a9832',       // Changed from avocado green to olive green - APlasker
     secondary: '#cf6d88',     // Changed from burnt orange to bright yellow - APlasker
     tertiary: '#FFFFFF',      // White (previously changed from mustard yellow)

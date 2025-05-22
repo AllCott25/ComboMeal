@@ -1154,7 +1154,7 @@ let firstInactivityMessageShown = false;
     
     // Calculate y positions for top and bottom rows
     // Add extra offset for mobile status bar/notch area
-    const mobileOffset = windowWidth <= 480 ? smallerPetalSize * 2 : 0; // Extra offset for mobile devices
+    const mobileOffset = windowWidth <= 480 ? smallerPetalSize * 4 : 0; // Doubled the offset for mobile devices
     // Position flowers to just barely show full pattern at top, plus mobile offset
     const topY = smallerPetalSize * 2.75 + mobileOffset;
     // Position flowers at the very bottom with just enough space to not be cut off
