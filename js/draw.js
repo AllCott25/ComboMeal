@@ -1154,9 +1154,8 @@ let firstInactivityMessageShown = false;
     
     // Calculate y positions for top and bottom rows
     // Position flowers using percentage of viewport height for better consistency across devices
-    const topY = windowHeight * 0.08; // 8% from top of viewport for better iPhone visibility
-    // Position flowers at the very bottom with just enough space to not be cut off
-    const bottomY = windowHeight - (smallerPetalSize * 1.5);
+    const topY = smallerPetalSize * 1.9; // Just enough space from the top edge
+    const bottomY = windowHeight - (smallerPetalSize * 1.5); // Just enough space from the bottom edge
     
     // Draw on the top edge of the screen
     // Start from center and work outward
