@@ -1154,7 +1154,7 @@ let firstInactivityMessageShown = false;
     
     // Calculate y positions for top and bottom rows
     // Position flowers using percentage of viewport height for better consistency across devices
-    const topY = height * 0.06; // 6% from top of viewport - should clear iPhone status bar
+    const topY = windowHeight * 0.08; // 8% from top of viewport for better iPhone visibility
     // Position flowers at the very bottom with just enough space to not be cut off
     const bottomY = windowHeight - (smallerPetalSize * 1.5);
     
