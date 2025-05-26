@@ -1514,9 +1514,14 @@ function shareScore() {
     }
     
     // Create the share text in the requested format:
-    // COMBO MEAL 🍴 Recipe ### 🍴 MM/DD/YY
-    // Score: [Letter with Circles on either side] 🍴Hints: # 🍴[Timer ##:##]
-    let shareText = `COMBO MEAL ${mainEmoji} Recipe ${recipeNumber} ${mainEmoji} ${formattedDate}\nScore: ${gradeEmojis} ${mainEmoji}Hints: ${hintCount} ${mainEmoji}${timeValue}`;
+    // COMBO MEAL 🍴 
+    // Recipe ### 🍴 MM/DD/YY
+    // 🌟A🌟 🍴 ##:## 🍴 # Hints
+    
+    // Handle hints text
+    const hintsText = hintCount === 0 ? "No Hints" : `${hintCount} Hints`;
+    
+    let shareText = `COMBO MEAL ${mainEmoji}\nRecipe ${recipeNumber} ${mainEmoji} ${formattedDate}\n${gradeEmojis} ${mainEmoji} ${timeValue} ${mainEmoji} ${hintsText}`;
     
     const shareUrl = "https://allcott25.github.io/ComboMeal/";
     

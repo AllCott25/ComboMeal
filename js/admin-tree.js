@@ -37,7 +37,7 @@ const messageArea = document.getElementById('message-area');
 const recipeContainer = document.getElementById('recipe-container');
 
 // Character limit constants
-const DESCRIPTION_MAX_LENGTH = 120;
+const DESCRIPTION_MAX_LENGTH = 200;
 
 // Current recipe data
 let currentRecipe = null;
