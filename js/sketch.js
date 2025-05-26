@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v20250516.1654
+ * Culinary Logic Puzzle v20250525.2237
  * Created by APlasker
- * Last Updated: May 16, 2025 (16:54 EDT) by APlasker
+ * Last Updated: May 25, 2025 (22:37 EDT - PRESERVED FINAL COMBINATION SEQUENCE) by APlasker - NESTED COMBINATIONS SUPPORT
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -122,6 +122,7 @@ let intermediate_combinations = [
   
   // Global variables
   let gameWon = false;
+  let gameStarted = false; // Missing variable declaration - APlasker
   let turnCounter = 0;
   let animations = []; // Array to store active animations
   let titleFont, bodyFont, buttonFont;
@@ -993,33 +994,58 @@ let intermediate_combinations = [
       const defaultH = this.h;
       const textAreaW = defaultW * 0.75; // 75% of vessel width
       const maxLines = 3;
-      let fontSize = Math.max(windowHeight * 0.018, 10); // Start with default
+      
+      // Start with a base font size
+      let fontSize = Math.max(windowHeight * 0.017, 10); // Slightly smaller base size for better fit
       textSize(fontSize);
       textStyle(BOLD);
       let displayText = this.getDisplayText();
 
-      // First try splitting the text to see how many lines we need
-      let lines = splitTextToLinesWithEllipsis(displayText, textAreaW, maxLines, fontSize, 10);
+      // Use simpler line breaking logic for more consistent results
+      let lines = this.splitTextSimple(displayText, textAreaW);
       
-      // Now that we know the number of lines, calculate the text area height
-      const textAreaH = defaultH * (lines.length > 1 ? 0.4 : 0.25); // 40% height for multi-line, 25% for single line
-      let totalHeight = lines.length * fontSize * 1.1;
-
-      // Only reduce font size if total height exceeds available height
-      if (totalHeight > textAreaH) {
-        // Calculate the minimum font size needed to fit the height
-        const minNeededFontSize = Math.floor((textAreaH / (lines.length * 1.1)));
-        fontSize = Math.max(minNeededFontSize, 10);
+      // Limit to max lines
+      if (lines.length > maxLines) {
+        // If we have too many lines, try to fit text on fewer lines with smaller font
+        fontSize = Math.max(fontSize * 0.85, 10);
         textSize(fontSize);
-        // Try splitting again with new font size
-        lines = splitTextToLinesWithEllipsis(displayText, textAreaW, maxLines, fontSize, 10);
-        totalHeight = lines.length * fontSize * 1.1;
+        lines = this.splitTextSimple(displayText, textAreaW);
+        
+        // If still too many lines, truncate
+        if (lines.length > maxLines) {
+          lines = lines.slice(0, maxLines);
+          // Add ellipsis to last line if truncated - use middle ellipsis instead of end
+          let lastLine = lines[maxLines - 1];
+          lines[maxLines - 1] = this.fitTextWithMiddleEllipsis(lastLine, textAreaW, fontSize, 9);
+        }
+      }
+      
+      // Calculate text area height - more generous allocation
+      const textAreaH = defaultH * 0.45; // 45% of vessel height for text area
+      
+      // Use consistent line height for better readability
+      const lineHeight = fontSize * 1.0; // Tight but readable line spacing
+      const totalHeight = lines.length * lineHeight;
+
+      // Only reduce font size if absolutely necessary
+      if (totalHeight > textAreaH) {
+        const reductionFactor = textAreaH / totalHeight;
+        fontSize = Math.max(fontSize * reductionFactor, 9); // Allow slightly smaller minimum
+        textSize(fontSize);
+        // Recalculate with new font size
+        lines = this.splitTextSimple(displayText, textAreaW);
+        if (lines.length > maxLines) {
+          lines = lines.slice(0, maxLines);
+        }
       }
 
-      // Vertically center block
-      let yOffsetStart = -defaultH * 0.1 - totalHeight / 2 + fontSize * 1.1 / 2;
+      // Vertically center the text block
+      const finalLineHeight = fontSize * 1.0; // Consistent line height
+      const finalTotalHeight = lines.length * finalLineHeight;
+      let yOffsetStart = -defaultH * 0.1 - finalTotalHeight / 2 + finalLineHeight / 2;
+      
       for (let i = 0; i < lines.length; i++) {
-        let yOffset = yOffsetStart + i * fontSize * 1.1;
+        let yOffset = yOffsetStart + i * finalLineHeight;
         text(lines[i], 0, yOffset);
       }
       textStyle(NORMAL);
@@ -1027,6 +1053,67 @@ let intermediate_combinations = [
       
       // Display the verb above the vessel - AFTER pop() to use screen coordinates
       this.displayVerb();
+    }
+    
+    // Simple text splitting method for more consistent line breaks
+    splitTextSimple(text, maxWidth) {
+      let words = text.split(' ');
+      let lines = [];
+      let currentLine = '';
+      
+      for (let i = 0; i < words.length; i++) {
+        let testLine = currentLine === '' ? words[i] : currentLine + ' ' + words[i];
+        
+        if (textWidth(testLine) <= maxWidth) {
+          currentLine = testLine;
+        } else {
+          // If current line has content, push it and start new line
+          if (currentLine !== '') {
+            lines.push(currentLine);
+            currentLine = words[i];
+          } else {
+            // Single word is too long - use it anyway but try to break it
+            currentLine = words[i];
+          }
+        }
+      }
+      
+      // Don't forget the last line
+      if (currentLine !== '') {
+        lines.push(currentLine);
+      }
+      
+      return lines;
+    }
+    
+    // Truncate text with ellipsis in the middle if too long for a given width
+    fitTextWithMiddleEllipsis(text, maxWidth, fontSize, minFontSize = 10) {
+      textSize(fontSize);
+      if (textWidth(text) <= maxWidth) return text;
+
+      // Reduce font size if needed
+      let currentFontSize = fontSize;
+      while (textWidth(text) > maxWidth && currentFontSize > minFontSize) {
+        currentFontSize -= 1;
+        textSize(currentFontSize);
+      }
+      if (textWidth(text) <= maxWidth) return text;
+
+      // If still too long at min font size, use ellipsis in the middle
+      let left = 0;
+      let right = text.length - 1;
+      let result = text;
+      // Always keep at least 2 chars on each side
+      while (right - left > 4) {
+        const leftPart = text.slice(0, Math.ceil((left + right) / 2 / 2));
+        const rightPart = text.slice(text.length - Math.floor((right - left) / 2 / 2));
+        result = leftPart + '...' + rightPart;
+        if (textWidth(result) <= maxWidth) break;
+        // Remove one more char from each side
+        left++;
+        right--;
+      }
+      return result;
     }
     
     pulse(duration = 150) {
@@ -1896,6 +1983,20 @@ let intermediate_combinations = [
           // Re-arrange vessels with the new vessel in place
           arrangeVessels();
           
+          // NEW: Check for parent combination opportunities after successful combination
+          // This implements Solution 2 for nested combinations
+          setTimeout(() => {
+            const parentVessel = checkForParentCombinations();
+            if (parentVessel) {
+              console.log("Auto-combination triggered after manual combination");
+              // If a parent combination was created, check for additional parent opportunities
+              // This handles deeply nested combinations
+              setTimeout(() => {
+                checkForParentCombinations();
+              }, 100); // Small delay to let animations settle
+            }
+          }, 50); // Small delay to let the manual combination settle first
+          
           // Check win condition
           if (vessels.length === 1 && vessels[0].name === final_combination.name) {
             // ENHANCEMENT - APlasker - Add increased version number to indicate this change was installed 
@@ -2038,6 +2139,45 @@ let intermediate_combinations = [
     gameTimer = 0;
     gameTimerActive = true;
     
+    // APlasker - Start analytics session tracking with improved error handling
+    if (typeof startGameSession === 'function') {
+      // Get recipe ID with multiple fallbacks
+      let recipeId = null;
+      
+      if (recipe_data && recipe_data.rec_id) {
+        recipeId = recipe_data.rec_id;
+      } else if (final_combination && final_combination.rec_id) {
+        recipeId = final_combination.rec_id;
+      } else if (recipe && recipe.rec_id) {
+        recipeId = recipe.rec_id;
+      }
+      
+      console.log("Recipe ID for analytics:", recipeId);
+      console.log("Available recipe data:", {
+        recipe_data: recipe_data,
+        final_combination: final_combination,
+        recipe: typeof recipe !== 'undefined' ? recipe : 'undefined'
+      });
+      
+      if (recipeId && recipeId !== null && recipeId !== undefined) {
+        console.log("Starting analytics session for recipe:", recipeId);
+        startGameSession(recipeId).then(sessionId => {
+          if (sessionId) {
+            console.log("✅ Analytics session started successfully:", sessionId);
+          } else {
+            console.warn("⚠️ Analytics session creation returned null - check Supabase");
+          }
+        }).catch(error => {
+          console.error("❌ Analytics session creation failed:", error);
+        });
+      } else {
+        console.warn("⚠️ No valid recipe ID found for analytics - session not created");
+        console.log("recipe_data:", recipe_data);
+      }
+    } else {
+      console.warn("⚠️ startGameSession function not available");
+    }
+    
     // Trigger help button animation from rectangular to circular
     helpButtonAnimating = true;
     helpButtonAnimationProgress = 0;
@@ -2108,6 +2248,50 @@ let intermediate_combinations = [
     loadTutorialRecipe().then(() => {
       // Once recipe is loaded, start the game
       gameStarted = true;
+      
+      // Initialize timer for tutorial mode - APlasker
+      startTime = Date.now();
+      gameTimer = 0;
+      gameTimerActive = true;
+      
+      // APlasker - Start analytics session tracking for tutorial with improved error handling
+      if (typeof startGameSession === 'function') {
+        // Get recipe ID with multiple fallbacks
+        let recipeId = null;
+        
+        if (recipe_data && recipe_data.rec_id) {
+          recipeId = recipe_data.rec_id;
+        } else if (final_combination && final_combination.rec_id) {
+          recipeId = final_combination.rec_id;
+        } else if (recipe && recipe.rec_id) {
+          recipeId = recipe.rec_id;
+        }
+        
+        console.log("Tutorial Recipe ID for analytics:", recipeId);
+        console.log("Available tutorial recipe data:", {
+          recipe_data: recipe_data,
+          final_combination: final_combination,
+          recipe: typeof recipe !== 'undefined' ? recipe : 'undefined'
+        });
+        
+        if (recipeId && recipeId !== null && recipeId !== undefined) {
+          console.log("Starting analytics session for tutorial recipe:", recipeId);
+          startGameSession(recipeId).then(sessionId => {
+            if (sessionId) {
+              console.log("✅ Tutorial analytics session started successfully:", sessionId);
+            } else {
+              console.warn("⚠️ Tutorial analytics session creation returned null - check Supabase");
+            }
+          }).catch(error => {
+            console.error("❌ Tutorial analytics session creation failed:", error);
+          });
+        } else {
+          console.warn("⚠️ No valid recipe ID found for tutorial analytics - session not created");
+          console.log("tutorial recipe_data:", recipe_data);
+        }
+      } else {
+        console.warn("⚠️ startGameSession function not available for tutorial");
+      }
       
       // Trigger help button animation from rectangular to circular
       helpButtonAnimating = true;
@@ -2890,6 +3074,11 @@ let intermediate_combinations = [
   
   // Function to handle showing random error messages - APlasker
   function showRandomErrorMessage() {
+    // APlasker - Track mistake in analytics
+    if (typeof trackMistake === 'function') {
+      trackMistake();
+    }
+
     // For tutorial mode, use specific tutorial bylines
     if (isTutorialMode) {
       tutorialErrorCount++;
@@ -3141,25 +3330,8 @@ let intermediate_combinations = [
   }
   
   function draw() {
-    // ... existing code ...
-
     // Set background color
     background(COLORS.background);
-    
-    // Update and display timer if game is active
-    if (gameStarted && !gameWon && gameTimerActive) {
-      gameTimer = Math.floor((Date.now() - startTime) / 1000);
-      // Cap at 59:59
-      gameTimer = Math.min(gameTimer, 3599);
-      
-      // Draw timer in top right corner
-      push();
-      textAlign(RIGHT, TOP);
-      textSize(Math.max(playAreaWidth * 0.02, 12)); // 2% of play area width, minimum 12px
-      fill(COLORS.text);
-      text(formatTime(gameTimer), width - 20, 20);
-      pop();
-    }
     
     // Draw the play area
     // ... existing code ...
@@ -3945,6 +4117,12 @@ let intermediate_combinations = [
     }
 
     return lines;
+  }
+
+  // Key handling for vintage filter toggle - APlasker
+  function keyPressed() {
+    // No key bindings currently active
+    return false; // Prevent default behavior
   }
   
   

@@ -22,6 +22,11 @@
   function displayEasterEgg(egg, draggedVesselRef, targetVesselRef) {
     console.log("Displaying easter egg:", egg.name);
     
+    // APlasker - Track Easter egg discovery in analytics
+    if (typeof trackEasterEggFound === 'function') {
+      trackEasterEggFound();
+    }
+    
     // Store references to the vessels that triggered the easter egg
     let draggedVesselCopy = null;
     let targetVesselCopy = null;

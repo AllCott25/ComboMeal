@@ -1,5 +1,12 @@
 // Enhanced move history display for win screen
 
+// Function to format time as MM:SS - APlasker
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
 // Layout configuration for different recipe sizes
 const LAYOUT = {
   small: {
@@ -501,33 +508,88 @@ let firstInactivityMessageShown = false;
         if (a.isFinalCombo) return 1;
         if (b.isFinalCombo) return -1;
         
-        // Sort base-ingredients-only combos to the left (instead of right)
-        if (a.isBaseIngredientsOnly && !b.isBaseIngredientsOnly) return -1;
-        if (!a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) return 1;
+        // ENHANCED ORDERING LOGIC: Siblings first, then their parent, then independent combos
+        const aHasParent = a.parent !== null;
+        const bHasParent = b.parent !== null;
+        const aHasChildren = a.children && a.children.length > 0;
+        const bHasChildren = b.children && b.children.length > 0;
         
-        // If they share the same parent, keep them together
-        if (a.parent && b.parent && a.parent === b.parent) {
-          // If they share a parent, sort alphabetically or by some other property
+        // Step 1: Identify sibling groups and their parents
+        // A sibling is a combo that has a parent AND that parent has multiple children
+        const aIsSibling = aHasParent && siblingGroups[a.parent] && siblingGroups[a.parent].length > 1;
+        const bIsSibling = bHasParent && siblingGroups[b.parent] && siblingGroups[b.parent].length > 1;
+        
+        // A parent-of-siblings is a combo that has children AND those children share the same parent (this combo)
+        const aIsParentOfSiblings = aHasChildren && a.children.some(child => 
+          siblingGroups[a.name] && siblingGroups[a.name].length > 1
+        );
+        const bIsParentOfSiblings = bHasChildren && b.children.some(child => 
+          siblingGroups[b.name] && siblingGroups[b.name].length > 1
+        );
+        
+        // Step 2: Prioritize siblings, then their parents, then independent combos
+        
+        // Case 1: Both are siblings of the same parent - sort alphabetically
+        if (aIsSibling && bIsSibling && a.parent === b.parent) {
           return a.name.localeCompare(b.name);
         }
         
-        // If a is a parent of b, put b first
-        if (a.children.includes(b.name)) {
-          return 1; // Parent comes after child
+        // Case 2: One is a sibling, the other is its parent - sibling comes first
+        if (aIsSibling && b.name === a.parent) {
+          return -1; // a (sibling) comes before b (its parent)
+        }
+        if (bIsSibling && a.name === b.parent) {
+          return 1; // b (sibling) comes before a (its parent)
         }
         
-        // If b is a parent of a, put a first
-        if (b.children.includes(a.name)) {
-          return -1; // Child comes before parent
+        // Case 3: Both are from different sibling groups - group by parent name
+        if (aIsSibling && bIsSibling && a.parent !== b.parent) {
+          return a.parent.localeCompare(b.parent);
         }
         
-        // For base-ingredients-only combos, sort by ingredient count (highest count leftmost)
-        if (a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) {
-          return b.requiredCount - a.requiredCount;
+        // Case 4: One is a sibling group member, other is a parent-of-siblings from different group
+        if (aIsSibling && bIsParentOfSiblings) {
+          // Compare the sibling's parent with the parent-of-siblings
+          return a.parent.localeCompare(b.name);
+        }
+        if (bIsSibling && aIsParentOfSiblings) {
+          // Compare the sibling's parent with the parent-of-siblings
+          return b.parent.localeCompare(a.name);
         }
         
-        // For other combos, use the existing logic
-        return a.baseIngredientPercentage - b.baseIngredientPercentage;
+        // Case 5: One is a sibling, other is independent - sibling groups come first
+        if (aIsSibling && !bIsSibling && !bIsParentOfSiblings) {
+          return -1; // Sibling groups come before independent combos
+        }
+        if (bIsSibling && !aIsSibling && !aIsParentOfSiblings) {
+          return 1; // Sibling groups come before independent combos
+        }
+        
+        // Case 6: One is a parent-of-siblings, other is independent - parent groups come first
+        if (aIsParentOfSiblings && !bIsSibling && !bIsParentOfSiblings) {
+          return -1; // Parent-of-siblings comes before independent combos
+        }
+        if (bIsParentOfSiblings && !aIsSibling && !aIsParentOfSiblings) {
+          return 1; // Parent-of-siblings comes before independent combos
+        }
+        
+        // Case 7: Both are independent combos (no parent, or parent with only one child)
+        if (!aIsSibling && !bIsSibling && !aIsParentOfSiblings && !bIsParentOfSiblings) {
+          // Sort base-ingredients-only combos to the left
+          if (a.isBaseIngredientsOnly && !b.isBaseIngredientsOnly) return -1;
+          if (!a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) return 1;
+          
+          // For base-ingredients-only combos, sort by ingredient count (highest count leftmost)
+          if (a.isBaseIngredientsOnly && b.isBaseIngredientsOnly) {
+            return b.requiredCount - a.requiredCount;
+          }
+          
+          // For other independent combos, sort by base ingredient percentage
+          return a.baseIngredientPercentage - b.baseIngredientPercentage;
+        }
+        
+        // Fallback: maintain original order
+        return 0;
       });
     } catch (error) {
       // If there's any error in the new logic, log it and fall back to the original sorting
@@ -1262,6 +1324,26 @@ let firstInactivityMessageShown = false;
     // Set background color
     background(COLORS.background);
     
+    // Update and display timer if game is active - APlasker
+    if (gameStarted && !gameWon && gameTimerActive) {
+      gameTimer = Math.floor((Date.now() - startTime) / 1000);
+      // Cap at 59:59
+      gameTimer = Math.min(gameTimer, 3599);
+      
+      // Draw timer opposite the help button (top left above title) - APlasker
+      push();
+      textAlign(LEFT, TOP);
+      textSize(Math.max(playAreaWidth * 0.025, 16)); // Slightly bigger: 2.5% of play area width, minimum 16px
+      fill(0); // Black text for better visibility
+      
+      // Position opposite the help button - top left above title
+      const timerX = playAreaX + 10; // 10px from left edge of play area
+      const timerY = playAreaY + 10; // 10px from top edge of play area
+      
+      text(formatTime(gameTimer), timerX, timerY);
+      pop();
+    }
+    
     // Check if we're still loading recipe data (initial loading state only)
     if (isLoadingRecipe) {
       // Draw loading animation only during initial loading
@@ -1981,6 +2063,12 @@ let firstInactivityMessageShown = false;
       
       // Set flag to prevent game win until animation completes
       this.isFinalAnimation = true;
+      
+      // Stop the timer when final animation starts - APlasker
+      if (typeof gameTimerActive !== 'undefined') {
+        gameTimerActive = false;
+        console.log("Timer stopped at final animation start. Final time:", formatTime(gameTimer));
+      }
       
       // Add transition circle properties
       this.transitionCircleSize = 0;

@@ -1,6 +1,11 @@
 function showWinScreen() {
   gameWon = true;
   triggerHapticFeedback('completion');
+  
+  // APlasker - Complete analytics session with win condition
+  if (typeof completeGameSession === 'function') {
+    completeGameSession('completed');
+  }
 }
 
 function drawWinScreen() {
@@ -620,6 +625,11 @@ function drawWinScreen() {
   // Hints used line
   const hintsLineHeight = drawStatLine("Hints Used:", hintCount.toString(), statsX, lineY, statsWidth, labelSize, valueSize);
   lineY += hintsLineHeight;
+  
+  // Time line - APlasker
+  const timeValue = typeof gameTimer !== 'undefined' ? formatTime(gameTimer) : "00:00";
+  const timeLineHeight = drawStatLine("Time:", timeValue, statsX, lineY, statsWidth, labelSize, valueSize);
+  lineY += timeLineHeight;
   
   // Center Share Score text under the stats block
   const shareScoreY = lineY + valueSize * 1.5; // Add some space after the last stat line
@@ -1430,6 +1440,11 @@ function drawTutorialWinScreen() {
 }
 
 function shareScore() {
+  // APlasker - Track share CTA click in analytics
+  if (typeof trackShareClick === 'function') {
+    trackShareClick();
+  }
+  
   try {
     console.log("shareScore called - letterGrade:", letterGrade, "isAPlus:", isAPlus);
     
@@ -1773,6 +1788,11 @@ function showRecipeModal() {
 }
 
 function viewRecipe() {
+  // APlasker - Track recipe CTA click in analytics
+  if (typeof trackRecipeClick === 'function') {
+    trackRecipeClick();
+  }
+  
   // Use the new modal approach for a consistent experience on all platforms
   showRecipeModal();
 }
