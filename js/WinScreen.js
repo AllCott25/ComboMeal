@@ -1464,6 +1464,22 @@ function shareScore() {
       recipeNumber = recipe_data.rec_id;
     }
     
+    // Get formatted date in MM/DD/YY format
+    let formattedDate = "##/##/##";
+    if (typeof recipe !== 'undefined' && recipe && recipe.date) {
+      try {
+        const dateParts = recipe.date.split('-');
+        if (dateParts.length === 3) {
+          formattedDate = `${dateParts[1]}/${dateParts[2]}/${dateParts[0].substring(2)}`;
+        }
+      } catch (e) {
+        console.error("Error formatting date:", e);
+      }
+    }
+    
+    // Get timer value
+    const timeValue = typeof gameTimer !== 'undefined' ? formatTime(gameTimer) : "00:00";
+    
     // Add fallbacks if global variables aren't set properly
     if (typeof isAPlus === 'undefined') {
       console.warn("isAPlus is undefined, defaulting to false");
@@ -1474,6 +1490,14 @@ function shareScore() {
       console.warn("letterGrade is undefined, defaulting to 'X'");
       letterGrade = "X";
     }
+    
+    // Check if Easter Egg was found
+    const eggFound = moveHistory.some(move => 
+      typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')
+    );
+    
+    // Choose emoji based on Easter egg status
+    const mainEmoji = eggFound ? '🍳' : '🍴';
     
     // Determine emoji markers based on letter grade
     let gradeEmojis;
@@ -1489,23 +1513,11 @@ function shareScore() {
       gradeEmojis = `❌`; // Failing score
     }
     
-    // Determine egg emoji based on Easter egg found
-    let eggEmoji = '';
-    if (moveHistory.some(move => 
-      typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')
-    )) {
-      eggEmoji = '🍳';
-    }
+    // Create the share text in the requested format:
+    // COMBO MEAL 🍴 Recipe ### 🍴 MM/DD/YY
+    // Score: [Letter with Circles on either side] 🍴Hints: # 🍴[Timer ##:##]
+    let shareText = `COMBO MEAL ${mainEmoji} Recipe ${recipeNumber} ${mainEmoji} ${formattedDate}\nScore: ${gradeEmojis} ${mainEmoji}Hints: ${hintCount} ${mainEmoji}${timeValue}`;
     
-    // Count red hint moves from moveHistory
-    // Add hint indicators (question mark emoji) based on how many hints were used
-    let hintEmojis = '';
-    for (let i = 0; i < hintCount; i++) {
-      hintEmojis += '❓';
-    }
-    
-    // Create the simplified emoji-based share text - WITHOUT the URL
-    let shareText = `Combo Meal 🍴 Recipe ${recipeNumber}: ${gradeEmojis} ${hintEmojis} ${eggEmoji}`;
     const shareUrl = "https://allcott25.github.io/ComboMeal/";
     
     // Check if mobile

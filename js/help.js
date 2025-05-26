@@ -1,7 +1,7 @@
 /*
  * Help Modal for Culinary Logic Puzzle
  * Created by APlasker
- * Last Updated: May 28, 2025 (11:45) - APlasker
+ * Last Updated: May 26, 2025 (07:45) - APlasker
  *
  * This file contains functionality for the help modal that allows players
  * to review the game instructions during gameplay.
@@ -19,6 +19,7 @@
  * - Implemented variable spacing to better utilize modal height (May 8, 2025, 15:21) - APlasker
  * - Updated row 2-5 text and colors to match latest game version (May 15, 2025, 10:34) - APlasker
  * - Moved drawSimpleTutorialVessel function from sketch.js to help.js (May 28, 2025, 11:45) - APlasker
+ * - Updated SEO branding with cm526.png thumbnail for PLAYSKER.COM (May 26, 2025, 07:45) - APlasker
  */
 
 // Global variable to track help modal state
