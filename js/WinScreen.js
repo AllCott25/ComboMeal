@@ -6,6 +6,38 @@ function showWinScreen() {
   if (typeof completeGameSession === 'function') {
     completeGameSession('completed');
   }
+  
+  // APlasker - Record streak completion if StreakSystem is available
+  if (typeof StreakSystem !== 'undefined' && typeof recipe !== 'undefined' && recipe && recipe.day_number) {
+    // Calculate the letter grade first (this logic is duplicated from drawWinScreen but needed here)
+    let blackMoves = 0;
+    for (let move of moveHistory) {
+      if (move === 'black' || move === '#333333') {
+        blackMoves++;
+      }
+    }
+    
+    let calculatedGrade;
+    if (blackMoves === 0) {
+      calculatedGrade = "A";
+    } else if (blackMoves >= 1 && blackMoves <= 2) {
+      calculatedGrade = "B";
+    } else if (blackMoves >= 3 && blackMoves <= 4) {
+      calculatedGrade = "C";
+    } else {
+      calculatedGrade = "X";
+    }
+    
+    // Get game time in seconds
+    const timeInSeconds = typeof gameTimer !== 'undefined' ? gameTimer : 0;
+    
+    // Record the completion in the streak system
+    const streakUpdated = StreakSystem.recordCompletion(recipe.day_number, calculatedGrade, timeInSeconds);
+    
+    if (streakUpdated) {
+      console.log('Streak updated for recipe day', recipe.day_number, 'with grade', calculatedGrade);
+    }
+  }
 }
 
 function drawWinScreen() {
@@ -580,7 +612,7 @@ function drawWinScreen() {
   
   // Position stats block on the right side of the score card
   const statsX = scoreX - scoreWidth/2 + scoreWidth * 0.55; // 55% from left edge
-  const statsY = scoreY - scoreHeight/2 + scoreHeight * 0.37; // 37% from top (changed from 28%)
+  const statsY = scoreY - scoreHeight/2 + scoreHeight * 0.30; // 30% from top (changed from 37% to move stats up)
   const statsWidth = scoreWidth * 0.38; // 38% of score card width
   
   // Calculate font sizes for stats
@@ -630,6 +662,11 @@ function drawWinScreen() {
   const timeValue = typeof gameTimer !== 'undefined' ? formatTime(gameTimer) : "00:00";
   const timeLineHeight = drawStatLine("Time:", timeValue, statsX, lineY, statsWidth, labelSize, valueSize);
   lineY += timeLineHeight;
+  
+  // Streak line - APlasker
+  const streakValue = typeof StreakSystem !== 'undefined' ? StreakSystem.getStreakDisplayText() : "0";
+  const streakLineHeight = drawStatLine("Streak:", streakValue, statsX, lineY, statsWidth, labelSize, valueSize);
+  lineY += streakLineHeight;
   
   // Center Share Score text under the stats block
   const shareScoreY = lineY + valueSize * 1.5; // Add some space after the last stat line

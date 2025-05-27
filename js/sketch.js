@@ -2121,8 +2121,8 @@ let intermediate_combinations = [
   // New function to initialize the game after data is loaded
   function initializeGame() {
     // Determine layout type based on number of ingredients
-    // Use small layout for recipes with 11 or fewer ingredients
-    currentLayoutType = ingredients.length <= 11 ? 'small' : 'big';
+    // Use small layout for recipes with 12 or fewer ingredients
+    currentLayoutType = ingredients.length <= 12 ? 'small' : 'big';
     console.log(`Setting layout type to ${currentLayoutType} based on ${ingredients.length} ingredients`);
 
     // Create vessels for each ingredient
