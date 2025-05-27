@@ -509,7 +509,7 @@ async function loadSummaryStats(period) {
     // Get total sessions
     const { data: sessions, error: sessionsError } = await supabase
         .from('game_sessions')
-        .select('session_id, win_condition, total_time_seconds, hints_used')
+        .select('session_id, win_condition, total_time_seconds, hints_used, play_url')
         .gte('started_at', dateFilter.start)
         .lte('started_at', dateFilter.end);
     
@@ -555,6 +555,7 @@ async function loadRecipeAnalytics(period) {
                 easter_eggs_found,
                 goto_recipe,
                 goto_share,
+                play_url,
                 started_at
             )
         `)
@@ -606,6 +607,9 @@ function calculateRecipeAnalytics(sessions) {
         ? ((sessions.filter(s => s.goto_share).length / totalSessions) * 100).toFixed(1)
         : 0;
     
+    // Analyze URL patterns - APlasker
+    const urlAnalysis = analyzeUrlPatterns(sessions);
+    
     return {
         totalSessions,
         completedSessions: completedSessions.length,
@@ -615,7 +619,50 @@ function calculateRecipeAnalytics(sessions) {
         avgHints,
         avgEasterEggs,
         recipeClickRate,
-        shareClickRate
+        shareClickRate,
+        urlAnalysis
+    };
+}
+
+// Analyze URL patterns for sessions - APlasker
+function analyzeUrlPatterns(sessions) {
+    const urlCounts = {};
+    const urlTypes = {
+        main: 0,        // Main site (no query params)
+        playtest: 0,    // Playtest URLs (with ?date= param)
+        tutorial: 0,    // Tutorial URLs (with tutorial param)
+        other: 0        // Other URLs
+    };
+    
+    sessions.forEach(session => {
+        const url = session.play_url;
+        if (!url) return;
+        
+        // Count exact URLs
+        urlCounts[url] = (urlCounts[url] || 0) + 1;
+        
+        // Categorize URL types
+        if (url.includes('?date=')) {
+            urlTypes.playtest++;
+        } else if (url.includes('tutorial') || url.includes('?tutorial')) {
+            urlTypes.tutorial++;
+        } else if (url.includes('?') || url.includes('#')) {
+            urlTypes.other++;
+        } else {
+            urlTypes.main++;
+        }
+    });
+    
+    // Get most common URLs (top 3)
+    const topUrls = Object.entries(urlCounts)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 3)
+        .map(([url, count]) => ({ url, count }));
+    
+    return {
+        urlTypes,
+        topUrls,
+        totalUrls: Object.keys(urlCounts).length
     };
 }
 
@@ -629,6 +676,45 @@ function createAnalyticsRecipeCard(recipe, analytics) {
         ? `<img src="${recipe.img_url}" alt="${recipe.name}" class="recipe-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
            <div class="recipe-image placeholder" style="display:none;">🍽️</div>`
         : `<div class="recipe-image placeholder">🍽️</div>`;
+    
+    // Create URL analytics section - APlasker
+    const urlAnalysis = analytics.urlAnalysis;
+    const urlBreakdown = urlAnalysis ? `
+        <div class="metric-section">
+            <div class="metric-section-title">Traffic Sources</div>
+            <div class="metric-item">
+                <div class="metric-label">Main Site</div>
+                <div class="metric-value">${urlAnalysis.urlTypes.main}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Playtest URLs</div>
+                <div class="metric-value">${urlAnalysis.urlTypes.playtest}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Tutorial Mode</div>
+                <div class="metric-value">${urlAnalysis.urlTypes.tutorial}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Other URLs</div>
+                <div class="metric-value">${urlAnalysis.urlTypes.other}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">Unique URLs</div>
+                <div class="metric-value">${urlAnalysis.totalUrls}</div>
+            </div>
+        </div>
+        ${urlAnalysis.topUrls.length > 0 ? `
+            <div class="metric-section">
+                <div class="metric-section-title">Top URLs</div>
+                ${urlAnalysis.topUrls.map(urlData => `
+                    <div class="url-item">
+                        <div class="url-path">${formatUrlForDisplay(urlData.url)}</div>
+                        <div class="url-count">${urlData.count} plays</div>
+                    </div>
+                `).join('')}
+            </div>
+        ` : ''}
+    ` : '';
     
     card.innerHTML = `
         <div class="recipe-header" onclick="toggleRecipeDetails(this)">
@@ -645,47 +731,91 @@ function createAnalyticsRecipeCard(recipe, analytics) {
         </div>
         <div class="recipe-details">
             <div class="recipe-metrics">
-                <div class="metric-item">
-                    <div class="metric-label">Total Sessions</div>
-                    <div class="metric-value">${analytics.totalSessions}</div>
+                <div class="metric-section">
+                    <div class="metric-section-title">Game Performance</div>
+                    <div class="metric-item">
+                        <div class="metric-label">Total Sessions</div>
+                        <div class="metric-value">${analytics.totalSessions}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Completed</div>
+                        <div class="metric-value">${analytics.completedSessions}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Abandoned</div>
+                        <div class="metric-value">${analytics.abandonedSessions}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Completion Rate</div>
+                        <div class="metric-value">${analytics.completionRate}%</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Avg. Time</div>
+                        <div class="metric-value">${formatDuration(analytics.avgTime)}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Avg. Hints</div>
+                        <div class="metric-value">${analytics.avgHints}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Avg. Easter Eggs</div>
+                        <div class="metric-value">${analytics.avgEasterEggs}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Recipe Clicks</div>
+                        <div class="metric-value">${analytics.recipeClickRate}%</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Share Clicks</div>
+                        <div class="metric-value">${analytics.shareClickRate}%</div>
+                    </div>
                 </div>
-                <div class="metric-item">
-                    <div class="metric-label">Completed</div>
-                    <div class="metric-value">${analytics.completedSessions}</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">Abandoned</div>
-                    <div class="metric-value">${analytics.abandonedSessions}</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">Completion Rate</div>
-                    <div class="metric-value">${analytics.completionRate}%</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">Avg. Time</div>
-                    <div class="metric-value">${formatDuration(analytics.avgTime)}</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">Avg. Hints</div>
-                    <div class="metric-value">${analytics.avgHints}</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">Avg. Easter Eggs</div>
-                    <div class="metric-value">${analytics.avgEasterEggs}</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">Recipe Clicks</div>
-                    <div class="metric-value">${analytics.recipeClickRate}%</div>
-                </div>
-                <div class="metric-item">
-                    <div class="metric-label">Share Clicks</div>
-                    <div class="metric-value">${analytics.shareClickRate}%</div>
-                </div>
+                ${urlBreakdown}
             </div>
         </div>
     `;
     
     return card;
+}
+
+// Format URL for display - APlasker
+function formatUrlForDisplay(url) {
+    try {
+        const urlObj = new URL(url);
+        let display = urlObj.pathname;
+        
+        // Add query parameters if they exist
+        if (urlObj.search) {
+            // Show important query parameters
+            const params = new URLSearchParams(urlObj.search);
+            const importantParams = [];
+            
+            if (params.has('date')) {
+                importantParams.push(`date=${params.get('date')}`);
+            }
+            if (params.has('tutorial')) {
+                importantParams.push('tutorial');
+            }
+            
+            if (importantParams.length > 0) {
+                display += `?${importantParams.join('&')}`;
+            } else if (urlObj.search.length < 50) {
+                display += urlObj.search;
+            } else {
+                display += '?...';
+            }
+        }
+        
+        // Truncate if too long
+        if (display.length > 60) {
+            display = display.substring(0, 57) + '...';
+        }
+        
+        return display;
+    } catch (error) {
+        // If URL parsing fails, just show the last part
+        return url.length > 60 ? '...' + url.substring(url.length - 57) : url;
+    }
 }
 
 // Toggle Recipe Details

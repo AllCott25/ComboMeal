@@ -1960,23 +1960,37 @@ let firstInactivityMessageShown = false;
     textAlign(CENTER, CENTER);
     const versionTextSize = Math.max(playAreaWidth * 0.016, 8); // 1.6% of width, min 8px
     textSize(versionTextSize);
-    fill(100); // Gray color for version text
 
     // Update version to reflect font size improvements
     const versionText = "v0.7 - AP";
 
-    // Center the version text at the bottom of the play area
-    text(versionText, playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.98);
+    // Combine version and "Say hi!" into one line with pipe separator
+    const combinedText = versionText + " | Say hi!";
     
-    // Add "Say hi!" link below the version text
-    textSize(min(max(playAreaWidth * 0.022, 9), 12)); // Slightly smaller than win screen
+    // Draw the version part in gray
+    fill(100); // Gray color for version text
+    const versionWidth = textWidth(versionText);
+    const pipeWidth = textWidth(" | ");
+    const sayHiWidth = textWidth("Say hi!");
+    const totalWidth = versionWidth + pipeWidth + sayHiWidth;
+    
+    // Calculate starting position to center the entire combined text
+    const startX = playAreaX + playAreaWidth/2 - totalWidth/2;
+    
+    // Draw version text
+    text(versionText, startX + versionWidth/2, playAreaY + playAreaHeight * 0.985);
+    
+    // Draw pipe separator in gray
+    text(" | ", startX + versionWidth + pipeWidth/2, playAreaY + playAreaHeight * 0.985);
+    
+    // Draw "Say hi!" in green
     fill(COLORS.primary); // Green color for the link
-    text("Say hi!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.993); // Positioned even lower, near the bottom edge
+    text("Say hi!", startX + versionWidth + pipeWidth + sayHiWidth/2, playAreaY + playAreaHeight * 0.985);
     
-    // Store position and dimensions for hit detection (in global variables)
-    tutorialSayHiLinkX = playAreaX + playAreaWidth/2;
-    tutorialSayHiLinkY = playAreaY + playAreaHeight * 0.993;
-    tutorialSayHiLinkWidth = textWidth("Say hi!") * 1.2; // Add some padding
+    // Store position and dimensions for hit detection (only for the "Say hi!" part)
+    tutorialSayHiLinkX = startX + versionWidth + pipeWidth + sayHiWidth/2;
+    tutorialSayHiLinkY = playAreaY + playAreaHeight * 0.985;
+    tutorialSayHiLinkWidth = sayHiWidth * 1.2; // Add some padding
     tutorialSayHiLinkHeight = textAscent() + textDescent();
     
     // Check if mouse is over the Say hi link in tutorial screen

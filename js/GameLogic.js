@@ -1,5 +1,9 @@
-function combineVessels(v1, v2) {
+function combineVessels(v1, v2, mouseX = null, mouseY = null) {
     console.log("combineVessels called for:", v1.name || "unnamed", "and", v2.name || "unnamed");
+    
+    // Use mouse position if provided, otherwise fall back to average position
+    const newVesselX = mouseX !== null ? mouseX : (v1.x + v2.x) / 2;
+    const newVesselY = mouseY !== null ? mouseY : (v1.y + v2.y) / 2;
     
     // COMPREHENSIVE DEBUG LOGGING - APlasker
     console.log("=== VESSEL COMBINATION DEBUG === BUGSLIFE");
@@ -19,6 +23,7 @@ function combineVessels(v1, v2) {
         hasIngredients: (v2.ingredients || []).length > 0,
         hasCompleteCombos: (v2.complete_combinations || []).length > 0
     }, "BUGSLIFE");
+    console.log("New vessel position:", { x: newVesselX, y: newVesselY, usingMouse: mouseX !== null }, "BUGSLIFE");
     
     // Check which case will be triggered
     const case1Condition = (v1.ingredients || []).length > 0 && (v2.ingredients || []).length > 0 && (v1.complete_combinations || []).length === 0 && (v2.complete_combinations || []).length === 0;
@@ -70,8 +75,8 @@ function combineVessels(v1, v2) {
         const vesselWidth = Math.max(playAreaWidth * 0.25, 150); // 25% of play area width, min 150px
         const vesselHeight = vesselWidth * 0.5; // Maintain aspect ratio
         
-        // Create a new vessel (yellow or green) with relative dimensions
-        let new_v = new Vessel(U, [], null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
+        // Create a new vessel (yellow or green) with mouse position
+        let new_v = new Vessel(U, [], null, 'yellow', newVesselX, newVesselY, vesselWidth, vesselHeight);
         // Explicitly set isAdvanced property for correct positioning
         new_v.isAdvanced = true;
         
@@ -442,8 +447,8 @@ function combineVessels(v1, v2) {
         const vesselWidth = Math.max(playAreaWidth * 0.25, 150);
         const vesselHeight = vesselWidth * 0.5;
         
-        // Create a new vessel
-        let new_v = new Vessel([], combinedSet, null, 'yellow', (v1.x + v2.x) / 2, (v1.y + v2.y) / 2, vesselWidth, vesselHeight);
+        // Create a new vessel with mouse position
+        let new_v = new Vessel([], combinedSet, null, 'yellow', newVesselX, newVesselY, vesselWidth, vesselHeight);
         new_v.isAdvanced = true;
         
         // If we have a resulting combination, set the vessel properties
@@ -557,7 +562,7 @@ function combineVessels(v1, v2) {
         const vesselHeight = vesselWidth * 0.5;
         
         // Create a new vessel
-        let new_v = new Vessel([], [], bestMatch.name, 'yellow', (comboVessel.x + ingredientVessel.x) / 2, (comboVessel.y + ingredientVessel.y) / 2, vesselWidth, vesselHeight);
+        let new_v = new Vessel([], [], bestMatch.name, 'yellow', newVesselX, newVesselY, vesselWidth, vesselHeight);
         new_v.isAdvanced = true;
         
         // Set vessel properties
@@ -608,7 +613,7 @@ function combineVessels(v1, v2) {
           const vesselHeight = vesselWidth * 0.5;
           
           // Create a new vessel
-          let new_v = new Vessel([], [], bestMatch.name, 'yellow', (comboVessel.x + ingredientVessel.x) / 2, (comboVessel.y + ingredientVessel.y) / 2, vesselWidth, vesselHeight);
+          let new_v = new Vessel([], [], bestMatch.name, 'yellow', newVesselX, newVesselY, vesselWidth, vesselHeight);
           new_v.isAdvanced = true;
           
           // Set vessel properties
@@ -1033,14 +1038,8 @@ function combineVessels(v1, v2) {
     // We estimate the maximum number of rows based on vessel count
     const maxRows = Math.ceil(vessels.length / 3); // At most 3 basic vessels per row
     
-    // Check if this is a newly combined vessel to apply correction
-    if (newVessel.isNewlyCombined) {
-      console.log("APPLYING ROW CORRECTION FOR NEWLY COMBINED VESSEL");
-      // Apply +1 correction to fix the "one row above" issue
-      newVessel.preferredRow = Math.min(dropRowIndex + 1, maxRows);
-    } else {
-      newVessel.preferredRow = Math.min(dropRowIndex, maxRows);
-    }
+    // Use the calculated row index directly - no correction needed
+    newVessel.preferredRow = Math.min(dropRowIndex, maxRows);
     
     console.log("final assigned row =", newVessel.preferredRow);
     

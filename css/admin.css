@@ -498,7 +498,6 @@ footer {
 }
 
 .metric-value {
-    font-size: 20px;
     font-weight: bold;
     color: #2c3e50;
 }
@@ -971,4 +970,54 @@ footer {
         font-size: 10px;
         padding: 2px;
     }
+}
+
+/* URL Analytics Styles - APlasker */
+.metric-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.metric-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.metric-section-title {
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 10px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.url-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f8f9fa;
+}
+
+.url-item:last-child {
+    border-bottom: none;
+}
+
+.url-path {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    color: #495057;
+    flex: 1;
+    margin-right: 10px;
+    word-break: break-all;
+}
+
+.url-count {
+    font-weight: bold;
+    color: #28a745;
+    font-size: 12px;
+    white-space: nowrap;
 } 

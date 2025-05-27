@@ -470,6 +470,7 @@ async function startGameSession(recipeId) {
       rec_id: recipeId,
       user_id: generateUserIdentifier(),
       started_at: new Date().toISOString(),
+      play_url: window.location.href,
       mistakes_total: 0,
       hints_used: 0,
       easter_eggs_found: 0,

@@ -1393,48 +1393,43 @@ function drawTutorialWinScreen() {
   text("Now that you made a pizza, you're ready to make anything! Put your skills to the test!", messageX, messageY + 15, messageWidth);
   
   // Replace the circular button with a pink rounded rectangle - APlasker
-  const ctaWidth = scoreWidth * 0.96; // 96% of the score card width
-  const ctaHeight = scoreHeight * 0.65; // 65% of score card height
-  const ctaX = scoreX; // Center horizontally
-  const ctaY = scoreY; // Center vertically (changed from scoreY + scoreHeight * 0.2)
-  const ctaRadius = min(ctaWidth, ctaHeight) * 0.1; // 10% of the smaller dimension for rounded corners
+  const ctaWidth = scoreWidth; // Match the score card width exactly
+  const ctaHeight = scoreHeight; // Match the score card height exactly
+  const ctaX = scoreX; // Center horizontally to match score card
+  const ctaY = scoreY; // Center vertically to match score card
+  const ctaRadius = max(scoreWidth * 0.02, 8); // Match the score card corner radius
   
-  // Draw pink rounded rectangle
+  // Draw pink rounded rectangle matching the score card exactly
   rectMode(CENTER);
   fill(COLORS.secondary); // Pink color from COLORS.secondary (#cf6d88)
   stroke(0, 50); // Added black outline with 50 opacity to match hint button style
   strokeWeight(2); // Match strokeWeight used in vessels and hint button
   rect(ctaX, ctaY, ctaWidth, ctaHeight, ctaRadius);
   
-  // Add the two lines of text
+  // Add the single line of text
   textAlign(CENTER, CENTER);
   
-  // Top line (smaller) - Increased size
-  textSize(min(max(playAreaWidth * 0.035, 14), 18)); // Increased from 0.03/12/16 to 0.035/14/18
+  // Single line text - sized to fit within 90% of the card width
+  textSize(min(max(playAreaWidth * 0.055, 18), 28)); // Same size as before for consistency
   textStyle(BOLD);
   fill(255); // White text
   noStroke(); // Remove stroke for text
-  text("YOU COMPLETED THE TUTORIAL,", ctaX, ctaY - ctaHeight * 0.2);
   
-  // Bottom line (larger) - Increased size and updated text
-  textSize(min(max(playAreaWidth * 0.055, 18), 28)); // Increased from 0.045/16/24 to 0.055/18/28
-  fill(255); // White text
-  
-  // Calculate bottom line width to ensure it fits 90% of the card width
-  const bottomLineText = "NOW COOK TODAY'S RECIPE!"; // Changed from "PLAY" to "COOK"
-  const maxBottomLineWidth = ctaWidth * 0.9; // 90% of the CTA width
-  const bottomLineTextWidth = textWidth(bottomLineText);
+  // Calculate text width to ensure it fits 90% of the card width
+  const ctaText = "COOK TODAY'S RECIPE! →";
+  const maxCtaTextWidth = ctaWidth * 0.9; // 90% of the CTA width
+  const ctaTextWidth = textWidth(ctaText);
   
   // Scale text if needed to fit 90% of width
-  if (bottomLineTextWidth > maxBottomLineWidth) {
-    const scaleFactor = maxBottomLineWidth / bottomLineTextWidth;
+  if (ctaTextWidth > maxCtaTextWidth) {
+    const scaleFactor = maxCtaTextWidth / ctaTextWidth;
     const scaledFontSize = textSize() * scaleFactor;
     textSize(scaledFontSize);
   }
   
-  // Draw the bottom line text
-  text(bottomLineText, ctaX, ctaY + ctaHeight * 0.15);
-
+  // Draw the text centered in the button
+  text(ctaText, ctaX, ctaY);
+  
   // Restore the drawing context
   pop();
 }

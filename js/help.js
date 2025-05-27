@@ -136,7 +136,7 @@ function showHelpModal() {
       const vesselConfig = [
         { name: "Carrots", color: "vesselBase", text: "Drag & drop one ingredient on to another to combine them! Which ingredients go together?" },
         { name: "Carrots + Flour + Eggs", color: "yellow", text: "Complete each recipe step by combining everything needed. What else can you add?" },
-        { name: "Carrot Sheet Cake", color: "#cfc23f", text: "Each step in the recipe its own combo. Add all the correct ingredients together to turn them into a combo!" },
+        { name: "Carrot Sheet Cake", color: "#f3a9b2", text: "Each step in the recipe its own combo. Add all the correct ingredients together to turn them into a combo!" },
         { type: "hintButton", text: "Keep an eye on the recipe card's question marks and highlights to clue in on what to combine. Or use the Hint button!" },
         { type: "star", text: "Combine everything together with as few mistakes as possible to make the grade!" }
       ];
@@ -273,19 +273,27 @@ function drawStarIcon(x, y, size) {
   pop();
 }
 
-// Function to draw a circular hint button icon like the one in the game
+// Function to draw a green rounded rectangle hint button icon like the one in the game
 function drawHintButtonIcon(x, y, size) {
   push();
   
-  // Use pink color (#cf6d88) for hint button
-  fill('#cf6d88');
+  // Use green color (COLORS.primary) to match the current game hint button
+  fill(COLORS.primary);
   
   // Use the same subtle border as buttons
   stroke(0, 50);
   strokeWeight(2);
   
-  // Draw circular button
-  circle(x, y, size);
+  // Calculate button dimensions - make it rectangular like the actual hint button
+  const buttonWidth = size * 1.8; // Make it wider than it is tall
+  const buttonHeight = size;
+  
+  // Calculate corner radius to match the game (12px equivalent, scaled to button size)
+  const cornerRadius = Math.max(buttonHeight * 0.12, 3); // 12% of height, min 3px
+  
+  // Draw rounded rectangle button
+  rectMode(CENTER);
+  rect(x, y, buttonWidth, buttonHeight, cornerRadius);
   
   // Draw "Hint" text using the same font size calculation as vessels
   fill('white');
