@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COMBO MEAL - Comprehensive Game Testing Suite</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        /* Testing Suite Specific Styles */
+        .test-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        .test-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .test-section {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .test-section-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #ddd;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .test-section-header:hover {
+            background: #e9ecef;
+        }
+        
+        .test-section-content {
+            padding: 20px;
+            display: none;
+        }
+        
+        .test-section.active .test-section-content {
+            display: block;
+        }
+        
+        .test-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .test-control-group {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .test-control-group h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+        
+        .test-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px 5px 5px 0;
+            transition: all 0.2s;
+        }
+        
+        .test-button:hover {
+            background: #0056b3;
+            transform: translateY(-1px);
+        }
+        
+        .test-button.success {
+            background: #28a745;
+        }
+        
+        .test-button.success:hover {
+            background: #1e7e34;
+        }
+        
+        .test-button.warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .test-button.warning:hover {
+            background: #e0a800;
+        }
+        
+        .test-button.danger {
+            background: #dc3545;
+        }
+        
+        .test-button.danger:hover {
+            background: #c82333;
+        }
+        
+        .test-button.secondary {
+            background: #6c757d;
+        }
+        
+        .test-button.secondary:hover {
+            background: #545b62;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.online {
+            background: #28a745;
+        }
+        
+        .status-indicator.offline {
+            background: #dc3545;
+        }
+        
+        .status-indicator.unknown {
+            background: #6c757d;
+        }
+        
+        .recipe-selector {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        
+        .recipe-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .recipe-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .recipe-item.selected {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .recipe-meta {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .current-state {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .current-state h4 {
+            margin: 0 0 10px 0;
+            color: #2e7d32;
+        }
+        
+        .state-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        
+        .state-item {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        .state-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .state-value {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .game-frame {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            width: 100%;
+            height: 600px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .game-frame.active {
+            display: block;
+        }
+        
+        .admin-links {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .admin-links h4 {
+            margin: 0 0 10px 0;
+            color: #856404;
+        }
+        
+        .quick-scenarios {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .scenario-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        
+        .scenario-card:hover {
+            border-color: #007bff;
+            box-shadow: 0 2px 8px rgba(0,123,255,0.1);
+        }
+        
+        .scenario-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        
+        .scenario-description {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        
+        .toggle-arrow {
+            transition: transform 0.2s;
+        }
+        
+        .test-section.active .toggle-arrow {
+            transform: rotate(90deg);
+        }
+        
+        .log-area {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 15px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+        
+        .log-entry.info {
+            color: #007bff;
+        }
+        
+        .log-entry.success {
+            color: #28a745;
+        }
+        
+        .log-entry.warning {
+            color: #ffc107;
+        }
+        
+        .log-entry.error {
+            color: #dc3545;
+        }
+        
+        @media (max-width: 768px) {
+            .test-controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .state-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-scenarios {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    
+    <!-- Favicon Support -->
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="manifest" href="assets/site.webmanifest">
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+    
+    <!-- Game Scripts -->
+    <script src="js/supabase.js"></script>
+    <script src="js/streak.js"></script>
+    <script src="js/user-migration.js"></script>
+</head>
+<body>
+    <div class="test-container">
+        <!-- Header -->
+        <div class="test-header">
+            <h1>🎮 COMBO MEAL - Comprehensive Testing Suite</h1>
+            <p>Test the game in various user states, completion scenarios, and different recipes</p>
+        </div>
+        
+        <!-- Admin Links -->
+        <div class="admin-links">
+            <h4>🔧 Admin Tools</h4>
+            <a href="admin.html" target="_blank" class="test-button secondary">Standard Admin Panel</a>
+            <a href="admin-tree.html" target="_blank" class="test-button secondary">Recipe Tree Editor</a>
+            <a href="playtest.html" target="_blank" class="test-button secondary">Original Playtest</a>
+            <a href="index.html" target="_blank" class="test-button secondary">Live Game</a>
+        </div>
+        
+        <!-- Current State Display -->
+        <div class="current-state">
+            <h4>📊 Current Testing State</h4>
+            <div class="state-grid">
+                <div class="state-item">
+                    <div class="state-label">Auth Status</div>
+                    <div class="state-value" id="authStatus">
+                        <span class="status-indicator unknown"></span>Checking...
+                    </div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">User Type</div>
+                    <div class="state-value" id="userType">Unknown</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Selected Recipe</div>
+                    <div class="state-value" id="selectedRecipe">None</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Completion State</div>
+                    <div class="state-value" id="completionState">Unknown</div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Database Status</div>
+                    <div class="state-value" id="dbStatus">
+                        <span class="status-indicator unknown"></span>Checking...
+                    </div>
+                </div>
+                <div class="state-item">
+                    <div class="state-label">Available Recipes</div>
+                    <div class="state-value" id="recipeCount">Loading...</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quick Test Scenarios -->
+        <div class="test-section active">
+            <div class="test-section-header">
+                <span>🚀 Quick Test Scenarios</span>
+                <span class="toggle-arrow">▶</span>
+            </div>
+            <div class="test-section-content">
+                <p>Click any scenario to quickly set up that testing condition:</p>
+                <div class="quick-scenarios">
+                    <div class="scenario-card" onclick="setupScenario('anonymous-fresh')">
+                        <div class="scenario-title">Anonymous New User</div>
+                        <div class="scenario-description">Test as a completely new anonymous user who hasn't played before</div>
+                        <button class="test-button">Setup Scenario</button>
+                    </div>
+                    <div class="scenario-card" onclick="setupScenario('anonymous-completed')">
+                        <div class="scenario-title">Anonymous Completed</div>
+                        <div class="scenario-description">Test as anonymous user who already completed today's recipe</div>
+                        <button class="test-button warning">Setup Scenario</button>
+                    </div>
+                    <div class="scenario-card" onclick="setupScenario('verified-fresh')">
+                        <div class="scenario-title">Verified New User</div>
+                        <div class="scenario-description">Test as authenticated user who hasn't played today</div>
+                        <button class="test-button success">Setup Scenario</button>
+                    </div>
+                    <div class="scenario-card" onclick="setupScenario('verified-completed')">
+                        <div class="scenario-title">Verified Completed</div>
+                        <div class="scenario-description">Test as authenticated user who already finished today</div>
+                        <button class="test-button danger">Setup Scenario</button>
+                    </div>
+                    <div class="scenario-card" onclick="setupScenario('historical-date')">
+                        <div class="scenario-title">Historical Recipe</div>
+                        <div class="scenario-description">Test playing an older recipe from a previous date</div>
+                        <button class="test-button secondary">Setup Scenario</button>
+                    </div>
+                    <div class="scenario-card" onclick="setupScenario('future-date')">
+                        <div class="scenario-title">Future Recipe</div>
+                        <div class="scenario-description">Test playing a future recipe (if available)</div>
+                        <button class="test-button secondary">Setup Scenario</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- User Authentication Control -->
+        <div class="test-section">
+            <div class="test-section-header">
+                <span>👤 User Authentication Control</span>
+                <span class="toggle-arrow">▶</span>
+            </div>
+            <div class="test-section-content">
+                <div class="test-controls">
+                    <div class="test-control-group">
+                        <h4>Authentication State</h4>
+                        <button class="test-button" onclick="setAnonymousUser()">Set Anonymous User</button>
+                        <button class="test-button success" onclick="loginTestUser()">Login Test User</button>
+                        <button class="test-button secondary" onclick="createNewTestUser()">Create New Test User</button>
+                        <button class="test-button danger" onclick="logoutUser()">Logout</button>
+                    </div>
+                    <div class="test-control-group">
+                        <h4>Test User Management</h4>
+                        <input type="email" id="testUserEmail" placeholder="test-user@example.com" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <input type="password" id="testUserPassword" placeholder="password123" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <button class="test-button" onclick="loginCustomUser()">Login Custom User</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recipe Selection -->
+        <div class="test-section">
+            <div class="test-section-header">
+                <span>📅 Recipe Selection & Date Control</span>
+                <span class="toggle-arrow">▶</span>
+            </div>
+            <div class="test-section-content">
+                <div class="test-controls">
+                    <div class="test-control-group">
+                        <h4>Date Selection</h4>
+                        <input type="date" id="targetDate" style="width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <button class="test-button" onclick="loadRecipeByDate()">Load Recipe by Date</button>
+                        <button class="test-button success" onclick="loadTodayRecipe()">Load Today's Recipe</button>
+                        <button class="test-button warning" onclick="loadRandomRecipe()">Load Random Recipe</button>
+                    </div>
+                    <div class="test-control-group">
+                        <h4>Available Recipes</h4>
+                        <div class="recipe-selector" id="recipeSelector">
+                            <div class="recipe-item">Loading recipes...</div>
+                        </div>
+                        <button class="test-button" onclick="refreshRecipeList()">Refresh Recipe List</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Completion State Control -->
+        <div class="test-section">
+            <div class="test-section-header">
+                <span>✅ Completion State Control</span>
+                <span class="toggle-arrow">▶</span>
+            </div>
+            <div class="test-section-content">
+                <div class="test-controls">
+                    <div class="test-control-group">
+                        <h4>Simulate Completion States</h4>
+                        <button class="test-button success" onclick="simulateGameCompletion()">Simulate Game Completion</button>
+                        <button class="test-button warning" onclick="simulatePartialProgress()">Simulate Partial Progress</button>
+                        <button class="test-button danger" onclick="clearUserProgress()">Clear All Progress</button>
+                        <button class="test-button secondary" onclick="checkCurrentProgress()">Check Current Progress</button>
+                    </div>
+                    <div class="test-control-group">
+                        <h4>Game Session Management</h4>
+                        <button class="test-button" onclick="startNewSession()">Start New Session</button>
+                        <button class="test-button success" onclick="completeCurrentSession()">Complete Current Session</button>
+                        <button class="test-button danger" onclick="abandonCurrentSession()">Abandon Session</button>
+                        <button class="test-button secondary" onclick="viewSessionHistory()">View Session History</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Game Launch -->
+        <div class="test-section">
+            <div class="test-section-header">
+                <span>🎮 Game Launch & Testing</span>
+                <span class="toggle-arrow">▶</span>
+            </div>
+            <div class="test-section-content">
+                <div class="test-controls">
+                    <div class="test-control-group">
+                        <h4>Launch Game</h4>
+                        <button class="test-button success" onclick="launchGameInFrame()">Launch in Frame</button>
+                        <button class="test-button" onclick="launchGameNewTab()">Launch in New Tab</button>
+                        <button class="test-button secondary" onclick="launchPlaytest()">Launch Playtest Mode</button>
+                    </div>
+                    <div class="test-control-group">
+                        <h4>Debug & Monitoring</h4>
+                        <button class="test-button warning" onclick="enableDebugMode()">Enable Debug Mode</button>
+                        <button class="test-button" onclick="monitorGameEvents()">Monitor Game Events</button>
+                        <button class="test-button danger" onclick="clearDebugLog()">Clear Debug Log</button>
+                    </div>
+                </div>
+                
+                <!-- Game Frame -->
+                <iframe id="gameFrame" class="game-frame" src="about:blank"></iframe>
+            </div>
+        </div>
+        
+        <!-- Database Testing -->
+        <div class="test-section">
+            <div class="test-section-header">
+                <span>🗄️ Database Testing & Analytics</span>
+                <span class="toggle-arrow">▶</span>
+            </div>
+            <div class="test-section-content">
+                <div class="test-controls">
+                    <div class="test-control-group">
+                        <h4>Database Operations</h4>
+                        <button class="test-button" onclick="testDatabaseConnection()">Test DB Connection</button>
+                        <button class="test-button success" onclick="checkRecipeData()">Check Recipe Data</button>
+                        <button class="test-button warning" onclick="validateUserData()">Validate User Data</button>
+                        <button class="test-button danger" onclick="runDataIntegrityCheck()">Data Integrity Check</button>
+                    </div>
+                    <div class="test-control-group">
+                        <h4>User Analytics</h4>
+                        <button class="test-button" onclick="viewUserStats()">View User Stats</button>
+                        <button class="test-button success" onclick="checkCompletionData()">Check Completion Data</button>
+                        <button class="test-button secondary" onclick="exportTestData()">Export Test Data</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Debug Log -->
+        <div class="test-section">
+            <div class="test-section-header">
+                <span>🐛 Debug Log & Console</span>
+                <span class="toggle-arrow">▶</span>
+            </div>
+            <div class="test-section-content">
+                <div class="log-area" id="debugLog">
+                    <div class="log-entry info">Testing suite initialized. Ready for testing...</div>
+                </div>
+                <button class="test-button danger" onclick="clearDebugLog()">Clear Log</button>
+                <button class="test-button secondary" onclick="exportDebugLog()">Export Log</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/test-game.js"></script>
+</body>
+</html>

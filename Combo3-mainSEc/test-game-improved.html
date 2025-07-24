@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COMBO MEAL - Playtest Tool</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Clean, playtest-focused styling */
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+        
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        
+        .instructions {
+            background: #f8f9fa;
+            padding: 20px 30px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .instructions h3 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.3em;
+        }
+        
+        .instructions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 600px;
+        }
+        
+        .left-panel, .right-panel {
+            padding: 30px;
+        }
+        
+        .left-panel {
+            border-right: 1px solid #e9ecef;
+            background: #f8f9fa;
+        }
+        
+        .panel-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin: 0 0 25px 0;
+            color: #495057;
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .scenario-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .scenario-card:hover {
+            border-color: #007bff;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.15);
+        }
+        
+        .scenario-card.active {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        }
+        
+        .scenario-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .scenario-title {
+            font-weight: 600;
+            margin: 0 0 8px 0;
+            font-size: 1.1em;
+        }
+        
+        .scenario-description {
+            font-size: 0.9em;
+            color: #666;
+            line-height: 1.4;
+        }
+        
+        .recipe-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .recipe-section h4 {
+            margin: 0 0 15px 0;
+            color: #495057;
+            font-size: 1.1em;
+        }
+        
+        .recipe-selector {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        
+        .recipe-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f1f1f1;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .recipe-item:hover {
+            background: #f8f9fa;
+        }
+        
+        .recipe-item.selected {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .recipe-item:last-child {
+            border-bottom: none;
+        }
+        
+        .recipe-meta {
+            font-size: 0.85em;
+            color: #666;
+            text-align: right;
+        }
+        
+        .status-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .status-item {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .status-label {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-value {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.online { background: #28a745; }
+        .status-indicator.offline { background: #dc3545; }
+        .status-indicator.unknown { background: #6c757d; }
+        
+        .action-button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+        
+        .action-button.primary {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+        }
+        
+        .action-button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+        }
+        
+        .action-button.secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 2px solid #e9ecef;
+        }
+        
+        .action-button.secondary:hover {
+            background: #e9ecef;
+            border-color: #dee2e6;
+        }
+        
+        .action-button:disabled {
+            background: #e9ecef;
+            color: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .date-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 1em;
+            margin-bottom: 15px;
+        }
+        
+        .date-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+        
+        .log-section {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            margin-top: 30px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .log-title {
+            color: #a0aec0;
+            margin: 0 0 15px 0;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+        
+        .log-content {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #1a202c;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 4px 0;
+        }
+        
+        .log-entry.info { color: #63b3ed; }
+        .log-entry.success { color: #68d391; }
+        .log-entry.warning { color: #f6e05e; }
+        .log-entry.error { color: #fc8181; }
+        
+        .admin-links {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .admin-link {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #495057;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .admin-link:hover {
+            background: #e9ecef;
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .left-panel {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+            }
+            
+            .scenario-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .admin-links {
+                flex-direction: column;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .left-panel, .right-panel {
+                padding: 20px;
+            }
+        }
+    </style>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎮 COMBO MEAL Playtest Tool</h1>
+            <p>Test New Play vs Completed states for Anonymous vs Verified users</p>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="instructions">
+            <h3>📋 How to Use This Playtest Tool</h3>
+            <ol>
+                <li><strong>Select a test scenario</strong> on the left (Anonymous/Verified + New/Completed)</li>
+                <li><strong>Choose a recipe</strong> by date or browse the list on the right</li>
+                <li><strong>Click "Launch Game"</strong> to test the selected scenario</li>
+                <li><strong>Monitor the log</strong> at the bottom for detailed testing feedback</li>
+                <li><strong>Reset and repeat</strong> to test different combinations</li>
+            </ol>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel: Scenarios -->
+            <div class="left-panel">
+                <div class="panel-title">🎭 Test Scenarios</div>
+                
+                <div class="scenario-grid">
+                    <div class="scenario-card" onclick="selectScenario('anonymous-new')" id="scenario-anonymous-new">
+                        <div class="scenario-icon">👤</div>
+                        <div class="scenario-title">Anonymous New</div>
+                        <div class="scenario-description">User hasn't played today's recipe</div>
+                    </div>
+                    
+                    <div class="scenario-card" onclick="selectScenario('anonymous-completed')" id="scenario-anonymous-completed">
+                        <div class="scenario-icon">👤✅</div>
+                        <div class="scenario-title">Anonymous Completed</div>
+                        <div class="scenario-description">User already finished today</div>
+                    </div>
+                    
+                    <div class="scenario-card" onclick="selectScenario('verified-new')" id="scenario-verified-new">
+                        <div class="scenario-icon">🔐</div>
+                        <div class="scenario-title">Verified New</div>
+                        <div class="scenario-description">Logged-in user, haven't played</div>
+                    </div>
+                    
+                    <div class="scenario-card" onclick="selectScenario('verified-completed')" id="scenario-verified-completed">
+                        <div class="scenario-icon">🔐✅</div>
+                        <div class="scenario-title">Verified Completed</div>
+                        <div class="scenario-description">Logged-in user, already done</div>
+                    </div>
+                </div>
+                
+                <!-- Admin Links -->
+                <div class="admin-links">
+                    <a href="admin.html" target="_blank" class="admin-link">Admin Panel</a>
+                    <a href="admin-tree.html" target="_blank" class="admin-link">Recipe Editor</a>
+                    <a href="playtest.html" target="_blank" class="admin-link">Original Playtest</a>
+                </div>
+                
+                <!-- Status Panel -->
+                <div class="status-panel">
+                    <h4>📊 Current Status</h4>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div class="status-label">Scenario</div>
+                            <div class="status-value" id="currentScenario">None Selected</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">Database</div>
+                            <div class="status-value" id="dbStatus">
+                                <span class="status-indicator unknown"></span>Checking...
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">User Type</div>
+                            <div class="status-value" id="userType">Not Set</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">Completion</div>
+                            <div class="status-value" id="completionStatus">Unknown</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Recipe Selection -->
+            <div class="right-panel">
+                <div class="panel-title">📅 Recipe Selection</div>
+                
+                <div class="recipe-section">
+                    <h4>Quick Date Selection</h4>
+                    <input type="date" id="targetDate" class="date-input">
+                    <button class="action-button secondary" onclick="loadTodayRecipe()">Today's Recipe</button>
+                    <button class="action-button secondary" onclick="loadRecipeByDate()">Load Selected Date</button>
+                </div>
+                
+                <div class="recipe-section">
+                    <h4>Available Recipes <span id="recipeCount">(Loading...)</span></h4>
+                    <div class="recipe-selector" id="recipeList">
+                        <div class="recipe-item">Loading recipes...</div>
+                    </div>
+                    <button class="action-button secondary" onclick="refreshRecipes()">🔄 Refresh List</button>
+                </div>
+                
+                <!-- Launch Section -->
+                <div class="recipe-section">
+                    <button class="action-button primary" id="launchButton" onclick="launchGame()" disabled>
+                        🚀 Launch Game
+                    </button>
+                    <button class="action-button secondary" onclick="resetScenario()">🔄 Reset Scenario</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Log Section -->
+        <div class="log-section">
+            <div class="log-title">📋 Playtest Log</div>
+            <div class="log-content" id="logContent">
+                <div class="log-entry info">[INFO] Playtest tool initialized</div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ================================================
+        // PLAYTEST TOOL - CORE FUNCTIONALITY
+        // ================================================
+        
+        let testState = {
+            selectedScenario: null,
+            selectedRecipe: null,
+            availableRecipes: [],
+            currentUser: null,
+            isReady: false
+        };
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePlaytestTool();
+        });
+        
+        async function initializePlaytestTool() {
+            log('info', 'Initializing playtest tool...');
+            
+            // Set today's date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('targetDate').value = today;
+            
+            // Check database connection
+            await checkDatabaseConnection();
+            
+            // Load available recipes
+            await loadAvailableRecipes();
+            
+            log('success', 'Playtest tool ready!');
+        }
+        
+        // ================================================
+        // SCENARIO SELECTION
+        // ================================================
+        
+        function selectScenario(scenarioType) {
+            // Clear previous selection
+            document.querySelectorAll('.scenario-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            
+            // Select new scenario
+            document.getElementById(`scenario-${scenarioType}`).classList.add('active');
+            testState.selectedScenario = scenarioType;
+            
+            // Update status
+            const scenarioNames = {
+                'anonymous-new': 'Anonymous New Player',
+                'anonymous-completed': 'Anonymous Completed',
+                'verified-new': 'Verified New Player', 
+                'verified-completed': 'Verified Completed'
+            };
+            
+            document.getElementById('currentScenario').textContent = scenarioNames[scenarioType];
+            log('info', `Selected scenario: ${scenarioNames[scenarioType]}`);
+            
+            updateLaunchButton();
+        }
+        
+        // ================================================
+        // RECIPE MANAGEMENT
+        // ================================================
+        
+        async function loadAvailableRecipes() {
+            try {
+                log('info', 'Loading available recipes...');
+                
+                if (typeof supabase === 'undefined') {
+                    throw new Error('Database not available');
+                }
+                
+                const { data: recipes, error } = await supabase
+                    .from('recipes')
+                    .select('rec_id, name, date, description')
+                    .order('date', { ascending: false });
+                
+                if (error) throw error;
+                
+                testState.availableRecipes = recipes || [];
+                updateRecipeList();
+                
+                document.getElementById('recipeCount').textContent = `(${recipes.length} available)`;
+                log('success', `Loaded ${recipes.length} recipes`);
+                
+            } catch (error) {
+                log('error', `Failed to load recipes: ${error.message}`);
+                document.getElementById('recipeCount').textContent = '(Error loading)';
+            }
+        }
+        
+        function updateRecipeList() {
+            const recipeList = document.getElementById('recipeList');
+            
+            if (testState.availableRecipes.length === 0) {
+                recipeList.innerHTML = '<div class="recipe-item">No recipes available</div>';
+                return;
+            }
+            
+            recipeList.innerHTML = testState.availableRecipes.map(recipe => `
+                <div class="recipe-item" onclick="selectRecipe('${recipe.rec_id}')" data-recipe-id="${recipe.rec_id}">
+                    <div>
+                        <strong>${recipe.name}</strong>
+                        <div class="recipe-meta">${recipe.date}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function selectRecipe(recipeId) {
+            // Clear previous selection
+            document.querySelectorAll('.recipe-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Select new recipe
+            const selectedItem = document.querySelector(`[data-recipe-id="${recipeId}"]`);
+            if (selectedItem) {
+                selectedItem.classList.add('selected');
+            }
+            
+            // Find recipe data
+            const recipe = testState.availableRecipes.find(r => r.rec_id === recipeId);
+            if (recipe) {
+                testState.selectedRecipe = recipe;
+                document.getElementById('targetDate').value = recipe.date;
+                log('info', `Selected recipe: ${recipe.name} (${recipe.date})`);
+            }
+            
+            updateLaunchButton();
+        }
+        
+        async function loadTodayRecipe() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('targetDate').value = today;
+            await loadRecipeByDate();
+        }
+        
+        async function loadRecipeByDate() {
+            const targetDate = document.getElementById('targetDate').value;
+            if (!targetDate) {
+                log('error', 'Please select a date');
+                return;
+            }
+            
+            const recipe = testState.availableRecipes.find(r => r.date === targetDate);
+            if (recipe) {
+                selectRecipe(recipe.rec_id);
+            } else {
+                log('warning', `No recipe found for ${targetDate}`);
+            }
+        }
+        
+        function refreshRecipes() {
+            loadAvailableRecipes();
+        }
+        
+        // ================================================
+        // DATABASE CONNECTION
+        // ================================================
+        
+        async function checkDatabaseConnection() {
+            try {
+                if (typeof supabase === 'undefined') {
+                    throw new Error('Supabase client not available');
+                }
+                
+                const { data, error } = await supabase
+                    .from('recipes')
+                    .select('count')
+                    .limit(1);
+                
+                if (error) throw error;
+                
+                updateStatus('dbStatus', 'online', 'Connected');
+                log('success', 'Database connection established');
+                
+            } catch (error) {
+                updateStatus('dbStatus', 'offline', 'Error');
+                log('error', `Database connection failed: ${error.message}`);
+            }
+        }
+        
+        // ================================================
+        // SCENARIO SETUP AND GAME LAUNCH
+        // ================================================
+        
+        async function launchGame() {
+            if (!testState.selectedScenario || !testState.selectedRecipe) {
+                log('error', 'Please select both a scenario and recipe');
+                return;
+            }
+            
+            log('info', `Setting up scenario: ${testState.selectedScenario}`);
+            
+            try {
+                // Setup the scenario
+                await setupScenario(testState.selectedScenario);
+                
+                // Build game URL with parameters
+                const params = new URLSearchParams({
+                    testMode: 'true',
+                    scenario: testState.selectedScenario,
+                    recipeId: testState.selectedRecipe.rec_id,
+                    selectedDate: testState.selectedRecipe.date
+                });
+                
+                const gameUrl = `index.html?${params.toString()}`;
+                
+                // Launch game in new tab
+                log('success', 'Launching game...');
+                window.open(gameUrl, '_blank');
+                
+            } catch (error) {
+                log('error', `Failed to launch game: ${error.message}`);
+            }
+        }
+        
+        async function setupScenario(scenarioType) {
+            switch (scenarioType) {
+                case 'anonymous-new':
+                    log('info', 'Setting up anonymous new user...');
+                    await setAnonymousUser();
+                    await clearUserProgress();
+                    updateStatus('userType', '', 'Anonymous');
+                    updateStatus('completionStatus', '', 'New Play');
+                    break;
+                    
+                case 'anonymous-completed':
+                    log('info', 'Setting up anonymous completed user...');
+                    await setAnonymousUser();
+                    await simulateCompletion();
+                    updateStatus('userType', '', 'Anonymous');
+                    updateStatus('completionStatus', '', 'Completed');
+                    break;
+                    
+                case 'verified-new':
+                    log('info', 'Setting up verified new user...');
+                    await loginTestUser();
+                    await clearUserProgress();
+                    updateStatus('userType', '', 'Verified');
+                    updateStatus('completionStatus', '', 'New Play');
+                    break;
+                    
+                case 'verified-completed':
+                    log('info', 'Setting up verified completed user...');
+                    await loginTestUser();
+                    await simulateCompletion();
+                    updateStatus('userType', '', 'Verified');
+                    updateStatus('completionStatus', '', 'Completed');
+                    break;
+                    
+                default:
+                    throw new Error(`Unknown scenario: ${scenarioType}`);
+            }
+        }
+        
+        // ================================================
+        // USER AUTHENTICATION HELPERS
+        // ================================================
+        
+        async function setAnonymousUser() {
+            try {
+                // Sign out first
+                await supabase.auth.signOut();
+                
+                // Create anonymous session
+                const { data, error } = await supabase.auth.signInAnonymously();
+                if (error) throw error;
+                
+                testState.currentUser = { id: data.user.id, isAnonymous: true };
+                log('success', 'Anonymous user session created');
+                
+            } catch (error) {
+                log('error', `Failed to create anonymous user: ${error.message}`);
+            }
+        }
+        
+        async function loginTestUser() {
+            try {
+                const testEmail = 'test-user@combomeal.test';
+                const testPassword = 'CHANGE_THIS_PASSWORD'; // Security: Update this in your local environment
+                
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email: testEmail,
+                    password: testPassword
+                });
+                
+                if (error) {
+                    // Try to create the test user if login failed
+                    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                        email: testEmail,
+                        password: testPassword
+                    });
+                    
+                    if (signUpError) throw signUpError;
+                    testState.currentUser = { id: signUpData.user.id, isAnonymous: false };
+                    log('success', 'Test user created and logged in');
+                } else {
+                    testState.currentUser = { id: data.user.id, isAnonymous: false };
+                    log('success', 'Test user logged in');
+                }
+                
+            } catch (error) {
+                log('error', `Failed to login test user: ${error.message}`);
+            }
+        }
+        
+        async function clearUserProgress() {
+            if (!testState.currentUser || !testState.selectedRecipe) return;
+            
+            try {
+                const { error } = await supabase
+                    .from('user_sessions')
+                    .delete()
+                    .eq('user_id', testState.currentUser.id)
+                    .eq('rec_id', testState.selectedRecipe.rec_id);
+                
+                if (error) throw error;
+                log('success', 'User progress cleared');
+                
+            } catch (error) {
+                log('warning', `Could not clear progress: ${error.message}`);
+            }
+        }
+        
+        async function simulateCompletion() {
+            if (!testState.currentUser || !testState.selectedRecipe) return;
+            
+            try {
+                const { error } = await supabase
+                    .from('user_sessions')
+                    .insert({
+                        user_id: testState.currentUser.id,
+                        rec_id: testState.selectedRecipe.rec_id,
+                        session_status: 'completed',
+                        hints_used: Math.floor(Math.random() * 3),
+                        time_taken: Math.floor(Math.random() * 600) + 120,
+                        star_score: Math.floor(Math.random() * 3) + 1,
+                        completed_at: new Date().toISOString()
+                    });
+                
+                if (error) throw error;
+                log('success', 'Completion status simulated');
+                
+            } catch (error) {
+                log('warning', `Could not simulate completion: ${error.message}`);
+            }
+        }
+        
+        // ================================================
+        // UI HELPERS
+        // ================================================
+        
+        function updateLaunchButton() {
+            const launchButton = document.getElementById('launchButton');
+            const isReady = testState.selectedScenario && testState.selectedRecipe;
+            
+            launchButton.disabled = !isReady;
+            launchButton.textContent = isReady ? '🚀 Launch Game' : '🚀 Select Scenario & Recipe';
+        }
+        
+        function resetScenario() {
+            // Clear scenario selection
+            document.querySelectorAll('.scenario-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            
+            // Clear recipe selection
+            document.querySelectorAll('.recipe-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Reset state
+            testState.selectedScenario = null;
+            testState.selectedRecipe = null;
+            
+            // Update UI
+            document.getElementById('currentScenario').textContent = 'None Selected';
+            document.getElementById('userType').textContent = 'Not Set';
+            document.getElementById('completionStatus').textContent = 'Unknown';
+            
+            updateLaunchButton();
+            log('info', 'Scenario reset');
+        }
+        
+        function updateStatus(elementId, statusClass, statusText) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            const indicator = element.querySelector('.status-indicator');
+            if (indicator) {
+                indicator.className = `status-indicator ${statusClass || 'unknown'}`;
+                element.innerHTML = `<span class="status-indicator ${statusClass || 'unknown'}"></span>${statusText}`;
+            } else {
+                element.textContent = statusText;
+            }
+        }
+        
+        function log(level, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logContent = document.getElementById('logContent');
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${level}`;
+            logEntry.textContent = `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+            
+            logContent.appendChild(logEntry);
+            logContent.scrollTop = logContent.scrollHeight;
+            
+            // Also log to console
+            console[level === 'error' ? 'error' : level === 'warning' ? 'warn' : 'log'](`[PLAYTEST] ${message}`);
+        }
+    </script>
+</body>
+</html>

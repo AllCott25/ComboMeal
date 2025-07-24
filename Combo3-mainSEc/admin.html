@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culinary Logic Puzzle - Admin</title>
+    <link rel="stylesheet" href="css/admin.css">
+    
+    <!-- Favicon Support -->
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="manifest" href="assets/site.webmanifest">
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Security Utilities -->
+    <script src="js/security-utils.js"></script>
+    <!-- Configuration -->
+    <script src="js/config.js"></script>
+    <!-- Admin Authentication -->
+    <script src="js/admin-auth.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Culinary Logic Puzzle - Admin Panel</h1>
+        </header>
+        
+        <!-- Login Section -->
+        <div id="login-section" class="section">
+            <h2>Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit">Login</button>
+            </form>
+            <div id="login-error" class="error-message"></div>
+        </div>
+        
+        <!-- Admin Panel (hidden until logged in) -->
+        <div id="admin-panel" class="section hidden">
+            <div class="tabs">
+                <button class="tab-button active" data-tab="recipe-tree">Recipe Tree</button>
+                <button class="tab-button" data-tab="planning-section">Planning</button>
+                <button class="tab-button" data-tab="test-section">Test</button>
+                <button class="tab-button" data-tab="analytics-section">Analytics</button>
+            </div>
+            
+            <!-- Recipe Tree Tab -->
+            <div id="recipe-tree" class="tab-content active">
+                <h2>Recipe Tree Management</h2>
+                <p>Create and edit recipes using the comprehensive recipe tree interface.</p>
+                <div style="margin: 20px 0;">
+                    <a href="admin-tree.html" target="_blank" class="recipe-tree-link">
+                        <button type="button" style="background-color: #28a745; color: white; padding: 15px 25px; font-size: 16px; border-radius: 6px;">
+                            Open Recipe Tree Editor
+                        </button>
+                    </a>
+                    </div>
+                <p style="color: #666; font-style: italic;">
+                    The Recipe Tree Editor opens in a new tab and provides a visual interface for creating recipes, combinations, ingredients, and easter eggs.
+                </p>
+            </div>
+            
+            <!-- Planning Section -->
+            <div id="planning-section" class="tab-content">
+                <h2>Recipe Planning Calendar</h2>
+                
+                <!-- Planning Messages Area -->
+                <div id="planning-messages" class="message"></div>
+                
+                <div class="planning-container">
+                    <!-- Calendar Section -->
+                    <div class="planning-calendar">
+                        <div class="calendar-header">
+                            <button id="prev-month" class="calendar-nav-btn">‹</button>
+                            <h3 id="current-month-year">May 2025</h3>
+                            <button id="next-month" class="calendar-nav-btn">›</button>
+                    </div>
+                        
+                        <div class="calendar-grid-container">
+                            <div class="calendar-weekdays">
+                                <div class="weekday">Sun</div>
+                                <div class="weekday">Mon</div>
+                                <div class="weekday">Tue</div>
+                                <div class="weekday">Wed</div>
+                                <div class="weekday">Thu</div>
+                                <div class="weekday">Fri</div>
+                                <div class="weekday">Sat</div>
+                            </div>
+                            <div id="planning-calendar-grid" class="planning-calendar-grid">
+                                <!-- Calendar days will be populated here -->
+                    </div>
+                </div>
+            </div>
+            
+                    <!-- Recipe Panel -->
+                    <div class="recipe-panel">
+                        <h3>Available Recipes</h3>
+                        <div class="recipe-filter">
+                            <input type="text" id="recipe-search" placeholder="Search recipes...">
+                            <select id="recipe-sort">
+                                <option value="name">Sort by Name</option>
+                                <option value="date">Sort by Date</option>
+                                <option value="author">Sort by Author</option>
+                            </select>
+                        </div>
+                        <div id="recipe-cards-container" class="recipe-cards-container">
+                            <!-- Recipe cards will be populated here -->
+                    </div>
+                    </div>
+                    </div>
+                
+                <!-- Recipe Edit Modal -->
+                <div id="recipe-edit-modal" class="modal-overlay">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3>Edit Recipe</h3>
+                            <button id="close-modal" class="close-modal">&times;</button>
+                        </div>
+                        <form id="recipe-edit-form">
+                            <input type="hidden" id="edit-recipe-id">
+                            
+                            <div class="form-row">
+                    <div class="form-group">
+                                    <label for="edit-recipe-name">Recipe Name:</label>
+                                    <input type="text" id="edit-recipe-name" required>
+                    </div>
+                    <div class="form-group">
+                                    <label for="edit-recipe-date">Date:</label>
+                                    <input type="date" id="edit-recipe-date" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="edit-recipe-day-number">Day Number:</label>
+                                    <input type="number" id="edit-recipe-day-number" min="1" placeholder="Optional">
+                    </div>
+                    <div class="form-group">
+                                    <label for="edit-recipe-author">Author:</label>
+                                    <input type="text" id="edit-recipe-author" placeholder="Recipe author">
+                    </div>
+            </div>
+            
+                    <div class="form-group">
+                                <label for="edit-recipe-description">Description:</label>
+                                <textarea id="edit-recipe-description" rows="3" placeholder="Recipe description"></textarea>
+                    </div>
+                            
+                    <div class="form-group">
+                                <label for="edit-recipe-url">Recipe URL:</label>
+                                <input type="url" id="edit-recipe-url" placeholder="https://...">
+                    </div>
+                            
+                    <div class="form-group">
+                                <label for="edit-recipe-img-url">Image URL:</label>
+                                <input type="url" id="edit-recipe-img-url" placeholder="https://...">
+                            </div>
+                            
+                            <div class="form-group" id="edit-recipe-easter-egg-info-container">
+                                <label for="edit-recipe-easter-egg-info">Easter Egg(s):</label>
+                                <div id="edit-recipe-easter-egg-info" class="non-interactive-text"></div>
+                            </div>
+                            
+                            <div class="modal-actions">
+                                <button type="button" id="playtest-recipe-btn" style="background:#007bff;color:#fff;margin-right:8px;" target="_blank">Playtest</button>
+                                <button type="button" id="cancel-edit">Cancel</button>
+                                <button type="submit" id="save-recipe">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                    </div>
+            </div>
+            
+            <!-- Test Section -->
+            <div id="test-section" class="tab-content">
+                <h2>Test Recipe</h2>
+                <div class="form-group">
+                    <label for="test-recipe">Select Recipe to Test:</label>
+                    <select id="test-recipe"></select>
+                </div>
+                <button id="test-button">Test Recipe</button>
+                <div id="test-results" class="results-container">
+                    <h3>Test Results</h3>
+                    <div id="test-output"></div>
+                </div>
+            </div>
+            
+            <!-- Analytics Section -->
+            <div id="analytics-section" class="tab-content">
+                <h2>Game Analytics Dashboard</h2>
+                
+                <!-- Dashboard Controls -->
+                <div class="analytics-controls">
+                    <div class="form-group">
+                        <label for="analytics-period">Time Period:</label>
+                        <select id="analytics-period">
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+                    <button id="refresh-analytics">Refresh Data</button>
+                </div>
+                
+                <!-- Summary Stats -->
+                <div id="analytics-summary" class="analytics-summary">
+                    <div class="stat-card">
+                        <h3>Total Sessions</h3>
+                        <div class="stat-value" id="total-sessions">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Completion Rate</h3>
+                        <div class="stat-value" id="completion-rate">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Avg. Time</h3>
+                        <div class="stat-value" id="avg-time">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Avg. Hints</h3>
+                        <div class="stat-value" id="avg-hints">-</div>
+                    </div>
+                </div>
+                
+                <!-- Recipe Calendar -->
+                <div class="analytics-calendar">
+                    <h3>Recipe Performance Calendar</h3>
+                    <div id="calendar-container">
+                        <!-- Calendar will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- Detailed Recipe Analytics -->
+                <div class="recipe-analytics">
+                    <h3>Recipe Details</h3>
+                    <div id="recipe-analytics-list">
+                        <!-- Recipe analytics will be populated here -->
+                    </div>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="analytics-loading" class="loading hidden">
+                    <p>Loading analytics data...</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 Culinary Logic Puzzle - Admin Panel</p>
+        </footer>
+    </div>
+    
+    <script src="js/admin.js"></script>
+</body>
+</html> 
