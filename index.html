@@ -81,12 +81,26 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- P5.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+    <!-- Configuration - loads environment-specific settings -->
+    <script src="js/config.js"></script>
+    <!-- Design System - must load before other game scripts -->
+    <script src="js/design-system.js"></script>
     <!-- Our Supabase Integration -->
     <script src="js/supabase.js"></script>
     <!-- Streak System -->
     <script src="js/streak.js"></script>
+    <!-- User Migration System -->
+    <script src="js/user-migration.js"></script>
     <!-- VesselSystem Module - Load before main game script -->
     <script src="js/modules/VesselSystem.js"></script>
+    <!-- Animation  Script -->
+    <script src="js/animation.js"></script>
+    <!-- Interaction Script -->
+    <script src="js/interaction.js"></script>
+    <!-- Menu System -->
+    <script src="js/menu.js"></script>
+    <!-- Authentication Modal -->
+    <script src="js/auth-modal.js"></script>
     <!-- Main Game Script -->
     <script src="js/sketch.js"></script>
     <!-- GameLogic Script -->
@@ -99,8 +113,66 @@
     <script src="js/egg.js"></script>
     <!-- Help Modal Script -->
     <script src="js/help.js"></script>
+    
 </head>
 <body>
-    
+    <!-- Terms & Conditions HTML Modal -->
+    <div id="terms-modal" class="terms-modal" style="display: none;">
+        <div class="terms-modal-overlay"></div>
+        <div class="terms-modal-content">
+            <div class="terms-modal-header">
+                <h2>Terms & Conditions</h2>
+                <button class="terms-modal-close" id="terms-close-btn">&times;</button>
+            </div>
+            <div class="terms-modal-body">
+                <h3>COMBO MEAL TERMS & CONDITIONS</h3>
+                
+                <h4>1. ACCEPTANCE OF TERMS</h4>
+                <p>By playing Combo Meal, you agree to these Terms & Conditions. If you do not agree, please do not use our game.</p>
+                
+                <h4>2. GAME DESCRIPTION</h4>
+                <p>Combo Meal is a daily logic puzzle game where players combine ingredients to create recipes.</p>
+                
+                <h4>3. USER ACCOUNTS</h4>
+                <ul>
+                    <li>Accounts are optional but enable progress saving</li>
+                    <li>You are responsible for maintaining account security</li>
+                    <li>We may suspend accounts for violations of these terms</li>
+                </ul>
+                
+                <h4>4. ACCEPTABLE USE</h4>
+                <p>You agree to:</p>
+                <ul>
+                    <li>Use the game for personal, non-commercial purposes</li>
+                    <li>Not attempt to hack, exploit, or reverse engineer the game</li>
+                    <li>Not use automated tools or scripts</li>
+                    <li>Be respectful in any feedback or communications</li>
+                </ul>
+                
+                <h4>5. INTELLECTUAL PROPERTY</h4>
+                <ul>
+                    <li>Combo Meal game design and content are owned by APlasker</li>
+                    <li>Recipe content may be sourced from third parties</li>
+                    <li>You may not reproduce or distribute game content without permission</li>
+                </ul>
+                
+                <h4>6. PRIVACY</h4>
+                <p>We collect minimal data to provide game functionality. We do not sell your personal information.</p>
+                
+                <h4>7. DISCLAIMERS</h4>
+                <ul>
+                    <li>The game is provided "as is" without warranties</li>
+                    <li>We are not liable for any damages from game use</li>
+                    <li>Recipe accuracy is not guaranteed</li>
+                </ul>
+                
+                <h4>8. CHANGES TO TERMS</h4>
+                <p>We may update these terms occasionally. Continued use constitutes acceptance of changes.</p>
+                
+                <h4>9. CONTACT INFORMATION</h4>
+                <p>For questions about these terms, please contact us through the game's feedback system.</p>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

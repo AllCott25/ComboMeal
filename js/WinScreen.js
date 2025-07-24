@@ -1,42 +1,47 @@
+// ... existing code ...
+// Add to the top of the file with other global state variables:
+// Last Updated: May 31, 2025 (05:43 PM EDT) by APlasker - Added bonus 6th star to Win Screen score card for perfect (0 mistakes, 0 hints) games.
+let isMouseOverScoreCard = false;
+// ... existing code ...
+
 function showWinScreen() {
   gameWon = true;
   triggerHapticFeedback('completion');
   
-  // APlasker - Complete analytics session with win condition
-  if (typeof completeGameSession === 'function') {
+  // Complete the game session immediately when win screen is shown - APlasker
+  // This ensures star scores are calculated and stored right away
+  // Use enhanced completion with retry logic for better reliability
+  if (typeof completeGameSessionWithRetry === 'function') {
+    console.log("Completing game session with retry logic on win");
+    completeGameSessionWithRetry('completed');
+  } else if (typeof completeGameSession === 'function') {
+    console.log("Completing game session immediately on win");
     completeGameSession('completed');
   }
   
+  // Start win screen tracking for timeout management
+  if (typeof startWinScreenTracking === 'function') {
+    startWinScreenTracking();
+  }
+  
   // APlasker - Record streak completion if StreakSystem is available
-  if (typeof StreakSystem !== 'undefined' && typeof recipe !== 'undefined' && recipe && recipe.day_number) {
-    // Calculate the letter grade first (this logic is duplicated from drawWinScreen but needed here)
-    let blackMoves = 0;
-    for (let move of moveHistory) {
-      if (move === 'black' || move === '#333333') {
-        blackMoves++;
-      }
-    }
-    
-    let calculatedGrade;
-    if (blackMoves === 0) {
-      calculatedGrade = "A";
-    } else if (blackMoves >= 1 && blackMoves <= 2) {
-      calculatedGrade = "B";
-    } else if (blackMoves >= 3 && blackMoves <= 4) {
-      calculatedGrade = "C";
-    } else {
-      calculatedGrade = "X";
-    }
+  // Exclude tutorial mode completions from streak tracking
+  if (typeof StreakSystem !== 'undefined' && typeof recipe !== 'undefined' && recipe && recipe.day_number && !isTutorialMode) {
+    // Use actual mistakes from analytics system instead of calculating grades
+    const currentMistakes = typeof totalMistakes !== 'undefined' ? totalMistakes : 0;
+    const validForStreak = currentMistakes < 5; // Less than 5 mistakes counts for streak
     
     // Get game time in seconds
     const timeInSeconds = typeof gameTimer !== 'undefined' ? gameTimer : 0;
     
     // Record the completion in the streak system
-    const streakUpdated = StreakSystem.recordCompletion(recipe.day_number, calculatedGrade, timeInSeconds);
+    const streakUpdated = StreakSystem.recordCompletion(recipe.day_number, validForStreak, timeInSeconds);
     
     if (streakUpdated) {
-      console.log('Streak updated for recipe day', recipe.day_number, 'with grade', calculatedGrade);
+      console.log('Streak updated for recipe day', recipe.day_number, 'with', currentMistakes, 'mistakes (valid:', validForStreak, ')');
     }
+  } else if (isTutorialMode) {
+    console.log('Tutorial mode completion - not recorded in streak system');
   }
 }
 
@@ -118,7 +123,7 @@ function drawWinScreen() {
   textAlign(CENTER, CENTER);
   
   // Draw reward message with multicolor treatment (like COMBO MEAL)
-  const rewardMessage = "WOW DELICIOUS!";
+  const rewardMessage = "DELICIOUS";
   const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36); // Changed from width to playAreaWidth with adjusted coefficient
   textSize(rewardMessageSize);
   textStyle(BOLD);
@@ -134,8 +139,8 @@ function drawWinScreen() {
     totalWidth += letterWidth;
   }
   
-  // Add kerning (50% increase in spacing)
-  const kerningFactor = 0.5; // 50% extra space
+  // Add kerning (25% increase in spacing)
+  const kerningFactor = 0.25; // 25% extra space
   let totalKerning = 0;
   
   // Calculate total kerning space (only between letters, not at the ends)
@@ -150,7 +155,58 @@ function drawWinScreen() {
   const outlineWeight = useVerticalLayout ? 1.5 : 2; // Thinner outline for bubble style
   const bounceAmount = 2 * Math.sin(frameCount * 0.05); // Subtle bounce animation
   
-  // Draw each letter with alternating colors
+  // Calculate outline sizes
+  const outerSize = 3.5;  // Outer black outline thickness
+  const middleSize = 2.5; // Middle peach outline thickness
+  const innerSize = 1;    // Inner black outline thickness
+  
+  // IMPROVED OUTLINE APPROACH - Draw outlines for each letter that connect smoothly with bounce
+  // First pass: Draw all outline layers for all letters
+  for (let layer = 0; layer < 3; layer++) {
+    let currentX = x; // Reset x position for each layer
+    
+    let layerSize, layerColor;
+    switch (layer) {
+      case 0: // Outer black outline
+        layerSize = outerSize;
+        layerColor = 'black';
+        break;
+      case 1: // Middle peach outline
+        layerSize = middleSize;
+        layerColor = COLORS.peach;
+        break;
+      case 2: // Inner black outline
+        layerSize = innerSize;
+        layerColor = 'black';
+        break;
+    }
+    
+      push();
+  fill(layerColor);
+  textAlign(CENTER, CENTER);
+  textSize(rewardMessageSize);
+  textFont(titleFont); // Use title font for win screen titles
+    
+    for (let i = 0; i < rewardMessage.length; i++) {
+      // Calculate letter position with bounce effect
+      let offsetY = (i % 2 === 0) ? bounceAmount : -bounceAmount;
+      let letterX = currentX + letterWidths[i]/2;
+      let letterY = playAreaY + playAreaHeight * 0.06 + offsetY;
+      
+      // Draw outline for this letter
+      for (let angle = 0; angle < TWO_PI; angle += PI/16) {
+        let outlineOffsetX = cos(angle) * layerSize;
+        let outlineOffsetY = sin(angle) * layerSize;
+        text(rewardMessage[i], letterX + outlineOffsetX, letterY + outlineOffsetY);
+      }
+      
+      // Move to next letter position (using kerning factor)
+      currentX += letterWidths[i] * (1 + kerningFactor);
+    }
+    pop();
+  }
+  
+  // Second pass: Draw colored letters on top
   for (let i = 0; i < rewardMessage.length; i++) {
     // Choose color based on position (cycle through green, yellow, red)
     let letterColor;
@@ -172,50 +228,16 @@ function drawWinScreen() {
     let letterX = x + letterWidths[i]/2;
     let letterY = playAreaY + playAreaHeight * 0.06 + offsetY;
     
-    // SOLID OUTLINE APPROACH - Create smooth solid outlines with multiple text copies - Updated to match COMBO MEAL title
-    push(); // Save drawing state
-    
-    // Set text properties for all layers
+    // Draw the colored letter
+    push();
     textAlign(CENTER, CENTER);
     textSize(rewardMessageSize);
-    
-    // Calculate outline sizes
-    const outerSize = 6;  // Outer black outline thickness
-    const middleSize = 4; // Middle peach outline thickness
-    const innerSize = 2;  // Inner black outline thickness
-    
-    // 1. Draw outer black outline (largest) using multiple offset copies
-    fill('black');
-    // Create a circular pattern of offsets for smooth round outline
-    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
-      let offsetX = cos(angle) * outerSize;
-      let offsetY = sin(angle) * outerSize;
-      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
-    }
-    
-    // 2. Draw middle peach layer using multiple offset copies
-    fill(COLORS.peach);
-    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
-      let offsetX = cos(angle) * middleSize;
-      let offsetY = sin(angle) * middleSize;
-      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
-    }
-    
-    // 3. Draw inner black layer using multiple offset copies
-    fill('black');
-    for (let angle = 0; angle < TWO_PI; angle += PI/8) {
-      let offsetX = cos(angle) * innerSize;
-      let offsetY = sin(angle) * innerSize;
-      text(rewardMessage[i], letterX + offsetX, letterY + offsetY);
-    }
-    
-    // 4. Draw the final colored letter in the center
+    textFont(titleFont); // Use title font for win screen titles
     fill(letterColor);
     text(rewardMessage[i], letterX, letterY);
+    pop();
     
-    pop(); // Restore drawing state
-    
-    // Move to the next letter position with kerning
+    // Move to the next letter position with kerning factor
     x += letterWidths[i] * (1 + kerningFactor);
   }
   
@@ -266,6 +288,7 @@ function drawWinScreen() {
   
   // Measure the title width at the default font size
   textSize(recipeNameSize);
+  textFont(titleFont); // Use Courier font for recipe card titles
   fill(COLORS.secondary);
   textStyle(BOLD);
   
@@ -415,603 +438,385 @@ function drawWinScreen() {
   textStyle(NORMAL); // Reset text style
   pop(); // End Recipe Details context
   
-  // ===== SCORE SECTION =====
-  
-  // RESET TEXT ALIGNMENT FOR SCORE SECTION - Ensure centered text
-  textAlign(CENTER, CENTER);
-  
-  // Calculate responsive position for score section - updated to 60% of screen height
-  const scoreCardPositionY = playAreaY + playAreaHeight * 0.60; // Changed back to 0.60 from 0.65
-  
-  // Calculate score card size based on play area width - updated dimensions
-  scoreWidth = min(playAreaWidth, 600); // Same max width as recipe card
-  scoreHeight = playAreaHeight * 0.28; // 28% of play area height
-  
-  // Position score card
-  scoreX = playAreaX + playAreaWidth/2; // Centered in the play area
-  scoreY = scoreCardPositionY + scoreHeight/2; // Adjusted for vertical centering
-  
-  // Draw letter score with drop shadow
-  push(); // Isolate drawing context for the score card
-  rectMode(CENTER); // Explicitly set CENTER mode for score card
-  
-  // Shadow
-  fill(0, 0, 0, 30);
-  noStroke();
-  rect(scoreX + 5, scoreY + 5, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8)); // Updated to 2% of score width, min 8px
-  
-  // Paper
-  fill(255);
-  stroke(220);
-  strokeWeight(1);
-  rect(scoreX, scoreY, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8)); // Updated to 2% of score width, min 8px
-  
-  // Check if mouse is over the letter score area
-  isMouseOverLetterScore = mouseX > scoreX - scoreWidth/2 && mouseX < scoreX + scoreWidth/2 && 
-                         mouseY > scoreY - scoreHeight/2 && mouseY < scoreY + scoreHeight/2;
-  
-  // Highlight the letter score area when hovered, similar to recipe card
-  if (isMouseOverLetterScore) {
-    // Add a subtle highlight effect
-    noFill();
-    stroke(COLORS.primary); // Green highlight
-    strokeWeight(3);
-    rect(scoreX, scoreY, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8)); // Updated to 2% of score width, min 8px
-  }
-  
-  pop(); // Restore the drawing context
-  
-  // Count black moves (incorrect attempts)
+  // Calculate blackMoves (mistakes) - APlasker - Moved here as it was removed with Letter Score section
   let blackMoves = 0;
-  
-  // Count black moves
   for (let move of moveHistory) {
     if (move === 'black' || move === '#333333') {
       blackMoves++;
     }
   }
-  
-  // Count red hint moves
-  let redHintMoves = 0;
-  for (let move of moveHistory) {
-    if (move === '#FF5252') {
-      redHintMoves++;
-    }
-  }
-  
-  // Calculate total score (only counting red hint and black moves)
-  const totalScore = blackMoves + redHintMoves;
-  
-  // Determine letter grade and color based on ONLY blackMoves (errors)
-  // Using global letterGrade variable
-  let letterColor;
-  // Using the global isAPlus variable now
-  isAPlus = false;
-  
-  if (blackMoves === 0) {
-    letterGrade = "A";
-    letterColor = color(0, 120, 255); // Blue
-    // A+ is achieved with zero errors AND zero hints
-    // Check both redHintMoves and hintCount to ensure no hints were used
-    if (redHintMoves === 0 && hintCount === 0) {
-      isAPlus = true; // Mark as A+ for diamond decoration
-    }
-  } else if (blackMoves >= 1 && blackMoves <= 2) {
-    letterGrade = "B";
-    letterColor = COLORS.green; // Use our explicit green color
-  } else if (blackMoves >= 3 && blackMoves <= 4) {
-    letterGrade = "C";
-    letterColor = '#f7dc30'; // Yellow - updated from COLORS.tertiary
-  } else { // blackMoves >= 5
-    letterGrade = "X";
-    letterColor = COLORS.secondary; // Red from vessels
-  }
-  
-  // Updated circle position and dimensions
-  // Position: Centered horizontally at 28% from left edge, 55% from top of score card
-  const circleX = scoreX - scoreWidth/2 + scoreWidth * 0.28;
-  const circleY = scoreY - scoreHeight/2 + scoreHeight * 0.55; // Updated to 55% from top of score card
-  
-  // Height: 80% of score height (updated from 85%)
-  const circleSize = scoreHeight * 0.8;
-  
-  // Create a copy of the letter color with 30% opacity
-  let circleBgColor = color(red(letterColor), green(letterColor), blue(letterColor), 76); // 76 is 30% of 255
-  
-  // Draw the circle with the same color as the letter but with 30% opacity
+
+  // ===== SCORE SECTION (TALLER, NARROWER STATS) =====
+  scoreWidth = min(playAreaWidth, 600);
+  scoreHeight = playAreaHeight * 0.20;
+  scoreX = playAreaX + playAreaWidth/2;
+  scoreY = playAreaY + playAreaHeight * 0.60 + scoreHeight/2;
+
+  // Card background and shadow
+  push();
+  rectMode(CENTER);
+  fill(0, 0, 0, 30);
   noStroke();
-  fill(circleBgColor);
-  circle(circleX, circleY, circleSize);
-  
-  // Add "COMBO MEAL SCORE" header above the letter grade - positioned at 8% of score height from top
-  textAlign(CENTER, CENTER);
-  // Calculate font size that ensures text fits within 90% of score card width
-  let maxComboMealSize = min(max(playAreaWidth * 0.04, 14), 18);
-  // Temporarily set text size to check if it fits
-  textSize(maxComboMealSize);
-  
-  // Apply kerning to "COMBO MEAL SCORE" text
-  const comboMealText = "COMBO MEAL SCORE";
-  let comboMealWidth = 0;
-  let comboMealLetterWidths = [];
-  
-  // Calculate letter widths
-  for (let i = 0; i < comboMealText.length; i++) {
-    let letterWidth = textWidth(comboMealText[i]);
-    comboMealLetterWidths.push(letterWidth);
-    comboMealWidth += letterWidth;
+  rect(scoreX + 5, scoreY + 5, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8));
+  fill(255);
+  stroke(220);
+  strokeWeight(1);
+  rect(scoreX, scoreY, scoreWidth, scoreHeight, max(scoreWidth * 0.02, 8));
+  pop();
+
+  // New 3x2 Grid Layout for Score Card (APlasker)
+  const numCols = 3;
+  const numRows = 2;
+  const gap = scoreWidth * 0.02; // 2% gap, adjust as needed
+
+  // Calculate usable width and height after accounting for gaps AND increased outer margins
+  const outerPadding = gap * 2; // Double the gap for outer padding
+  const totalGapWidth = gap * (numCols - 1) + outerPadding * 2; // Gaps between cols + outer L/R padding
+  const totalGapHeight = gap * (numRows - 1) + outerPadding * 2; // Gaps between rows + outer T/B padding
+
+  const usableWidth = scoreWidth - totalGapWidth;
+  const usableHeight = scoreHeight - totalGapHeight;
+
+  // Define column widths based on percentages of usableWidth
+  const colWidth1 = usableWidth * 0.20;
+  const colWidth2 = usableWidth * 0.46667;
+  const colWidth3 = usableWidth * 0.33333; // Remaining width
+
+  const rowHeight = usableHeight / numRows;
+
+  // Define cell start positions (top-left of each cell), accounting for outerPadding
+  const cellAX1 = scoreX - scoreWidth / 2 + outerPadding;
+  const cellAY = scoreY - scoreHeight / 2 + outerPadding;
+
+  const cellAX2 = cellAX1 + colWidth1 + gap;
+  const cellAX3 = cellAX2 + colWidth2 + gap;
+
+  const cellBY = cellAY + rowHeight + gap;
+
+  // --- Stars (A1+A2) ---
+  let actualTotalStarsToDisplay = 5;
+  const baseStars = 5;
+  const mistakes = blackMoves; // Assumes blackMoves is calculated earlier
+  // console.log("DEBUG WINSCREEN STARS: Mistakes=", mistakes, "HintCount=", hintCount);
+
+  let showBonusStar = false;
+  if (mistakes === 0 && hintCount === 0) {
+    showBonusStar = true;
+    actualTotalStarsToDisplay = 6;
   }
+  // console.log("DEBUG WINSCREEN STARS: showBonusStar=", showBonusStar, "actualTotalStarsToDisplay=", actualTotalStarsToDisplay);
   
-  // Increase kerning by 70%
-  const comboMealKerningFactor = 0.7;
-  let comboMealTotalKerning = 0;
+  const starSize = Math.min(Math.max(rowHeight * 0.3, 8), 15); // Size relative to row height
+  const starSpacing = starSize * 1.5;
+  const starsAreaWidth = colWidth1 + colWidth2; // Stars span first two columns
+  const totalStarLayoutWidth = (starSize * actualTotalStarsToDisplay) + (starSpacing * (actualTotalStarsToDisplay - 1));
   
-  // Calculate total kerning space
-  for (let i = 0; i < comboMealText.length - 1; i++) {
-    comboMealTotalKerning += comboMealLetterWidths[i] * comboMealKerningFactor;
+  const starsGroupStartX = cellAX1 + (starsAreaWidth - totalStarLayoutWidth) / 2;
+  // let starsYPosition = cellAY + rowHeight / 2 + gap * 0.5; // Original position before message
+
+  // --- Add message above stars (APlasker) ---
+  let starMessage = "";
+  let effectiveStars = showBonusStar ? actualTotalStarsToDisplay : (baseStars - mistakes);
+  if (effectiveStars === 6) starMessage = "Flawless! No Hints!";
+  else if (effectiveStars === 5) starMessage = "Perfect!";
+  else if (effectiveStars === 4) starMessage = "Delish!";
+  else if (effectiveStars === 3) starMessage = "Tasty!";
+  else if (effectiveStars === 2) starMessage = "Sloppy but yummy!";
+  else if (effectiveStars === 1) starMessage = "Just made it!";
+  else if (effectiveStars <= 0) starMessage = "It's all mixed up :("; // 5 or more mistakes
+
+  let messageTextSize = Math.min(max(colWidth1 * 0.8 * 0.2, 8), 12); // Same as streakLabelSize approx (colWidth1*0.8 is streakRectWidth)
+  textSize(messageTextSize);
+  let messageTextHeight = textAscent() + textDescent();
+  
+  // Adjust stars Y position to make room for the message above them
+  let starsYPosition = cellAY + rowHeight / 2 + messageTextHeight * 0.5 + gap * 0.5; // Scootched down
+
+  if (starMessage) {
+    push();
+    textAlign(CENTER, BOTTOM);
+    textStyle(NORMAL);
+    fill('#333');
+    textSize(messageTextSize);
+    let messageX = cellAX1 + starsAreaWidth / 2;
+    let messageY = starsYPosition - starSize / 2 - gap * 0.5; // Original position
+    messageY -= scoreHeight * 0.05; // Move message up by 5% of score card height
+    text(starMessage, messageX, messageY);
+    pop();
   }
-  
-  // Calculate total width with kerning
-  const totalComboMealWidth = comboMealWidth + comboMealTotalKerning;
-  
-  // Adjust font size if text is too wide (exceeds 90% of score card width)
-  if (totalComboMealWidth > scoreWidth * 0.9) {
-    maxComboMealSize *= (scoreWidth * 0.9) / totalComboMealWidth;
-    textSize(maxComboMealSize);
-    
-    // Recalculate widths with new font size
-    comboMealWidth = 0;
-    comboMealLetterWidths = [];
-    for (let i = 0; i < comboMealText.length; i++) {
-      let letterWidth = textWidth(comboMealText[i]);
-      comboMealLetterWidths.push(letterWidth);
-      comboMealWidth += letterWidth;
-    }
-    
-    // Recalculate kerning
-    comboMealTotalKerning = 0;
-    for (let i = 0; i < comboMealText.length - 1; i++) {
-      comboMealTotalKerning += comboMealLetterWidths[i] * comboMealKerningFactor;
-    }
-  }
-  
-  fill(0); // Black text
-  textStyle(BOLD);
-  
-  // Starting x position (centered with kerning)
-  let comboMealX = scoreX - (comboMealWidth + comboMealTotalKerning)/2;
-  
-  // Position at 8% of score height from top
-  const comboMealY = scoreY - scoreHeight/2 + scoreHeight * 0.08;
-  
-  // Draw each letter with increased spacing
-  for (let i = 0; i < comboMealText.length; i++) {
-    // Calculate letter position
-    let letterX = comboMealX + comboMealLetterWidths[i]/2;
-    
-    // Draw letter
-    text(comboMealText[i], letterX, comboMealY);
-    
-    // Move to the next letter position with kerning
-    comboMealX += comboMealLetterWidths[i] * (1 + comboMealKerningFactor);
-  }
-  
-  // Draw letter grade - with 95% of circle size (updated from 85%)
-  // Position 10% lower in Score card height than center of the circle background
-  const letterGradeY = circleY + scoreHeight * 0.1; // 10% lower than circle center
-  
-  textAlign(CENTER, CENTER);
-  textSize(circleSize * 1.1); // Updated from 0.95 to 1.1 for larger display
-  fill(letterColor);
-  textStyle(NORMAL);
-  text(letterGrade, circleX, letterGradeY); // Updated position to be 10% lower than circle
-  
-  // ------------------------------
-  // NEW SECTION: SCORE STATISTICS
-  // ------------------------------
-  
-  // Position stats block on the right side of the score card
-  const statsX = scoreX - scoreWidth/2 + scoreWidth * 0.55; // 55% from left edge
-  const statsY = scoreY - scoreHeight/2 + scoreHeight * 0.30; // 30% from top (changed from 37% to move stats up)
-  const statsWidth = scoreWidth * 0.38; // 38% of score card width
-  
-  // Calculate font sizes for stats
-  const labelSize = min(max(playAreaWidth * 0.025, 10), 14); // Increased from 0.02/9/12 to 0.025/10/14
-  const valueSize = min(max(playAreaWidth * 0.03, 12), 16); // Increased from 0.025/11/14 to 0.03/12/16
-  
-  // Get recipe information
-  let recipeNumber = "###";
-  let formattedDate = "##/##/##";
-  
-  // Extract recipe number and date from recipe data
-  if (typeof recipe !== 'undefined' && recipe) {
-    if (recipe.day_number) recipeNumber = recipe.day_number;
-    
-    // Format the date if available
-    if (recipe.date) {
-      try {
-        const dateParts = recipe.date.split('-');
-        if (dateParts.length === 3) {
-          formattedDate = `${dateParts[1]}/${dateParts[2]}/${dateParts[0].substring(2)}`;
-        }
-      } catch (e) {
-        console.error("Error formatting date:", e);
+
+  for (let i = 0; i < actualTotalStarsToDisplay; i++) {
+    const starX = starsGroupStartX + (i * (starSize + starSpacing)) + starSize / 2;
+    // if (actualTotalStarsToDisplay === 6 && i === 5) {
+    //   console.log("DEBUG WINSCREEN STARS: Drawing BONUS 6th star at x=", starX, "y=", starsYPosition);
+    // }
+    let starFillColor;
+    if (showBonusStar && i === baseStars) {
+      starFillColor = COLORS.vesselHint;
+    } else {
+      if (mistakes === 0 || i < baseStars - mistakes) {
+        starFillColor = COLORS.vesselHint;
+      } else {
+        starFillColor = STAR_GREY;
       }
     }
+    drawStar(starX, starsYPosition, starSize * 0.475, starSize, 5, starFillColor, STAR_OUTLINE);
   }
-  
-  // Format recipe value with recipe number and date
-  const recipeValue = `${recipeNumber} (${formattedDate})`;
-  
-  // Draw the three stat lines
-  let lineY = statsY;
-  
-  // Recipe number line
-  const recipeLineHeight = drawStatLine("Recipe No.", recipeValue, statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += recipeLineHeight;
-  
-  // Mistakes line
-  const mistakesLineHeight = drawStatLine("Mistakes:", blackMoves.toString(), statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += mistakesLineHeight;
-  
-  // Hints used line
-  const hintsLineHeight = drawStatLine("Hints Used:", hintCount.toString(), statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += hintsLineHeight;
-  
-  // Time line - APlasker
-  const timeValue = typeof gameTimer !== 'undefined' ? formatTime(gameTimer) : "00:00";
-  const timeLineHeight = drawStatLine("Time:", timeValue, statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += timeLineHeight;
-  
-  // Streak line - APlasker
-  const streakValue = typeof StreakSystem !== 'undefined' ? StreakSystem.getStreakDisplayText() : "0";
-  const streakLineHeight = drawStatLine("Streak:", streakValue, statsX, lineY, statsWidth, labelSize, valueSize);
-  lineY += streakLineHeight;
-  
-  // Center Share Score text under the stats block
-  const shareScoreY = lineY + valueSize * 1.5; // Add some space after the last stat line
-  
-  // Draw Share Score link
+
+  // --- Streak (B1) ---
+  const streakCellX = cellAX1; // Base X for the cell column
+  const streakCellY = cellBY;
+  // Shift Streak content to the right by 5% of scoreWidth
+  const streakCenterX = (streakCellX + colWidth1 / 2) + (scoreWidth * 0.05);
+  const streakCenterY = streakCellY + rowHeight / 2;
+  const streakRectWidth = colWidth1 * 0.8; // Use 80% of cell width
+  // Increase height of Streak holding shape by 10%
+  const streakRectHeight = rowHeight * (0.7 * 1.1); // Increased height
+
+  push();
+  rectMode(CENTER);
+  fill(255);
+  stroke(COLORS.primary);
+  strokeWeight(2);
+  rect(streakCenterX, streakCenterY, streakRectWidth, streakRectHeight, 14);
   textAlign(CENTER, CENTER);
-  textSize(min(max(playAreaWidth * 0.03, 10), 14));
-  if (isMouseOverLetterScore) {
-    fill(COLORS.primary); // Green text when hovered
-  } else {
-    fill('#666'); // Gray text normally
+  noStroke();
+  
+  let streakLabelSize = Math.min(max(streakRectWidth * 0.2, 8), 12);
+  let streakValueSize = Math.min(max(streakRectWidth * 0.35, 14), 24);
+  // Increase spacing between Streak label and value
+  let streakLabelY = streakCenterY - streakRectHeight * 0.25; // Pushed label up more
+  let streakValueY = streakCenterY + streakRectHeight * 0.20; // Pushed value down more
+
+  textSize(streakLabelSize);
+  fill('#333');
+  textStyle(NORMAL);
+  text('Streak', streakCenterX, streakLabelY);
+  
+  textStyle(BOLD);
+  textSize(streakValueSize);
+  fill(COLORS.primary);
+      // Calculate display streak using enhanced server-side streak system - APlasker
+    async function getDisplayStreak() {
+      const currentMistakes = typeof totalMistakes !== 'undefined' ? totalMistakes : 0;
+      
+      // If too many mistakes, streak is broken
+      if (currentMistakes >= 5) {
+        return 0;
+      }
+      
+      // Get enhanced streak data from server
+      if (window.authState?.user?.id && typeof getUserProfileStats === 'function') {
+        try {
+          const profileStats = await getUserProfileStats(window.authState.user.id);
+          if (profileStats?.enhanced_streaks) {
+            // Return the current recipe streak + 1 (for this completion)
+            return (profileStats.enhanced_streaks.current_recipe_streak || 0) + 1;
+          }
+        } catch (error) {
+          console.error('Error fetching enhanced streak for display:', error);
+        }
+      }
+      
+      // Fallback to localStorage-based calculation
+      const sessionStart = typeof sessionStartStreak !== 'undefined' ? sessionStartStreak : 0;
+      return sessionStart + 1;
+    }
+    
+    // Handle async streak calculation
+    if (typeof window.displayStreakValue === 'undefined') {
+      // Initialize streak value calculation
+      window.displayStreakValue = 'Loading...';
+      getDisplayStreak().then(streak => {
+        window.displayStreakValue = streak.toString();
+      }).catch(error => {
+        console.error('Error getting display streak:', error);
+        window.displayStreakValue = '0';
+      });
+    }
+    
+    text(window.displayStreakValue, streakCenterX, streakValueY);
+  pop();
+
+  // --- Timer (B2) ---
+  const timerCellX = cellAX2;
+  const timerCellY = cellBY;
+  const timerCenterX = timerCellX + colWidth2 / 2;
+  const timerCenterY = timerCellY + rowHeight / 2;
+  const timerRectWidth = colWidth2 * 0.9; // Use 90% of cell width
+  const timerRectHeight = rowHeight * 0.7; // Use 70% of cell height
+
+  push();
+  // rectMode(CENTER); // No rectangle for timer
+  // fill(255);
+  // stroke(COLORS.primary);
+  // strokeWeight(2);
+  // rect(timerCenterX, timerCenterY, timerRectWidth, timerRectHeight, 14);
+  textAlign(CENTER, CENTER);
+  noStroke();
+  
+  // let timerLabelSize = Math.min(max(timerRectWidth * 0.15, 8), 12); // No label for timer
+  let timerValueSize = Math.min(max(timerRectWidth * 0.375, 21), 36); // Increased font size by 50%
+  // let timerLabelY = timerCenterY - timerRectHeight * 0.20; // No label
+  // let timerValueY = timerCenterY + timerRectHeight * 0.15; // Value will be centered in cell
+
+  // textSize(timerLabelSize);
+  // fill('#333');
+  // textStyle(NORMAL);
+  // text('Total Time', timerCenterX, timerLabelY); // No label
+  
+  textStyle(BOLD);
+  textSize(timerValueSize);
+  fill(COLORS.primary);
+  let timeValue = typeof gameTimer !== 'undefined' ? formatTime(gameTimer) : '00:00';
+  text(timeValue, timerCenterX, timerCenterY); // Draw time centered in B2 cell
+  pop();
+
+  // --- Share Score Button (A3+B3) ---
+  const shareButtonX = cellAX3;
+  const shareButtonY = cellAY; // Top-left Y of the A3 cell
+  const shareButtonWidth = colWidth3;
+  const shareButtonHeight = scoreHeight - (totalGapHeight / 2) ; // Full height of score card, minus half a gap to prevent going outside bounds.
+
+  const shareButtonCenterX = shareButtonX + shareButtonWidth / 2;
+  const shareButtonCenterY = shareButtonY + shareButtonHeight / 2;
+  
+  push();
+  rectMode(CORNER); // Draw from top-left
+  // fill(isMouseOverScoreCard ? lerpColor(color(COLORS.secondary), color(255), 0.2) : COLORS.secondary); // Pinkish, hover effect
+  // stroke(0, 50); // Subtle black outline
+  // strokeWeight(2);
+  // // Rounded rectangle for the button
+  // rect(shareButtonX, shareButtonY, shareButtonWidth, shareButtonHeight, 14); // Use corner rounding
+
+  // APlasker: Adjust Share Score button for internal margins
+  const shareButtonActualWidth = colWidth3 * 0.9; // e.g., 90% of the cell width
+  const shareButtonActualHeight = (rowHeight * 2) * 0.9; // e.g., 90% of the combined row height for this column
+
+  const shareButtonActualX = cellAX3 + (colWidth3 - shareButtonActualWidth) / 2;
+  const shareButtonActualY = cellAY + ( (rowHeight * 2 + gap) - shareButtonActualHeight) / 2; // Center in the full A3+B3 space
+
+  fill(isMouseOverScoreCard ? lerpColor(color(COLORS.secondary), color(255), 0.2) : COLORS.secondary);
+  stroke(0,50);
+  strokeWeight(2);
+  rect(shareButtonActualX, shareButtonActualY, shareButtonActualWidth, shareButtonActualHeight, 14);
+
+  textAlign(CENTER, CENTER);
+  // Increase Share Score font size and stack text, remove arrow
+  let shareTextSize = Math.min(max(shareButtonActualWidth * 0.21, 17), 28); // Slightly reduced font size (1pt from .22, 18, 30)
+  textSize(shareTextSize);
+  textStyle(BOLD);
+  fill(255); // White text
+  noStroke();
+  text('Share\nScore', shareButtonActualX + shareButtonActualWidth / 2, shareButtonActualY + shareButtonActualHeight / 2);
+  pop();
+
+  // Update isMouseOverScoreCard for the new Share Button area
+  isMouseOverScoreCard = mouseX > shareButtonActualX && mouseX < shareButtonActualX + shareButtonActualWidth &&
+                         mouseY > shareButtonActualY && mouseY < shareButtonActualY + shareButtonActualHeight;
+
+  if (isMouseOverScoreCard) {
+    cursor(HAND);
   }
-  // Center it under the stats block
-  text("Share Score →", statsX + statsWidth/2, shareScoreY);
   
-  // Check if Easter Egg was found
-  let eggFound = moveHistory.some(move => 
-    typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')
-  );
-  
-  // Draw sunny-side-up egg indicator if an Easter egg was found
+  // --- Easter Egg (Positioned over Share Score Button A3/B3) ---
+  // (Code for calculating blackMoves, letterGrade, circleSize etc. for egg was removed as letter grade is gone)
+  // We need to recalculate blackMoves if it's not available globally or passed to drawWinScreen
+  // For now, assuming 'mistakes' (which is blackMoves) is available from star calculation section.
+  // Also, 'circleSize' was tied to letter grade circle. We need a new reference for egg size.
+  // Let's make egg size relative to the share button's width or height.
+
+  let eggFound = moveHistory.some(move => typeof move === 'object' && move.type === 'easterEgg');
+
   if (eggFound) {
     push();
-    // Position the egg in the top left corner of the letter grade
-    const eggSize = circleSize * 0.25; // 25% of circle size
-    const eggX = circleX - circleSize * 0.3; // Updated to use circleX
-    const eggY = circleY - circleSize * 0.3;
-    const sizeMultiplier = 1.25; // Increase size by 25%
+    const eggContainerWidth = shareButtonWidth; // Egg is over the share button
+    const eggBaseSize = eggContainerWidth * 0.25; // Egg base size 25% of share button width
     
-    // Draw drop shadow for the entire egg
-    fill(0, 0, 0, 40);
-    noStroke();
-    // Offset shadow by 4px
-    translate(4, 4);
+    // Position egg at top-right corner of Score Card - APlasker: Updated for doubled size and new position
+    // Calculate the score card boundaries (not the recipe card)
+    const scoreCardRight = scoreX + scoreWidth/2;
+    const scoreCardTop = scoreY - scoreHeight/2;
     
-    // Draw egg white (soft blob shape from Design 3)
+    // Position egg so its right side aligns with the top-right corner of the score card
+    // The egg extends approximately 20 units to the right from center, so we offset by that amount
+    const sizeMultiplier = 2.0; // Double the size - APlasker
+    const eggRightExtent = 20 * sizeMultiplier; // Right extent of the egg from its center point
+    const eggX = scoreCardRight - eggRightExtent;
+    const eggY = scoreCardTop + (15 * sizeMultiplier); // Offset down slightly to avoid cutting off the top
+
+    fill(0, 0, 0, 40); noStroke(); translate(2, 2); // Shadow offset
     beginShape();
-    vertex(eggX - 30 * sizeMultiplier, eggY * sizeMultiplier);
-    bezierVertex(
-        eggX - 45 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX - 20 * sizeMultiplier, eggY - 45 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY - 30 * sizeMultiplier  // end point
-    );
-    bezierVertex(
-        eggX + 40 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX + 30 * sizeMultiplier, eggY + 20 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY + 30 * sizeMultiplier  // end point
-    );
-    // Create a soft, rounded blob shape with no pointiness
-    bezierVertex(
-        eggX - 5 * sizeMultiplier, eggY + 35 * sizeMultiplier,  // control point 1 (moved inward and up)
-        eggX - 20 * sizeMultiplier, eggY + 15 * sizeMultiplier, // control point 2 (moved significantly upward)
-        eggX - 30 * sizeMultiplier, eggY * sizeMultiplier       // end point (connects to start)
-    );
+    vertex(eggX - 15 * sizeMultiplier, eggY);
+    bezierVertex(eggX - 22.5 * sizeMultiplier, eggY - 10 * sizeMultiplier, eggX - 10 * sizeMultiplier, eggY - 22.5 * sizeMultiplier, eggX + 5 * sizeMultiplier, eggY - 15 * sizeMultiplier);
+    bezierVertex(eggX + 20 * sizeMultiplier, eggY - 10 * sizeMultiplier, eggX + 15 * sizeMultiplier, eggY + 10 * sizeMultiplier, eggX + 5 * sizeMultiplier, eggY + 15 * sizeMultiplier);
+    bezierVertex(eggX - 2.5 * sizeMultiplier, eggY + 17.5 * sizeMultiplier, eggX - 10 * sizeMultiplier, eggY + 7.5 * sizeMultiplier, eggX - 15 * sizeMultiplier, eggY);
     endShape(CLOSE);
-    
-    // Reset translation for the actual egg
-    translate(-4, -4);
-    
-    // Draw the egg white (soft blob shape)
-    fill(255, 255, 255); // Pure white
-    noStroke();
-    
+    translate(-2, -2); // Reset shadow offset
+
+    fill(255, 255, 255); noStroke(); // Egg white
     beginShape();
-    vertex(eggX - 30 * sizeMultiplier, eggY * sizeMultiplier);
-    bezierVertex(
-        eggX - 45 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX - 20 * sizeMultiplier, eggY - 45 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY - 30 * sizeMultiplier  // end point
-    );
-    bezierVertex(
-        eggX + 40 * sizeMultiplier, eggY - 20 * sizeMultiplier, // control point 1
-        eggX + 30 * sizeMultiplier, eggY + 20 * sizeMultiplier, // control point 2
-        eggX + 10 * sizeMultiplier, eggY + 30 * sizeMultiplier  // end point
-    );
-    // Create a soft, rounded blob shape with no pointiness
-    bezierVertex(
-        eggX - 5 * sizeMultiplier, eggY + 35 * sizeMultiplier,  // control point 1 (moved inward and up)
-        eggX - 20 * sizeMultiplier, eggY + 15 * sizeMultiplier, // control point 2 (moved significantly upward)
-        eggX - 30 * sizeMultiplier, eggY * sizeMultiplier       // end point (connects to start)
-    );
+    vertex(eggX - 15 * sizeMultiplier, eggY);
+    bezierVertex(eggX - 22.5 * sizeMultiplier, eggY - 10 * sizeMultiplier, eggX - 10 * sizeMultiplier, eggY - 22.5 * sizeMultiplier, eggX + 5 * sizeMultiplier, eggY - 15 * sizeMultiplier);
+    bezierVertex(eggX + 20 * sizeMultiplier, eggY - 10 * sizeMultiplier, eggX + 15 * sizeMultiplier, eggY + 10 * sizeMultiplier, eggX + 5 * sizeMultiplier, eggY + 15 * sizeMultiplier);
+    bezierVertex(eggX - 2.5 * sizeMultiplier, eggY + 17.5 * sizeMultiplier, eggX - 10 * sizeMultiplier, eggY + 7.5 * sizeMultiplier, eggX - 15 * sizeMultiplier, eggY);
     endShape(CLOSE);
-    
-    // Draw the yolk - positioned higher up and slightly to the left
-    const yolkSize = 36 * sizeMultiplier;
+
+    const yolkSize = 18 * sizeMultiplier; // Yolk
     for (let i = 5; i >= 0; i--) {
-      const currentYolkSize = yolkSize * (1 - i * 0.05);
-      const alpha = 255 - i * 10;
-      fill(255, 204, 0, alpha); // Bright egg yolk yellow with gradient
-      noStroke();
-      ellipse(eggX - 5 * sizeMultiplier, eggY - 20 * sizeMultiplier, currentYolkSize, currentYolkSize * 0.9); // Slightly oval
+      const currentYolkSize = yolkSize * (1 - i * 0.05); fill(255, 204, 0, 255 - i * 10); noStroke();
+      ellipse(eggX - 2.5 * sizeMultiplier, eggY - 10 * sizeMultiplier, currentYolkSize, currentYolkSize * 0.9);
     }
-    
-    // Add highlight to the yolk
-    fill(255, 255, 255, 100);
-    noStroke();
-    ellipse(eggX - 12 * sizeMultiplier, eggY - 25 * sizeMultiplier, yolkSize * 0.4, yolkSize * 0.3);
-    
-    // Add a thin outline to the yolk
-    noFill();
-    stroke(200, 150, 0, 100);
-    strokeWeight(1);
-    ellipse(eggX - 5 * sizeMultiplier, eggY - 20 * sizeMultiplier, yolkSize, yolkSize * 0.9);
+    fill(255, 255, 255, 100); noStroke(); // Highlight
+    ellipse(eggX - 6 * sizeMultiplier, eggY - 12.5 * sizeMultiplier, yolkSize * 0.4, yolkSize * 0.3);
+    noFill(); stroke(200, 150, 0, 100); strokeWeight(1); // Yolk outline
+    ellipse(eggX - 2.5 * sizeMultiplier, eggY - 10 * sizeMultiplier, yolkSize, yolkSize * 0.9);
     pop();
   }
   
-  // Draw star stickers for A+ grade
-  if (isAPlus) {
-    // Star parameters
-    const starLargeSize = circleSize * 0.3; // 30% of circle size for larger stars
-    const starSmallSize = circleSize * 0.24; // 24% of circle size for smaller stars
-    const outerRadius = starLargeSize * 0.5;
-    const innerRadius = outerRadius * 0.5; // Increased inner radius for rounder appearance
-    const roundness = outerRadius * 0.25; // Increased roundness for more cartoonish look
-    
-    // Function to draw a star sticker
-    const drawStarSticker = (x, y, size) => {
-      push();
-      translate(x, y);
-      
-      // Calculate radius based on size (large or small)
-      const currentOuterRadius = size === 'large' ? outerRadius : outerRadius * 0.8;
-      const currentInnerRadius = size === 'large' ? innerRadius : innerRadius * 0.8;
-      const currentRoundness = size === 'large' ? roundness : roundness * 0.8;
-      
-      // Draw drop shadow
-      fill(0, 0, 0, 40);
-      noStroke();
-      translate(2, 2);
-      starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
-      
-      // Draw white outline
-      translate(-2, -2);
-      fill(255);
-      strokeWeight(3);
-      stroke(255);
-      starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
-      
-      // Draw yellow star with yolk color (255, 204, 0) instead of COLORS.tertiary
-      fill(255, 204, 0);
-      strokeWeight(1);
-      stroke(255, 255, 255, 200);
-      starWithRoundedPoints(0, 0, currentInnerRadius, currentOuterRadius, 5, currentRoundness);
-      
-      pop();
-    };
-    
-    // Top right corner - two stars (updated positions to use circleX and circleY)
-    drawStarSticker(circleX + circleSize * 0.35, circleY - circleSize * 0.35, 'large');
-    drawStarSticker(circleX + circleSize * 0.5, circleY - circleSize * 0.2, 'small');
-    
-    // Bottom left corner - two stars (updated positions to use circleX and circleY)
-    drawStarSticker(circleX - circleSize * 0.35, circleY + circleSize * 0.35, 'large');
-    drawStarSticker(circleX - circleSize * 0.5, circleY + circleSize * 0.2, 'small');
-  }
+  // REMOVE OLD STATS DRAWING (Streak, Hints, Letter Score, Total Time, old Share Score text)
+  // The sections for --- Streak ---, --- Hints ---, --- Letter Score ---, --- Total Time ---, 
+  // and the old "Share Score" text drawing are now replaced by the grid layout above.
+  // The mistake stars drawing logic is also integrated into the new grid (Stars A1+A2).
   
-  // Draw hint indicators if hints were used
-  if (hintCount > 0) {
-    // Function to draw a hint indicator sticker
-    const drawHintIndicator = (x, y, size) => {
-      push();
-      translate(x, y);
-      
-      // Calculate hint indicator size - 25% of circle size
-      const hintSize = circleSize * 0.25 * size;
-      
-      // Draw drop shadow
-      fill(0, 0, 0, 40);
-      noStroke();
-      translate(4, 4);
-      ellipse(0, 0, hintSize, hintSize);
-      
-      // Draw white outline
-      translate(-4, -4);
-      fill(255);
-      strokeWeight(4);
-      stroke(255);
-      ellipse(0, 0, hintSize, hintSize);
-      
-      // Draw white background
-      fill(255);
-      strokeWeight(1);
-      stroke(255, 255, 255, 200);
-      ellipse(0, 0, hintSize, hintSize);
-      
-      // Draw red circle outline (closer to the edge)
-      noFill();
-      strokeWeight(3);
-      stroke('#FF5252');
-      ellipse(0, 0, hintSize * 0.8, hintSize * 0.8);
-      
-      // Draw red question mark using Helvetica font
-      fill('#FF5252');
-      noStroke();
-      textSize(hintSize * 0.6);
-      textFont('Helvetica, Arial, sans-serif');
-      textStyle(NORMAL);
-      textAlign(CENTER, CENTER);
-      text("?", 0, 0);
-      
-      pop();
-    };
-    
-    // HINT INDICATORS TEMPORARILY DISABLED
-    /*
-    // Draw hint indicators based on hint count (updated positions to use circleX and circleY)
-    if (hintCount >= 1) {
-      // First hint indicator - bottom right
-      drawHintIndicator(circleX + circleSize * 0.4, circleY + circleSize * 0.4, 1);
-    }
-    
-    if (hintCount >= 2) {
-      // Second hint indicator - top right
-      drawHintIndicator(circleX + circleSize * 0.4, circleY - circleSize * 0.4, 1);
-    }
-    
-    if (hintCount >= 3) {
-      // Third hint indicator - with minimal overlap
-      drawHintIndicator(circleX + circleSize * 0.4 + 25, circleY + circleSize * 0.4 - 25, 1);
-    }
-    */
-  }
-  
-  textStyle(NORMAL);
-  
-  // Add "Share Score" text at the bottom of the letter score area
-  // REMOVED AS REQUESTED - Removing "Share Score" language at the bottom
-  /*
-  textAlign(CENTER, CENTER);
-  textSize(min(max(playAreaWidth * 0.03, 10), 14)); // Same size as before
-  if (isMouseOverLetterScore) {
-    fill(COLORS.primary); // Green text when hovered
-  } else {
-    fill('#666'); // Gray text normally
-  }
-  text("Share Score →", scoreX, scoreY + scoreHeight/2 - scoreHeight * 0.07); // 7% of score height from bottom
-  */
-  
-  // Helper function to draw a stat line with label and value
-  function drawStatLine(label, value, x, y, width, labelSize, valueSize) {
-    push();
-    
-    // Calculate line height and spacing
-    const lineHeight = valueSize * 1.2;
-    const underlineWidth = width * 0.7; // 70% of provided width
-    
-    // Draw label (smaller, normal weight)
-    textAlign(LEFT, CENTER);
-    textSize(labelSize);
-    textStyle(NORMAL);
-    fill('#333');
-    text(label, x, y);
-    
-    // Draw underline
-    const labelWidth = textWidth(label) + 5; // Add a small space after the label
-    const underlineY = y + lineHeight * 0.2; // Slightly below the text baseline
-    stroke('#666');
-    strokeWeight(1);
-    line(x + labelWidth, underlineY, x + labelWidth + underlineWidth, underlineY);
-    
-    // Draw value (larger, bold)
-    textAlign(CENTER, CENTER);
-    textSize(valueSize);
-    textStyle(BOLD);
-    fill('#333');
-    // Position value in the center of the underline
-    const valueX = x + labelWidth + underlineWidth / 2;
-    text(value, valueX, y);
-    
-    // Reset text style
-    textStyle(NORMAL);
-    pop();
-    
-    // Return height of line for positioning subsequent elements
-    return lineHeight * 1.5; // Add some extra space between lines
-  }
-  
-  // Add "NEW RECIPE DAILY" text at the bottom - updated to 94% from bottom of screen
-  textAlign(CENTER, CENTER);
-  textSize(min(max(playAreaWidth * 0.04, 14), 18)); // Same size as before
-  fill('#333');
-  textStyle(BOLD);
-  text("NEW RECIPE DAILY – COME BACK SOON!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.94);
-  textStyle(NORMAL);
-  
-  // Add "Say hi!" link text below the main text - updated to 97.5% from bottom of screen
-  textSize(min(max(playAreaWidth * 0.025, 10), 14)); // Same size as before
-  fill(COLORS.primary); // Green color for the link
-  text("Say hi!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.975); // Updated to 97.5%
-  
-  // Store position and dimensions for hit detection
-  sayHiLinkX = playAreaX + playAreaWidth/2;
-  sayHiLinkY = playAreaY + playAreaHeight * 0.975; // Updated to 97.5%
-  sayHiLinkWidth = textWidth("Say hi!") * 1.2; // Add some padding
-  sayHiLinkHeight = textAscent() + textDescent();
-  
-  // Check if mouse is over the Say hi link
-  isMouseOverSayHi = mouseX > sayHiLinkX - sayHiLinkWidth/2 && 
-                     mouseX < sayHiLinkX + sayHiLinkWidth/2 && 
-                     mouseY > sayHiLinkY - sayHiLinkHeight/2 && 
-                     mouseY < sayHiLinkY + sayHiLinkHeight/2;
-  
-  // Change cursor to pointer if over the link
-  if (isMouseOverSayHi) {
-    cursor(HAND);
-  }
-  
-  // Check if mouse is over the recipe card
-  isMouseOverCard = mouseX > cardX - cardWidth/2 && mouseX < cardX + cardWidth/2 && 
-                   mouseY > cardY - cardHeight/2 && mouseY < cardY + cardHeight/2;
-  
-  // Change cursor to pointer if over the card or letter score area
-  if (isMouseOverCard || isMouseOverLetterScore) {
-    cursor(HAND);
-  }
-  
-  // TEMPORARY - TEST BUTTON FOR LETTER SCORE INTERACTION
-  // Add this at the very end of the function before the closing brace
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    // Only show test UI in local development
-    push();
-    fill(200, 50, 50);
-    rect(playAreaX + 20, playAreaY + 20, 120, 30);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(12);
-    text("Test Letter Score", playAreaX + 20 + 60, playAreaY + 20 + 15);
-    pop();
-    
-    // Check if test button is clicked
-    if (mouseIsPressed && 
-        mouseX > playAreaX + 20 && mouseX < playAreaX + 20 + 120 &&
-        mouseY > playAreaY + 20 && mouseY < playAreaY + 20 + 30) {
-      console.log("Test button clicked - calling handleLetterScoreInteraction");
-      // Call the handler with score coordinates instead of mouse coordinates
-      if (scoreX && scoreY) {
-        handleLetterScoreInteraction(scoreX, scoreY);
-      }
-    }
-  }
+  // --- A+ Stars and Hint Indicators are removed as they were tied to Letter Grade display ---
+
+  textStyle(NORMAL); // Reset text style just in case
   
   // After drawing all win screen content, draw the flower animation on top if it's active
   if (persistentFlowerAnimation && persistentFlowerAnimation.active) {
     persistentFlowerAnimation.draw();
     persistentFlowerAnimation.update();
+  }
+  
+  // Add "NEW RECIPE DAILY" text at the bottom - APlasker - Restored
+  textAlign(CENTER, CENTER);
+  textSize(min(max(playAreaWidth * 0.04, 14), 18)); 
+  fill('#333');
+  textStyle(BOLD);
+  text("NEW RECIPE DAILY – COME BACK SOON!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.94);
+  textStyle(NORMAL);
+  
+  // Add "Say hi!" link text below the main text - APlasker - Restored
+  textSize(min(max(playAreaWidth * 0.025, 10), 14)); 
+  fill(COLORS.primary); // Green color for the link
+  text("Say hi!", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight * 0.975); 
+  
+  // Store position and dimensions for hit detection - APlasker - Restored
+  sayHiLinkX = playAreaX + playAreaWidth/2;
+  sayHiLinkY = playAreaY + playAreaHeight * 0.975; 
+  sayHiLinkWidth = textWidth("Say hi!") * 1.2; // Add some padding
+  sayHiLinkHeight = textAscent() + textDescent();
+  
+  // Check if mouse is over the Say hi link - APlasker - Restored
+  isMouseOverSayHi = mouseX > sayHiLinkX - sayHiLinkWidth/2 && 
+                     mouseX < sayHiLinkX + sayHiLinkWidth/2 && 
+                     mouseY > sayHiLinkY - sayHiLinkHeight/2 && 
+                     mouseY < sayHiLinkY + sayHiLinkHeight/2;
+  
+  // Change cursor to pointer if over the link - APlasker - Restored
+  if (isMouseOverSayHi) {
+    cursor(HAND);
   }
   
   // At the end of the drawWinScreen function, restore the drawing context
@@ -1056,7 +861,7 @@ function drawTutorialWinScreen() {
   textAlign(CENTER, CENTER);
   
   // Draw reward message with multicolor treatment (like COMBO MEAL)
-  const rewardMessage = "WOW DELICIOUS!";
+  const rewardMessage = "DELICIOUS";
   const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36); // Changed from width to playAreaWidth with adjusted coefficient
   textSize(rewardMessageSize);
   textStyle(BOLD);
@@ -1472,13 +1277,13 @@ function drawTutorialWinScreen() {
 }
 
 function shareScore() {
-  // APlasker - Track share CTA click in analytics
-  if (typeof trackShareClick === 'function') {
-    trackShareClick();
-  }
-  
   try {
-    console.log("shareScore called - letterGrade:", letterGrade, "isAPlus:", isAPlus);
+    console.log("shareScore called - old letterGrade:", letterGrade, "isAPlus:", isAPlus); // Old log
+    
+    // Reset win screen timer on share attempt
+    if (typeof resetWinScreenTimer === 'function') {
+      resetWinScreenTimer();
+    }
     
     // More robust recipe number retrieval with fallbacks
     let recipeNumber = '?';
@@ -1509,52 +1314,63 @@ function shareScore() {
       }
     }
     
-    // Get timer value
     const timeValue = typeof gameTimer !== 'undefined' ? formatTime(gameTimer) : "00:00";
     
-    // Add fallbacks if global variables aren't set properly
-    if (typeof isAPlus === 'undefined') {
-      console.warn("isAPlus is undefined, defaulting to false");
-      isAPlus = false;
+    // Calculate mistakes (blackMoves) for star count - APlasker
+    let blackMoves = 0;
+    for (let move of moveHistory) {
+      if (move === 'black' || move === '#333333') {
+        blackMoves++;
+      }
     }
-    
-    if (typeof letterGrade === 'undefined') {
-      console.warn("letterGrade is undefined, defaulting to 'X'");
-      letterGrade = "X";
+
+    const baseStars = 5; // Standard number of mistake stars
+    let actualTotalStarsToDisplay = baseStars; // Initialize
+    let showBonusStar = false;
+    if (blackMoves === 0 && hintCount === 0) {
+      showBonusStar = true;
+      actualTotalStarsToDisplay = 6;
     }
-    
-    // Check if Easter Egg was found
-    const eggFound = moveHistory.some(move => 
-      typeof move === 'object' && (move.type === 'egg' || move.type === 'easterEgg')
-    );
-    
-    // Choose emoji based on Easter egg status
-    const mainEmoji = eggFound ? '🍳' : '🍴';
-    
-    // Determine emoji markers based on letter grade
-    let gradeEmojis;
-    if (isAPlus) {
-      gradeEmojis = `🌟A🌟`; // A+ score
-    } else if (letterGrade === "A") {
-      gradeEmojis = `🔵A🔵`; // A score
-    } else if (letterGrade === "B") {
-      gradeEmojis = `🟢B🟢`; // B score
-    } else if (letterGrade === "C") {
-      gradeEmojis = `🟠C🟠`; // C score
-    } else { // X grade
-      gradeEmojis = `❌`; // Failing score
+
+    let yellowStarsCount = showBonusStar ? actualTotalStarsToDisplay : (baseStars - blackMoves);
+    if (yellowStarsCount < 0) yellowStarsCount = 0; // Ensure it doesn't go negative
+
+    let starsDisplay = '⭐'.repeat(yellowStarsCount);
+    if (yellowStarsCount === 0) starsDisplay = "0⭐"; // Or your preferred display for 0 stars
+
+    // APlasker: Update hint display for 0 hints
+    let hintsDisplay;
+    if (hintCount === 0) {
+      hintsDisplay = '🧑‍🍳'; // Chef emoji for 0 hints
+    } else {
+      hintsDisplay = '🔍'.repeat(hintCount);
     }
-    
-    // Create the share text in the requested format:
-    // COMBO MEAL 🍴 
-    // Recipe ### 🍴 MM/DD/YY
-    // 🌟A🌟 🍴 ##:## 🍴 # Hints
-    
-    // Handle hints text
-    const hintsText = hintCount === 0 ? "No Hints" : `${hintCount} Hints`;
-    
-    let shareText = `COMBO MEAL ${mainEmoji}\nRecipe ${recipeNumber} ${mainEmoji} ${formattedDate}\n${gradeEmojis} ${mainEmoji} ${timeValue} ${mainEmoji} ${hintsText}`;
-    
+
+    // APlasker: Add diagnostic logging for Easter egg detection
+    let foundEggMoveDebug = null;
+    const eggFound = moveHistory.some(move => {
+      if (typeof move === 'object' && move && move.type === 'easterEgg') {
+        foundEggMoveDebug = move;
+        return true;
+      }
+      return false;
+    });
+    const eggIcon = eggFound ? '🍳' : '';
+
+    console.log(`[shareScore Debug] moveHistory: ${JSON.stringify(moveHistory)}`);
+    console.log(`[shareScore Debug] eggFound: ${eggFound}, Triggering move: ${JSON.stringify(foundEggMoveDebug)}`);
+    console.log(`[shareScore Debug] hintCount: ${hintCount}`);
+
+    // Construct new share text - APlasker
+    // COMBO MEAL 🍴Recipe ### (Date)
+    // Star Count | Timer | Hint Count | Egg Found
+    let shareText = `COMBO MEAL 🍴Recipe ${recipeNumber} (${formattedDate})\n${starsDisplay} | ${timeValue} | ${hintsDisplay}`;
+    if (eggFound) {
+      shareText += ` | ${eggIcon}`;
+    }
+
+    console.log("New Share Text:", shareText);
+
     const shareUrl = "https://allcott25.github.io/ComboMeal/";
     
     // Check if mobile
@@ -1571,6 +1387,10 @@ function shareScore() {
         })
         .then(() => {
           console.log('Successfully shared using Web Share API');
+          // Track successful share
+          if (typeof trackShareClick === 'function') {
+            trackShareClick();
+          }
         })
         .catch(error => {
           console.log('Error sharing:', error);
@@ -1578,7 +1398,7 @@ function shareScore() {
           // Fallback if Web Share API fails - combine text and URL for clipboard
           clipboardShareFallback(shareText + '\n\n' + shareUrl);
         });
-      }, 100); // Short delay helps with first-time initialization on iOS
+      }, 100);
     } else {
       // Desktop or browsers without Web Share API
       clipboardShareFallback(shareText);
@@ -1596,6 +1416,11 @@ function shareScore() {
 // Separate clipboard sharing function for fallback
 function clipboardShareFallback(text) {
   try {
+    // Reset win screen timer on clipboard share attempt
+    if (typeof resetWinScreenTimer === 'function') {
+      resetWinScreenTimer();
+    }
+    
     // On iOS, sometimes the toast works better than clipboard API
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
     
@@ -1603,83 +1428,79 @@ function clipboardShareFallback(text) {
       // For iOS, try to copy to clipboard silently
       try {
         navigator.clipboard.writeText(text).then(() => {
-          // Show a simpler toast notification
-          const toast = document.createElement('div');
-          toast.className = 'share-toast';
-          toast.style.position = 'fixed';
-          toast.style.bottom = '30px';
-          toast.style.left = '50%';
-          toast.style.transform = 'translateX(-50%)';
-          toast.style.backgroundColor = 'rgba(119, 143, 93, 0.9)'; // Avocado green
-          toast.style.color = 'white';
-          toast.style.padding = '12px 24px';
-          toast.style.borderRadius = '8px';
-          toast.style.zIndex = '1000';
-          toast.style.opacity = '0';
-          toast.style.transition = 'opacity 0.3s ease';
-          toast.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
-          toast.style.fontWeight = 'bold';
-          toast.style.fontSize = '16px';
-          toast.style.textAlign = 'center';
-          toast.innerText = '🍽️ Score copied to clipboard! 🍽️';
+          // Track successful copy
+          if (typeof trackShareClick === 'function') {
+            trackShareClick();
+          }
           
-          document.body.appendChild(toast);
-          
-          // Fade in
-          setTimeout(() => {
-            toast.style.opacity = '1';
-          }, 50);
-          
-          // Fade out after 3 seconds
-          setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => {
-              if (toast.parentNode) {
-                document.body.removeChild(toast);
-              }
-            }, 500);
-          }, 3000);
-          
-          console.log('Text copied to clipboard silently on iOS');
+          // Show success toast
+          showShareToast('🍽️ Score copied to clipboard! 🍽️');
         });
       } catch (clipErr) {
         console.log('Silent clipboard copy failed on iOS, showing modal as fallback');
-        // Removed the manual copy alert message
+        showShareModal(text);
       }
     } else {
       // For non-iOS, use clipboard API with toast
       navigator.clipboard.writeText(text)
         .then(() => {
-          // Create and show toast
-          const toast = document.createElement('div');
-          toast.className = 'share-toast';
-          toast.innerText = '🍽️ Score copied! Share your food! 🍽️';
-          document.body.appendChild(toast);
+          // Track successful copy
+          if (typeof trackShareClick === 'function') {
+            trackShareClick();
+          }
           
-          // Fade in with a small delay to ensure DOM update
-          setTimeout(() => {
-            toast.style.opacity = '1';
-          }, 50);
-          
-          // Fade out and remove after 3 seconds
-          setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => {
-              if (toast.parentNode) {
-                document.body.removeChild(toast);
-              }
-            }, 500);
-          }, 3000);
+          // Show success toast
+          showShareToast('🍽️ Score copied! Share your food! 🍽️');
         })
         .catch(err => {
           console.error('Error copying to clipboard:', err);
-          // Removed the manual copy alert message
+          showShareModal(text);
         });
     }
   } catch (error) {
     console.error('Fallback share error:', error);
-    // Removed the manual copy alert message
+    showShareModal(text);
   }
+}
+
+// Helper function to show share toast
+function showShareToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'share-toast';
+  toast.style.position = 'fixed';
+  toast.style.bottom = '30px';
+  toast.style.left = '50%';
+  toast.style.transform = 'translateX(-50%)';
+  toast.style.backgroundColor = 'rgba(119, 143, 93, 0.9)';
+  toast.style.color = 'white';
+  toast.style.padding = '12px 24px';
+  toast.style.borderRadius = '8px';
+  toast.style.zIndex = '1000';
+  toast.style.opacity = '0';
+  toast.style.transition = 'opacity 0.3s ease';
+  toast.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+  toast.style.fontWeight = 'bold';
+  toast.style.fontSize = '16px';
+  toast.style.textAlign = 'center';
+  toast.style.fontFamily = 'Courier, "Courier New", monospace';
+  toast.innerText = message;
+  
+  document.body.appendChild(toast);
+  
+  // Fade in
+  setTimeout(() => {
+    toast.style.opacity = '1';
+  }, 50);
+  
+  // Fade out after 3 seconds
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => {
+      if (toast.parentNode) {
+        document.body.removeChild(toast);
+      }
+    }, 500);
+  }, 3000);
 }
 
 // New function to show a recipe link modal - APlasker
@@ -1713,7 +1534,7 @@ function showRecipeModal() {
     
     // Create modal container
     const modal = document.createElement('div');
-    modal.id = 'recipe-modal'; // Add ID for easier debugging and targeting
+    modal.id = 'recipe-modal';
     modal.style.position = 'fixed';
     modal.style.top = '0';
     modal.style.left = '0';
@@ -1777,7 +1598,7 @@ function showRecipeModal() {
     header.style.marginTop = '0';
     header.style.color = '#778F5D'; // Avocado green
     header.style.fontFamily = 'Arial, sans-serif';
-    header.style.marginBottom = '25px'; // Added margin to maintain spacing after removing recipe name
+    header.style.marginBottom = '25px';
     
     // Create button container
     const buttonContainer = document.createElement('div');
@@ -1802,6 +1623,27 @@ function showRecipeModal() {
     openButton.style.textDecoration = 'none';
     openButton.style.display = 'inline-block';
     openButton.style.textAlign = 'center';
+    
+    // Add click tracking to the recipe link with proper tracking before navigation
+    openButton.addEventListener('click', async (e) => {
+      e.preventDefault(); // Prevent immediate navigation
+      
+      // Track the recipe click first
+      if (typeof trackRecipeClick === 'function') {
+        console.log("Tracking recipe click before navigation");
+        await trackRecipeClick();
+      }
+      
+      // Session is already completed when win screen is shown - no need to complete again
+      console.log("Opening recipe URL (session already completed)");
+      
+      // Small delay to ensure tracking completes
+      setTimeout(() => {
+        console.log("Opening recipe URL after tracking");
+        window.open(urlToOpen, '_blank');
+        closeModal();
+      }, 50);
+    });
     
     // Create close button
     const closeButton = document.createElement('button');
@@ -1837,12 +1679,20 @@ function showRecipeModal() {
 }
 
 function viewRecipe() {
-  // APlasker - Track recipe CTA click in analytics
-  if (typeof trackRecipeClick === 'function') {
-    trackRecipeClick();
+  // Check if we have a URL to open
+  if (!recipeUrl) {
+    console.log("No recipe URL available");
+    return;
   }
   
-  // Use the new modal approach for a consistent experience on all platforms
+  console.log("Opening recipe URL:", recipeUrl);
+  
+  // Reset win screen timer on recipe view
+  if (typeof resetWinScreenTimer === 'function') {
+    resetWinScreenTimer();
+  }
+  
+  // Create and show the recipe modal
   showRecipeModal();
 }
 
@@ -1859,8 +1709,8 @@ function mouseMoved() {
 }
 // Function to check if a point is within the random recipe hotspot area
 function isInRandomRecipeHotspot(x, y) {
-  // Calculate the position of the "!" in "WOW DELICIOUS!"
-  const rewardMessage = "WOW DELICIOUS!";
+  // Calculate the position of the "E" in "DELICIOUS"
+  const rewardMessage = "DELICIOUS";
   const rewardMessageSize = min(max(playAreaWidth * 0.08, 24), 36);
   textSize(rewardMessageSize);
   textStyle(BOLD);
@@ -1888,26 +1738,27 @@ function isInRandomRecipeHotspot(x, y) {
   // Starting x position (centered with kerning)
   let startX = playAreaX + playAreaWidth/2 - (totalWidth + totalKerning)/2;
   
-  // Calculate the position of the "!"
-  let exclamationX = startX;
-  for (let i = 0; i < rewardMessage.length - 1; i++) {
-    exclamationX += letterWidths[i] * (1 + kerningFactor);
+  // Calculate the position of the "E" (second-to-last letter, index 7 in "DELICIOUS")
+  const targetLetterIndex = 7; // "E" is at position 7 (0-indexed)
+  let targetLetterX = startX;
+  for (let i = 0; i < targetLetterIndex; i++) {
+    targetLetterX += letterWidths[i] * (1 + kerningFactor);
   }
-  exclamationX += letterWidths[rewardMessage.length - 1]/2;
+  targetLetterX += letterWidths[targetLetterIndex]/2;
   
-  let exclamationY = playAreaY + playAreaHeight * 0.06;
+  let targetLetterY = playAreaY + playAreaHeight * 0.06;
   
-  // Create a 60x60 pixel hotspot around the "!"
-  const isInHotspot = x >= exclamationX - 30 && x <= exclamationX + 30 && 
-                      y >= exclamationY - 30 && y <= exclamationY + 30;
+  // Create a 60x60 pixel hotspot around the "E"
+  const isInHotspot = x >= targetLetterX - 30 && x <= targetLetterX + 30 && 
+                      y >= targetLetterY - 30 && y <= targetLetterY + 30;
   
   // Debug visualization when hovering over hotspot
   if (isInHotspot) {
     noFill();
     stroke(255, 0, 0, 100); // Semi-transparent red for random recipe
     strokeWeight(2);
-    rect(exclamationX - 30, exclamationY - 30, 60, 60);
-    console.log("Hovering over random recipe hotspot at:", exclamationX, exclamationY);
+    rect(targetLetterX - 30, targetLetterY - 30, 60, 60);
+    console.log("Hovering over random recipe hotspot at:", targetLetterX, targetLetterY);
   }
   
   return isInHotspot;
@@ -2136,7 +1987,7 @@ function showFeedbackModal() {
     
     // Prevent event bubbling from content to modal
     content.addEventListener('click', (e) => {
-      e.stopPropagation();
+      e.stopPropagation(); // Temporarily commented out to test input field focus
     });
     
     // Create header
@@ -2264,6 +2115,14 @@ function showFeedbackModal() {
         }
         
         try {
+          // Get the current recipe UUID
+          let recipeUuid = null;
+          
+          // Try getting recipe UUID from recipe_data
+          if (typeof recipe_data !== 'undefined' && recipe_data && recipe_data.rec_id) {
+            recipeUuid = recipe_data.rec_id;
+          }
+          
           // Submit to Supabase SayHi table
           const { data, error } = await supabase
             .from('SayHi')
@@ -2271,7 +2130,7 @@ function showFeedbackModal() {
               { 
                 email_hi: email, 
                 comment_hi: comment,
-                recipe_hi: recipeName,
+                recipe_uuid: recipeUuid,
                 created_at: new Date().toISOString()
               }
             ]);
@@ -2447,7 +2306,7 @@ function handleLetterScoreInteraction(x, y) {
   const circleSize = scoreHeight * 0.8; // Updated to 80% to match drawWinScreen
   
   // Calculate letter grade position
-  const letterGradeY = circleY + scoreHeight * 0.1; // 10% lower than circle center
+  const letterGradeY = circleY + scoreHeight * 0.1;
   
   // Check if click is within the circle area with padding
   const padding = 20; // 20px of extra clickable area
@@ -2488,9 +2347,14 @@ function handleLetterScoreInteraction(x, y) {
   
   // If coordinates are within circle, letter grade, or letter score, trigger share action
   if (isOverCircle || isOverLetterGrade || isOverLetterScore) {
-    console.log("Letter score interaction handled - directly calling shareScore");
+    console.log("Letter score interaction handled - tracking share click");
     
-    // Directly call shareScore and catch any errors
+    // Track share click immediately when they interact with the score card
+    if (typeof trackShareClick === 'function') {
+      trackShareClick();
+    }
+    
+    // Then try to execute the share action
     try {
       shareScore();
       console.log("shareScore executed successfully");

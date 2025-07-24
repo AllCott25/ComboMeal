@@ -121,18 +121,11 @@
           this.x = currentX - this.dragOffsetX;
           this.y = currentY - this.dragOffsetY;
         } else {
-          // Calculate vertical margin based on vessel height and layout type
-          const verticalMargin = this.h * 0.2 * getCurrentLayout().vesselMarginMultiplier;
+          // Smooth animations with easing
+          this.scale = lerp(this.scale, this.targetScale, 0.35);
           
-          // Calculate starting Y position based on layout type
-          const startY = playAreaY + (playAreaHeight * getCurrentLayout().vesselsStart);
-          
-          // Legacy scale animation - kept for backward compatibility
-          this.scale = lerp(this.scale, this.targetScale, 0.2);
-          
-          // New separate scale animations for body and text
-          this.bodyScale = lerp(this.bodyScale, this.targetBodyScale, 0.2);
-          this.textScale = lerp(this.textScale, this.targetTextScale, 0.2);
+          this.bodyScale = lerp(this.bodyScale, this.targetBodyScale, 0.35);
+          this.textScale = lerp(this.textScale, this.targetTextScale, 0.35);
           
           // Update text margin based on scale - APlasker
           // When vessel is being dragged or returning from being dragged,

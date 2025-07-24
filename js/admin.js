@@ -1,5 +1,77 @@
 // Admin Panel for Culinary Logic Puzzle
 
+// Add styles for messages
+const messageStyles = document.createElement('style');
+messageStyles.textContent = `
+    .messages-list {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        background: #f9f9f9;
+    }
+
+    .message-item {
+        padding: 12px;
+        border-bottom: 1px solid #e0e0e0;
+        background: white;
+        margin: 8px;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .message-item:last-child {
+        border-bottom: none;
+    }
+
+    .message-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.9em;
+        color: #666;
+    }
+
+    .message-date {
+        color: #888;
+    }
+
+    .message-email {
+        color: #2196F3;
+        font-weight: 500;
+    }
+
+    .message-content {
+        color: #333;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    .recipe-summary-stats span {
+        margin-right: 12px;
+        padding: 2px 8px;
+        background: #f0f0f0;
+        border-radius: 12px;
+        font-size: 0.9em;
+    }
+`;
+document.head.appendChild(messageStyles);
+
+const nonInteractiveTextStyle = document.createElement('style');
+nonInteractiveTextStyle.textContent = `
+    .non-interactive-text {
+        padding: 8px;
+        background-color: #f9f9f9;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        min-height: 24px; /* Ensure it has some height even when empty */
+        color: #333;
+        font-size: 0.9em;
+    }
+`;
+document.head.appendChild(nonInteractiveTextStyle);
+
 // Initialize Supabase client
 const SUPABASE_URL = 'https://ovrvtfjejmhrflybslwi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
@@ -50,6 +122,8 @@ let currentPlanningDate = new Date();
 let allPlanningRecipes = [];
 let filteredRecipes = [];
 let draggedRecipe = null;
+let pendingChanges = new Map(); // Store pending date changes
+let originalDates = new Map(); // Store original dates for revert
 
 // Check if user is already logged in
 async function checkSession() {
@@ -98,9 +172,29 @@ document.addEventListener('DOMContentLoaded', () => {
             closeRecipeModal();
         }
     });
+
+    // Playtest button logic for recipe modal - APlasker
+    const playtestBtn = document.getElementById('playtest-recipe-btn');
+    const dateInput = document.getElementById('edit-recipe-date');
+    function updatePlaytestBtn() {
+        const date = dateInput.value;
+        if (date) {
+            playtestBtn.disabled = false;
+            playtestBtn.onclick = () => {
+                window.open(`index.html?date=${date}`, '_blank');
+            };
+        } else {
+            playtestBtn.disabled = true;
+            playtestBtn.onclick = null;
+        }
+    }
+    if (playtestBtn && dateInput) {
+        updatePlaytestBtn();
+        dateInput.addEventListener('input', updatePlaytestBtn);
+    }
 });
 
-// Handle Login
+// Handle Login with enhanced security
 async function handleLogin(e) {
     e.preventDefault();
     
@@ -108,17 +202,17 @@ async function handleLogin(e) {
     const password = document.getElementById('password').value;
     
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+        // Use AdminAuth for secure login
+        const result = await AdminAuth.adminLogin(email, password);
         
-        if (error) throw error;
-        
-        showAdminPanel();
-        loadFormData();
+        if (result.success) {
+            showAdminPanel();
+            loadFormData();
+            loginError.textContent = '';
+        }
     } catch (error) {
         loginError.textContent = `Login failed: ${error.message}`;
+        console.error('Admin login error:', error);
     }
 }
 
@@ -177,10 +271,10 @@ async function loadRecipes() {
         // Populate test recipe dropdown
         const testRecipeDropdown = document.getElementById('test-recipe');
         testRecipeDropdown.innerHTML = '';
-        recipes.forEach(recipe => {
-            const option = document.createElement('option');
-            option.value = recipe.rec_id;
-            option.textContent = `${recipe.name} (${recipe.date})`;
+            recipes.forEach(recipe => {
+                const option = document.createElement('option');
+                option.value = recipe.rec_id;
+                option.textContent = `${recipe.name} (${recipe.date})`;
             testRecipeDropdown.appendChild(option);
         });
     } catch (error) {
@@ -515,17 +609,20 @@ async function loadSummaryStats(period) {
     
     if (sessionsError) throw sessionsError;
     
-    const totalSessions = sessions.length;
-    const completedSessions = sessions.filter(s => s.win_condition === 'completed').length;
+    // Filter out local file testing sessions
+    const filteredSessions = sessions.filter(s => !s.play_url || !s.play_url.startsWith('file://'));
+    
+    const totalSessions = filteredSessions.length;
+    const completedSessions = filteredSessions.filter(s => s.win_condition === 'completed').length;
     const completionRate = totalSessions > 0 ? ((completedSessions / totalSessions) * 100).toFixed(1) : 0;
     
     // Calculate averages for completed sessions only
-    const completedSessionsData = sessions.filter(s => s.win_condition === 'completed' && s.total_time_seconds);
+    const completedSessionsData = filteredSessions.filter(s => s.win_condition === 'completed' && s.total_time_seconds);
     const avgTime = completedSessionsData.length > 0 
         ? Math.round(completedSessionsData.reduce((sum, s) => sum + s.total_time_seconds, 0) / completedSessionsData.length)
         : 0;
-    const avgHints = sessions.length > 0 
-        ? (sessions.reduce((sum, s) => sum + (s.hints_used || 0), 0) / sessions.length).toFixed(1)
+    const avgHints = totalSessions > 0 
+        ? (filteredSessions.reduce((sum, s) => sum + (s.hints_used || 0), 0) / totalSessions).toFixed(1)
         : 0;
     
     // Update UI
@@ -539,7 +636,7 @@ async function loadSummaryStats(period) {
 async function loadRecipeAnalytics(period) {
     const dateFilter = getDateFilter(period);
     
-    // Get all recipes with their analytics
+    // Get all recipes with their analytics and messages
     const { data: recipes, error: recipesError } = await supabase
         .from('recipes')
         .select(`
@@ -556,12 +653,18 @@ async function loadRecipeAnalytics(period) {
                 goto_recipe,
                 goto_share,
                 play_url,
-                started_at
+                started_at,
+                mistakes_total
+            ),
+            SayHi!recipe_uuid (
+                created_at,
+                email_hi,
+                comment_hi
             )
         `)
         .gte('date', dateFilter.start)
         .lte('date', dateFilter.end)
-        .order('date', { ascending: false });
+        .order('date', { ascending: true });
     
     if (recipesError) throw recipesError;
     
@@ -570,7 +673,8 @@ async function loadRecipeAnalytics(period) {
     
     recipes.forEach(recipe => {
         const sessions = recipe.game_sessions || [];
-        const analytics = calculateRecipeAnalytics(sessions);
+        const messages = recipe.SayHi || [];
+        const analytics = calculateRecipeAnalytics(sessions, messages);
         
         const recipeCard = createAnalyticsRecipeCard(recipe, analytics);
         recipeAnalyticsList.appendChild(recipeCard);
@@ -578,10 +682,13 @@ async function loadRecipeAnalytics(period) {
 }
 
 // Calculate Recipe Analytics
-function calculateRecipeAnalytics(sessions) {
-    const totalSessions = sessions.length;
-    const completedSessions = sessions.filter(s => s.win_condition === 'completed');
-    const abandonedSessions = sessions.filter(s => s.win_condition === 'abandoned');
+function calculateRecipeAnalytics(sessions, messages) {
+    // Filter out local file testing sessions
+    const filteredSessions = sessions.filter(s => !s.play_url || !s.play_url.startsWith('file://'));
+    
+    const totalSessions = filteredSessions.length;
+    const completedSessions = filteredSessions.filter(s => s.win_condition === 'completed');
+    const abandonedSessions = filteredSessions.filter(s => s.win_condition === 'abandoned');
     
     const completionRate = totalSessions > 0 ? ((completedSessions.length / totalSessions) * 100).toFixed(1) : 0;
     
@@ -592,24 +699,59 @@ function calculateRecipeAnalytics(sessions) {
         : 0;
     
     const avgHints = totalSessions > 0 
-        ? (sessions.reduce((sum, s) => sum + (s.hints_used || 0), 0) / totalSessions).toFixed(1)
+        ? (filteredSessions.reduce((sum, s) => sum + (s.hints_used || 0), 0) / totalSessions).toFixed(1)
         : 0;
     
     const avgEasterEggs = totalSessions > 0 
-        ? (sessions.reduce((sum, s) => sum + (s.easter_eggs_found || 0), 0) / totalSessions).toFixed(1)
+        ? (filteredSessions.reduce((sum, s) => sum + (s.easter_eggs_found || 0), 0) / totalSessions).toFixed(1)
         : 0;
     
     const recipeClickRate = totalSessions > 0 
-        ? ((sessions.filter(s => s.goto_recipe).length / totalSessions) * 100).toFixed(1)
+        ? ((filteredSessions.filter(s => s.goto_recipe).length / totalSessions) * 100).toFixed(1)
         : 0;
     
     const shareClickRate = totalSessions > 0 
-        ? ((sessions.filter(s => s.goto_share).length / totalSessions) * 100).toFixed(1)
+        ? ((filteredSessions.filter(s => s.goto_share).length / totalSessions) * 100).toFixed(1)
         : 0;
     
-    // Analyze URL patterns - APlasker
-    const urlAnalysis = analyzeUrlPatterns(sessions);
+    // Calculate mistake distribution and average
+    const mistakeDistribution = {
+        0: 0, 1: 0, 2: 0, 3: 0, 4: 0, '5+': 0
+    };
     
+    let totalMistakes = 0;
+    filteredSessions.forEach(session => {
+        const mistakes = session.mistakes_total || 0;
+        totalMistakes += mistakes;
+        if (mistakes >= 5) {
+            mistakeDistribution['5+']++;
+        } else {
+            mistakeDistribution[mistakes]++;
+        }
+    });
+    
+    const avgMistakes = totalSessions > 0 ? (totalMistakes / totalSessions).toFixed(1) : 0;
+    
+    // Calculate percentages for mistake distribution
+    const mistakePercentages = {};
+    Object.keys(mistakeDistribution).forEach(key => {
+        mistakePercentages[key] = totalSessions > 0 
+            ? ((mistakeDistribution[key] / totalSessions) * 100).toFixed(1)
+            : 0;
+    });
+    
+    // Analyze URL patterns (excluding local file testing URLs)
+    const urlAnalysis = analyzeUrlPatterns(filteredSessions);
+    
+    // Process messages
+    const processedMessages = messages
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .map(msg => ({
+            date: new Date(msg.created_at),
+            email: msg.email_hi,
+            comment: msg.comment_hi
+        }));
+
     return {
         totalSessions,
         completedSessions: completedSessions.length,
@@ -620,7 +762,12 @@ function calculateRecipeAnalytics(sessions) {
         avgEasterEggs,
         recipeClickRate,
         shareClickRate,
-        urlAnalysis
+        urlAnalysis,
+        messages: processedMessages,
+        totalMessages: processedMessages.length,
+        mistakeDistribution,
+        mistakePercentages,
+        avgMistakes
     };
 }
 
@@ -676,46 +823,90 @@ function createAnalyticsRecipeCard(recipe, analytics) {
         ? `<img src="${recipe.img_url}" alt="${recipe.name}" class="recipe-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
            <div class="recipe-image placeholder" style="display:none;">🍽️</div>`
         : `<div class="recipe-image placeholder">🍽️</div>`;
-    
-    // Create URL analytics section - APlasker
-    const urlAnalysis = analytics.urlAnalysis;
-    const urlBreakdown = urlAnalysis ? `
+
+    // Create mistake distribution graph with average
+    const mistakeGraph = `
         <div class="metric-section">
-            <div class="metric-section-title">Traffic Sources</div>
-            <div class="metric-item">
-                <div class="metric-label">Main Site</div>
-                <div class="metric-value">${urlAnalysis.urlTypes.main}</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-label">Playtest URLs</div>
-                <div class="metric-value">${urlAnalysis.urlTypes.playtest}</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-label">Tutorial Mode</div>
-                <div class="metric-value">${urlAnalysis.urlTypes.tutorial}</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-label">Other URLs</div>
-                <div class="metric-value">${urlAnalysis.urlTypes.other}</div>
-            </div>
-            <div class="metric-item">
-                <div class="metric-label">Unique URLs</div>
-                <div class="metric-value">${urlAnalysis.totalUrls}</div>
+            <div class="metric-section-title">Mistake Distribution</div>
+            <div class="mistake-graph">
+                <div class="mistake-bars">
+                    ${Object.entries(analytics.mistakeDistribution).map(([mistakes, count]) => {
+                        const percentage = analytics.mistakePercentages[mistakes];
+                        const height = Math.max(percentage * 2, 4); // Scale percentage to pixels, minimum 4px
+                        return `
+                            <div class="mistake-bar-container">
+                                <div class="mistake-bar" style="height: ${height}px"></div>
+                                <div class="mistake-bar-label">${mistakes}</div>
+                                <div class="mistake-bar-value">${count}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="mistake-average">
+                    Average Mistakes: <strong>${analytics.avgMistakes}</strong>
+                </div>
             </div>
         </div>
-        ${urlAnalysis.topUrls.length > 0 ? `
-            <div class="metric-section">
-                <div class="metric-section-title">Top URLs</div>
-                ${urlAnalysis.topUrls.map(urlData => `
-                    <div class="url-item">
-                        <div class="url-path">${formatUrlForDisplay(urlData.url)}</div>
-                        <div class="url-count">${urlData.count} plays</div>
+    `;
+
+    // Create messages section
+    const messagesSection = analytics.messages.length > 0 ? `
+        <div class="metric-section">
+            <div class="metric-section-title">User Messages (${analytics.totalMessages})</div>
+            <div class="messages-list">
+                ${analytics.messages.map(msg => `
+                    <div class="message-item">
+                        <div class="message-header">
+                            <span class="message-date">${formatMessageDate(msg.date)}</span>
+                            <span class="message-email">${msg.email}</span>
+                        </div>
+                        <div class="message-content">${escapeHtml(msg.comment)}</div>
                     </div>
                 `).join('')}
             </div>
-        ` : ''}
+        </div>
     ` : '';
-    
+
+    // Merge Traffic Sources and Top URLs sections
+    const trafficSection = `
+        <div class="metric-section">
+            <div class="metric-section-title">Traffic Analysis</div>
+            <div class="traffic-stats">
+                <div class="metric-item">
+                    <div class="metric-label">Main Site</div>
+                    <div class="metric-value">${analytics.urlAnalysis.urlTypes.main}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Playtest URLs</div>
+                    <div class="metric-value">${analytics.urlAnalysis.urlTypes.playtest}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Tutorial Mode</div>
+                    <div class="metric-value">${analytics.urlAnalysis.urlTypes.tutorial}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Other URLs</div>
+                    <div class="metric-value">${analytics.urlAnalysis.urlTypes.other}</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-label">Unique URLs</div>
+                    <div class="metric-value">${analytics.urlAnalysis.totalUrls}</div>
+                </div>
+            </div>
+            ${analytics.urlAnalysis.topUrls.length > 0 ? `
+                <div class="top-urls">
+                    <h4>Top Traffic Sources</h4>
+                    ${analytics.urlAnalysis.topUrls.map(urlData => `
+                        <div class="url-item">
+                            <div class="url-path">${formatUrlForDisplay(urlData.url)}</div>
+                            <div class="url-count">${urlData.count} plays</div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        </div>
+    `;
+
     card.innerHTML = `
         <div class="recipe-header" onclick="toggleRecipeDetails(this)">
             ${imageElement}
@@ -725,6 +916,8 @@ function createAnalyticsRecipeCard(recipe, analytics) {
                 <div class="recipe-summary-stats">
                     <span>${analytics.totalSessions} plays</span>
                     <span>${analytics.completionRate}% completion</span>
+                    <span>Avg. ${analytics.avgMistakes} mistakes</span>
+                    ${analytics.totalMessages > 0 ? `<span>${analytics.totalMessages} messages</span>` : ''}
                 </div>
             </div>
             <div class="recipe-expand-icon">▼</div>
@@ -770,7 +963,9 @@ function createAnalyticsRecipeCard(recipe, analytics) {
                         <div class="metric-value">${analytics.shareClickRate}%</div>
                     </div>
                 </div>
-                ${urlBreakdown}
+                ${mistakeGraph}
+                ${trafficSection}
+                ${messagesSection}
             </div>
         </div>
     `;
@@ -778,45 +973,19 @@ function createAnalyticsRecipeCard(recipe, analytics) {
     return card;
 }
 
-// Format URL for display - APlasker
-function formatUrlForDisplay(url) {
-    try {
-        const urlObj = new URL(url);
-        let display = urlObj.pathname;
-        
-        // Add query parameters if they exist
-        if (urlObj.search) {
-            // Show important query parameters
-            const params = new URLSearchParams(urlObj.search);
-            const importantParams = [];
-            
-            if (params.has('date')) {
-                importantParams.push(`date=${params.get('date')}`);
-            }
-            if (params.has('tutorial')) {
-                importantParams.push('tutorial');
-            }
-            
-            if (importantParams.length > 0) {
-                display += `?${importantParams.join('&')}`;
-            } else if (urlObj.search.length < 50) {
-                display += urlObj.search;
-            } else {
-                display += '?...';
-            }
-        }
-        
-        // Truncate if too long
-        if (display.length > 60) {
-            display = display.substring(0, 57) + '...';
-        }
-        
-        return display;
-    } catch (error) {
-        // If URL parsing fails, just show the last part
-        return url.length > 60 ? '...' + url.substring(url.length - 57) : url;
-    }
+// Format Message Date
+function formatMessageDate(date) {
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }
+
+// Use SecurityUtils for HTML escaping
+const escapeHtml = SecurityUtils.escapeHtml;
 
 // Toggle Recipe Details
 function toggleRecipeDetails(headerElement) {
@@ -846,78 +1015,63 @@ async function loadCalendarView(period) {
     
     if (error) throw error;
     
+    // Create calendar navigation controls
+    const calendarNav = `
+        <div class="calendar-header">
+            <button class="calendar-nav-btn" onclick="navigateAnalyticsCalendar(-1)">←</button>
+            <span id="analytics-current-period"></span>
+            <button class="calendar-nav-btn" onclick="navigateAnalyticsCalendar(1)">→</button>
+        </div>
+    `;
+    
     // Create calendar grid
     const calendar = createCalendarGrid(dateFilter, recipes);
-    calendarContainer.innerHTML = calendar;
+    calendarContainer.innerHTML = calendarNav + calendar;
+    
+    // Update period display
+    updateAnalyticsPeriodDisplay(dateFilter);
 }
 
-// Create Calendar Grid
-function createCalendarGrid(dateFilter, recipes) {
-    const start = new Date(dateFilter.start);
-    const end = new Date(dateFilter.end);
-    const today = new Date();
+// Add navigation function for analytics calendar
+let currentAnalyticsDate = new Date();
+
+function navigateAnalyticsCalendar(direction) {
+    const period = analyticsPeriodSelect.value;
     
-    // Create recipe map by date
-    const recipeMap = {};
-    recipes.forEach(recipe => {
-        const sessions = recipe.game_sessions || [];
-        const totalSessions = sessions.length;
-        const completedSessions = sessions.filter(s => s.win_condition === 'completed').length;
-        const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
-        
-        recipeMap[recipe.date] = {
-            name: recipe.name,
-            totalSessions,
-            completionRate
-        };
-    });
-    
-    let calendarHtml = '<div class="calendar-grid">';
-    
-    // Add day headers
-    const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    dayHeaders.forEach(day => {
-        calendarHtml += `<div style="font-weight: bold; text-align: center; padding: 8px;">${day}</div>`;
-    });
-    
-    // Get first day of the period and adjust to start on Sunday
-    const firstDay = new Date(start);
-    firstDay.setDate(firstDay.getDate() - firstDay.getDay());
-    
-    // Generate calendar days
-    const current = new Date(firstDay);
-    const endOfPeriod = new Date(end);
-    endOfPeriod.setDate(endOfPeriod.getDate() + (6 - endOfPeriod.getDay())); // Extend to end of week
-    
-    while (current <= endOfPeriod) {
-        const dateStr = current.toISOString().split('T')[0];
-        const isToday = current.toDateString() === today.toDateString();
-        const recipe = recipeMap[dateStr];
-        
-        let dayClass = 'calendar-day';
-        if (isToday) dayClass += ' today';
-        if (recipe) dayClass += ' has-recipe';
-        
-        calendarHtml += `
-            <div class="${dayClass}">
-                <div class="calendar-date">${current.getDate()}</div>
-                ${recipe ? `
-                    <div class="calendar-recipe">${recipe.name}</div>
-                    <div class="calendar-stats">${recipe.totalSessions} plays • ${recipe.completionRate}%</div>
-                ` : ''}
-            </div>
-        `;
-        
-        current.setDate(current.getDate() + 1);
+    if (period === 'week') {
+        // Move by weeks
+        currentAnalyticsDate.setDate(currentAnalyticsDate.getDate() + (direction * 7));
+    } else if (period === 'month') {
+        // Move by months
+        currentAnalyticsDate.setMonth(currentAnalyticsDate.getMonth() + direction);
     }
     
-    calendarHtml += '</div>';
-    return calendarHtml;
+    loadAnalyticsData();
 }
 
-// Get Date Filter based on period
+// Update period display
+function updateAnalyticsPeriodDisplay(dateFilter) {
+    const periodDisplay = document.getElementById('analytics-current-period');
+    const period = analyticsPeriodSelect.value;
+    
+    if (period === 'week') {
+        const start = new Date(dateFilter.start);
+        const end = new Date(dateFilter.end);
+        periodDisplay.textContent = `${formatDate(start)} - ${formatDate(end)}`;
+    } else if (period === 'month') {
+        const date = new Date(dateFilter.start);
+        periodDisplay.textContent = date.toLocaleString('en-US', { 
+            month: 'long', 
+            year: 'numeric' 
+        });
+    } else {
+        periodDisplay.textContent = 'All Time';
+    }
+}
+
+// Update getDateFilter to use currentAnalyticsDate
 function getDateFilter(period) {
-    const now = new Date();
+    const now = currentAnalyticsDate;
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     
     switch (period) {
@@ -946,6 +1100,129 @@ function getDateFilter(period) {
                 end: '2030-12-31'    // Very late date
             };
     }
+}
+
+// Update createCalendarGrid to show pending changes
+function createCalendarGrid(dateFilter, recipes) {
+    const start = new Date(dateFilter.start);
+    const end = new Date(dateFilter.end);
+    const today = new Date();
+    const period = analyticsPeriodSelect.value;
+    
+    // Create recipe map by date
+    const recipeMap = {};
+    recipes.forEach(recipe => {
+        const sessions = recipe.game_sessions || [];
+        const totalSessions = sessions.length;
+        const completedSessions = sessions.filter(s => s.win_condition === 'completed').length;
+        const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+        
+        // Calculate average mistakes
+        const totalMistakes = sessions.reduce((sum, s) => sum + (s.mistakes_total || 0), 0);
+        const avgMistakes = totalSessions > 0 ? (totalMistakes / totalSessions).toFixed(1) : 0;
+        
+        const date = pendingChanges.has(recipe.rec_id) ? pendingChanges.get(recipe.rec_id) : recipe.date;
+        
+        recipeMap[date] = {
+            rec_id: recipe.rec_id,
+            name: recipe.name,
+            totalSessions,
+            completionRate,
+            avgMistakes,
+            hasPendingChange: pendingChanges.has(recipe.rec_id)
+        };
+    });
+    
+    let calendarHtml = '<div class="calendar-grid">';
+    
+    // Add day headers
+    const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    dayHeaders.forEach(day => {
+        calendarHtml += `<div class="calendar-header-cell">${day}</div>`;
+    });
+    
+    if (period === 'week') {
+        // For week view, just show the exact week (Sunday to Saturday)
+        const current = new Date(start);
+        
+        while (current <= end) {
+            const dateStr = current.toISOString().split('T')[0];
+            const isToday = current.toDateString() === today.toDateString();
+            const recipe = recipeMap[dateStr];
+            
+            let dayClass = 'calendar-day';
+            if (isToday) dayClass += ' today';
+            if (recipe) {
+                dayClass += ' has-recipe';
+                if (recipe.hasPendingChange) dayClass += ' has-pending-change';
+            }
+            
+            calendarHtml += `
+                <div class="${dayClass}">
+                    <div class="calendar-date">${current.getDate()}</div>
+                    ${recipe ? `
+                        <div class="calendar-recipe">${recipe.name}</div>
+                        <div class="calendar-stats">
+                            ${recipe.totalSessions} plays • ${recipe.completionRate}%
+                            <br>Avg. ${recipe.avgMistakes} mistakes
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            current.setDate(current.getDate() + 1);
+        }
+    } else {
+        // For month view, show the full month grid
+        const firstDay = new Date(start);
+        firstDay.setDate(1);
+        const startingDayOfWeek = firstDay.getDay();
+        
+        // Get first day of the grid (last days of previous month if needed)
+        const gridStart = new Date(firstDay);
+        gridStart.setDate(1 - startingDayOfWeek);
+        
+        // Calculate last day to show
+        const lastDay = new Date(end);
+        const endingDayOfWeek = lastDay.getDay();
+        const gridEnd = new Date(lastDay);
+        gridEnd.setDate(lastDay.getDate() + (6 - endingDayOfWeek));
+        
+        const current = new Date(gridStart);
+        
+        while (current <= gridEnd) {
+            const dateStr = current.toISOString().split('T')[0];
+            const isToday = current.toDateString() === today.toDateString();
+            const isCurrentMonth = current.getMonth() === start.getMonth();
+            const recipe = recipeMap[dateStr];
+            
+            let dayClass = 'calendar-day';
+            if (!isCurrentMonth) dayClass += ' other-month';
+            if (isToday) dayClass += ' today';
+            if (recipe) {
+                dayClass += ' has-recipe';
+                if (recipe.hasPendingChange) dayClass += ' has-pending-change';
+            }
+            
+            calendarHtml += `
+                <div class="${dayClass}">
+                    <div class="calendar-date">${current.getDate()}</div>
+                    ${recipe ? `
+                        <div class="calendar-recipe">${recipe.name}</div>
+                        <div class="calendar-stats">
+                            ${recipe.totalSessions} plays • ${recipe.completionRate}%
+                            <br>Avg. ${recipe.avgMistakes} mistakes
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+            
+            current.setDate(current.getDate() + 1);
+        }
+    }
+    
+    calendarHtml += '</div>';
+    return calendarHtml;
 }
 
 // Format Duration (seconds to MM:SS)
@@ -978,7 +1255,7 @@ function showMessage(element, message, type) {
         element.textContent = '';
         element.className = 'message';
     }, 5000);
-}
+} 
 
 // ============================================================================
 // PLANNING CALENDAR FUNCTIONS - APlasker
@@ -989,6 +1266,41 @@ async function loadPlanningData() {
     console.log("Loading planning data...");
     
     try {
+        // Ensure planning section structure exists
+        const planningSection = document.getElementById('planning-section');
+        if (!planningSection.querySelector('.planning-container')) {
+            planningSection.innerHTML = `
+                <div class="planning-container">
+                    <div class="planning-calendar">
+                        <div class="calendar-header">
+                            <button id="prev-month" class="calendar-nav-btn">←</button>
+                            <h2 id="current-month-year"></h2>
+                            <button id="next-month" class="calendar-nav-btn">→</button>
+                        </div>
+                        <div id="planning-calendar-grid" class="planning-calendar-grid"></div>
+                    </div>
+                    <div class="recipe-panel">
+                        <div class="recipe-filter">
+                            <input type="text" id="recipe-search" placeholder="Search recipes...">
+                            <select id="recipe-sort">
+                                <option value="name">Sort by Name</option>
+                                <option value="date">Sort by Date</option>
+                                <option value="author">Sort by Author</option>
+                            </select>
+                        </div>
+                        <div id="recipe-cards-container" class="recipe-cards-container"></div>
+                    </div>
+                </div>
+                <div id="planning-messages" class="message"></div>
+            `;
+            
+            // Add event listeners for navigation
+            document.getElementById('prev-month').addEventListener('click', () => navigateMonth(-1));
+            document.getElementById('next-month').addEventListener('click', () => navigateMonth(1));
+            document.getElementById('recipe-search').addEventListener('input', filterRecipes);
+            document.getElementById('recipe-sort').addEventListener('change', filterRecipes);
+        }
+        
         // Load all recipes
         const { data: recipes, error } = await supabase
             .from('recipes')
@@ -999,6 +1311,18 @@ async function loadPlanningData() {
         
         allPlanningRecipes = recipes || [];
         filteredRecipes = [...allPlanningRecipes];
+        
+        // Clear pending changes and store original dates
+        pendingChanges.clear();
+        originalDates.clear();
+        allPlanningRecipes.forEach(recipe => {
+            if (recipe.date) {
+                originalDates.set(recipe.rec_id, recipe.date);
+            }
+        });
+        
+        // Create planning controls
+        createPlanningControls();
         
         // Update calendar and recipe panel
         updatePlanningCalendar();
@@ -1054,9 +1378,17 @@ function updatePlanningCalendar() {
         cell.dataset.date = dateStr;
         
         // Find recipe for this date
-        const recipe = allPlanningRecipes.find(r => r.date === dateStr);
+        const recipe = allPlanningRecipes.find(r => {
+            const recipeDate = pendingChanges.has(r.rec_id) ? 
+                pendingChanges.get(r.rec_id) : r.date;
+            return recipeDate === dateStr;
+        });
+
         if (recipe) {
             cell.classList.add('has-recipe');
+            if (pendingChanges.has(recipe.rec_id)) {
+                cell.classList.add('has-pending-change');
+            }
         }
         
         cell.innerHTML = `
@@ -1072,16 +1404,13 @@ function updatePlanningCalendar() {
             const recipeElement = cell.querySelector('.calendar-recipe');
             if (recipeElement) {
                 recipeElement.addEventListener('dragstart', (e) => {
-                    // Find the full recipe object from allPlanningRecipes
-                    const fullRecipe = allPlanningRecipes.find(r => r.rec_id === recipe.rec_id);
-                    draggedRecipe = fullRecipe || recipe;
+                    draggedRecipe = recipe;
                     recipeElement.classList.add('dragging');
                     e.stopPropagation();
                 });
                 
                 recipeElement.addEventListener('dragend', (e) => {
                     recipeElement.classList.remove('dragging');
-                    draggedRecipe = null;
                     e.stopPropagation();
                 });
             }
@@ -1104,6 +1433,7 @@ function createCalendarRecipeElement(recipe) {
              oncontextmenu="openRecipeModal('${recipe.rec_id}'); return false;">
             ${imageElement}
             <div class="calendar-recipe-name">${recipe.name}</div>
+            <span class="calendar-edit-icon" title="Edit Recipe" onclick="openRecipeModal('${recipe.rec_id}')">🖉</span>
         </div>
     `;
 }
@@ -1139,7 +1469,10 @@ async function handleDrop(e) {
     const cell = e.currentTarget;
     cell.classList.remove('drag-over');
     
-    if (!draggedRecipe) return;
+    if (!draggedRecipe) {
+        console.error('No dragged recipe found');
+        return;
+    }
     
     const targetDate = cell.dataset.date;
     const hasRecipe = cell.classList.contains('has-recipe');
@@ -1151,13 +1484,8 @@ async function handleDrop(e) {
     }
     
     try {
-        // Update recipe date in database
-        const { error } = await supabase
-            .from('recipes')
-            .update({ date: targetDate })
-            .eq('rec_id', draggedRecipe.rec_id);
-        
-        if (error) throw error;
+        // Store the change in pendingChanges
+        pendingChanges.set(draggedRecipe.rec_id, targetDate);
         
         // Update local data
         const recipeIndex = allPlanningRecipes.findIndex(r => r.rec_id === draggedRecipe.rec_id);
@@ -1165,14 +1493,15 @@ async function handleDrop(e) {
             allPlanningRecipes[recipeIndex].date = targetDate;
         }
         
-        // Refresh calendar and recipe panel
+        // Refresh UI
         updatePlanningCalendar();
-        filterRecipes(); // This will update filteredRecipes and call updateRecipePanel()
+        filterRecipes();
+        createPlanningControls(); // Update controls to show pending changes
         
-        showPlanningMessage(`Recipe "${draggedRecipe.name}" scheduled for ${formatDate(targetDate)}`, 'success');
+        showPlanningMessage(`Recipe "${draggedRecipe.name}" will be scheduled for ${formatDate(targetDate)}. Click "Save Changes" to confirm.`, 'info');
         
     } catch (error) {
-        console.error('Error updating recipe date:', error);
+        console.error('Error scheduling recipe:', error);
         showPlanningMessage(`Error scheduling recipe: ${error.message}`, 'error');
     }
     
@@ -1193,6 +1522,9 @@ function updateRecipePanel() {
 function createPlanningRecipeCard(recipe) {
     const card = document.createElement('div');
     card.className = 'draggable-recipe-card';
+    if (pendingChanges.has(recipe.rec_id)) {
+        card.classList.add('has-pending-change');
+    }
     card.draggable = true;
     card.dataset.recipeId = recipe.rec_id;
     
@@ -1228,7 +1560,6 @@ function createPlanningRecipeCard(recipe) {
     
     card.addEventListener('dragend', (e) => {
         card.classList.remove('dragging');
-        draggedRecipe = null;
     });
     
     return card;
@@ -1264,7 +1595,7 @@ function filterRecipes() {
 }
 
 // Open Recipe Modal
-function openRecipeModal(recipeId) {
+async function openRecipeModal(recipeId) {
     const recipe = allPlanningRecipes.find(r => r.rec_id === recipeId);
     if (!recipe) return;
     
@@ -1277,6 +1608,43 @@ function openRecipeModal(recipeId) {
     document.getElementById('edit-recipe-description').value = recipe.description || '';
     document.getElementById('edit-recipe-url').value = recipe.recipe_url || '';
     document.getElementById('edit-recipe-img-url').value = recipe.img_url || '';
+
+    // Fetch and display Easter Egg info
+    const easterEggInfoDiv = document.getElementById('edit-recipe-easter-egg-info');
+    easterEggInfoDiv.textContent = 'Loading...'; // Placeholder while fetching
+    try {
+        const { data: easterEggs, error } = await supabase
+            .from('eastereggs')
+            .select('name')
+            .eq('rec_id', recipe.rec_id);
+
+        if (error) throw error;
+
+        if (easterEggs && easterEggs.length > 0) {
+            const eggNames = easterEggs.map(egg => `🍳 ${egg.name}`).join('<br>');
+            easterEggInfoDiv.innerHTML = eggNames;
+        } else {
+            easterEggInfoDiv.textContent = 'No Easter Egg Found';
+        }
+    } catch (error) {
+        console.error('Error fetching easter eggs:', error);
+        easterEggInfoDiv.textContent = 'Error loading Easter Egg info';
+    }
+    
+    // Update Playtest button state
+    const playtestBtn = document.getElementById('playtest-recipe-btn');
+    const dateInput = document.getElementById('edit-recipe-date');
+    if (playtestBtn && dateInput) {
+        if (dateInput.value) {
+            playtestBtn.disabled = false;
+            playtestBtn.onclick = () => {
+                window.open(`index.html?date=${dateInput.value}`, '_blank');
+            };
+        } else {
+            playtestBtn.disabled = true;
+            playtestBtn.onclick = null;
+        }
+    }
     
     // Show modal
     recipeEditModal.classList.add('active');
@@ -1286,6 +1654,11 @@ function openRecipeModal(recipeId) {
 function closeRecipeModal() {
     recipeEditModal.classList.remove('active');
     recipeEditForm.reset();
+    // Clear Easter Egg info
+    const easterEggInfoDiv = document.getElementById('edit-recipe-easter-egg-info');
+    if (easterEggInfoDiv) {
+        easterEggInfoDiv.innerHTML = ''; // Clear the content
+    }
 }
 
 // Handle Recipe Edit
@@ -1351,6 +1724,147 @@ function showPlanningMessage(message, type) {
     }, 5000);
 }
 
-// Make functions globally accessible - APlasker
+// Format URL for display (truncate and clean up)
+function formatUrlForDisplay(url) {
+    try {
+        // Try to parse the URL
+        const urlObj = new URL(url);
+        
+        // Get pathname and search params
+        let displayUrl = urlObj.pathname;
+        
+        // Add search params if they exist
+        if (urlObj.search) {
+            // Limit the length of search params
+            const searchParams = urlObj.search.length > 30 
+                ? urlObj.search.substring(0, 30) + '...' 
+                : urlObj.search;
+            displayUrl += searchParams;
+        }
+        
+        // Truncate if too long
+        if (displayUrl.length > 50) {
+            displayUrl = displayUrl.substring(0, 47) + '...';
+        }
+        
+        return displayUrl;
+    } catch (e) {
+        // If URL parsing fails, just truncate the raw string
+        return url.length > 50 ? url.substring(0, 47) + '...' : url;
+    }
+}
+
+// Create Planning Controls
+function createPlanningControls() {
+    // Remove existing controls if they exist
+    const existingControls = document.getElementById('planning-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
+    
+    // Create new controls
+    const container = document.createElement('div');
+    container.id = 'planning-controls';
+    container.className = 'planning-controls';
+    
+    const hasChanges = pendingChanges.size > 0;
+    
+    container.innerHTML = `
+        <button id="save-planning" class="save-planning-btn" ${!hasChanges ? 'disabled' : ''}>
+            Save Changes (${pendingChanges.size})
+        </button>
+        <button id="revert-planning" class="revert-planning-btn" ${!hasChanges ? 'disabled' : ''}>
+            Revert Changes
+        </button>
+    `;
+    
+    // Add after the calendar
+    const planningCalendar = document.querySelector('.planning-calendar');
+    if (planningCalendar) {
+        planningCalendar.insertAdjacentElement('afterend', container);
+        
+        // Add event listeners
+        document.getElementById('save-planning').addEventListener('click', savePlanningChanges);
+        document.getElementById('revert-planning').addEventListener('click', revertPlanningChanges);
+    }
+}
+
+// Save Planning Changes
+async function savePlanningChanges() {
+    if (pendingChanges.size === 0) return;
+    
+    try {
+        // Create an array of updates
+        const updates = Array.from(pendingChanges.entries()).map(([rec_id, date]) => {
+            // Find the full recipe object
+            const recipe = allPlanningRecipes.find(r => r.rec_id === rec_id);
+            if (!recipe) {
+                throw new Error(`Recipe with ID ${rec_id} not found`);
+            }
+            
+            // Return all existing fields plus the new date
+            return {
+                ...recipe,
+                date: date
+            };
+        });
+        
+        // Update all changed recipes in one batch
+        const { error } = await supabase
+            .from('recipes')
+            .upsert(updates);
+        
+        if (error) throw error;
+        
+        // Clear pending changes and update original dates
+        updates.forEach(update => {
+            originalDates.set(update.rec_id, update.date);
+        });
+        pendingChanges.clear();
+        
+        // Refresh UI
+        updatePlanningCalendar();
+        filterRecipes();
+        createPlanningControls();
+        
+        showPlanningMessage('All changes have been saved successfully!', 'success');
+        
+    } catch (error) {
+        console.error('Error saving changes:', error);
+        showPlanningMessage(`Error saving changes: ${error.message}`, 'error');
+    }
+}
+
+// Revert Planning Changes
+function revertPlanningChanges() {
+    if (pendingChanges.size === 0) return;
+    
+    try {
+        // Revert all recipes to their original dates
+        allPlanningRecipes.forEach(recipe => {
+            if (pendingChanges.has(recipe.rec_id)) {
+                recipe.date = originalDates.get(recipe.rec_id) || null;
+            }
+        });
+        
+        // Clear pending changes
+        pendingChanges.clear();
+        
+        // Refresh UI
+        updatePlanningCalendar();
+        filterRecipes();
+        createPlanningControls();
+        
+        showPlanningMessage('All changes have been reverted.', 'info');
+        
+    } catch (error) {
+        console.error('Error reverting changes:', error);
+        showPlanningMessage(`Error reverting changes: ${error.message}`, 'error');
+    }
+}
+
+// Make functions globally accessible
+window.savePlanningChanges = savePlanningChanges;
+window.revertPlanningChanges = revertPlanningChanges;
 window.openRecipeModal = openRecipeModal;
 window.closeRecipeModal = closeRecipeModal; 

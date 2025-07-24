@@ -241,6 +241,11 @@ function createRecipeElement(recipe) {
         recipeContent += `<img src="${recipe.img_url}" alt="${recipe.name}" loading="lazy">`;
     }
     
+    // === NEW: Add edit icon overlay ===
+    recipeContent += `
+        <span class="calendar-edit-icon" title="Edit Recipe" data-recipe-id="${recipe.rec_id}">🖉</span>
+    `;
+    
     // Add actions
     recipeContent += `
         <div class="calendar-recipe-actions">
@@ -355,6 +360,29 @@ function addCalendarEventListeners() {
             const date = this.getAttribute('data-date');
             const dayNumber = this.getAttribute('data-day');
             scheduleRecipe(recipeId, date, dayNumber);
+        });
+    });
+
+    // === NEW: Calendar Recipe Click for Edit Modal ===
+    document.querySelectorAll('.calendar-recipe').forEach(el => {
+        el.addEventListener('click', function(e) {
+            // Only trigger if not clicking a button inside the recipe element
+            if (e.target.closest('button')) return;
+            const recipeId = this.dataset.recipeId;
+            if (window.openRecipeModal && recipeId) {
+                window.openRecipeModal(recipeId);
+            }
+        });
+    });
+
+    // === NEW: Edit icon click handler ===
+    document.querySelectorAll('.calendar-edit-icon').forEach(icon => {
+        icon.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const recipeId = this.getAttribute('data-recipe-id');
+            if (window.openRecipeModal && recipeId) {
+                window.openRecipeModal(recipeId);
+            }
         });
     });
 }

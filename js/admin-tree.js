@@ -142,6 +142,17 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Add this line to the existing DOMContentLoaded event listener
     setTimeout(testSupabasePermissions, 2000); // Wait 2 seconds to ensure login is complete
+    
+    // Add admin test button
+    const adminTestBtn = document.createElement('button');
+    adminTestBtn.textContent = 'Test Admin Access';
+    adminTestBtn.onclick = testAdminAccess;
+    adminTestBtn.style.marginLeft = '10px';
+    
+    // Add it next to an existing button
+    if (newRecipeBtn && newRecipeBtn.parentNode) {
+        newRecipeBtn.parentNode.insertBefore(adminTestBtn, newRecipeBtn.nextSibling);
+    }
 });
 
 // Helper function to update character counter and provide visual feedback
@@ -1629,5 +1640,32 @@ async function deleteIngredient(ingId) {
     } catch (error) {
         showMessage(`Error deleting ingredient: ${error.message}`, 'error');
         console.error('Error deleting ingredient:', error);
+    }
+}
+
+// Add this function at the end of the file
+async function testAdminAccess() {
+    console.log("Testing admin access...");
+    
+    try {
+        // Test reading from legacy_user_mapping
+        const { data: legacyData, error: legacyError } = await supabase
+            .from('legacy_user_mapping')
+            .select('*')
+            .limit(1);
+        
+        if (legacyError) {
+            console.error("❌ Admin access test failed:", legacyError.message);
+            showMessage(`Admin access test failed: ${legacyError.message}`, 'error');
+            return false;
+        }
+        
+        console.log("✅ Admin access test passed:", legacyData);
+        showMessage('Admin access test passed! You have proper admin permissions.', 'success');
+        return true;
+    } catch (error) {
+        console.error("❌ Error testing admin access:", error);
+        showMessage(`Error testing admin access: ${error.message}`, 'error');
+        return false;
     }
 } 

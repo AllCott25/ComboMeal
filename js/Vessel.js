@@ -1,8 +1,2 @@
-// Add shake method
-shake() {
-  this.shaking = true;
-  this.shakeTime = 0;
-  // Use more intense shake for emphasis
-  this.shakeAmount = 8; // Increased from default (5)
-  this.shakeDuration = 30; // 0.5 seconds at 60fps
-} 
+// This file should be empty or contain proper class definitions
+// The shake method should be added to the Vessel class in the main game files 

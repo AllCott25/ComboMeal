@@ -290,7 +290,7 @@ let intermediate_combinations = [
     
     update() {
       // Scale animation only (removed floating animation)
-      this.scale = lerp(this.scale, this.targetScale, 0.2);
+      this.scale = lerp(this.scale, this.targetScale, 0.35);
     }
     
     draw() {
@@ -405,164 +405,42 @@ let intermediate_combinations = [
   }
   
   function setup() {
-    createCanvas(windowWidth, windowHeight); // Fullscreen canvas for mobile
-    textFont('Arial');
-    
-    let original_w = 100;
-    let original_h = 80;
-    let margin = 10; // Reduced margin for compact UI
-    
-    // Create vessels for each ingredient
-    ingredients.forEach((ing) => {
-      let v = new Vessel([ing], [], null, 'white', 0, 0, original_w, original_h);
-      vessels.push(v);
-    });
-    
-    // Randomize the order of vessels
-    shuffleArray(vessels);
-    
-    // Initial arrangement of vessels
-    arrangeVessels();
-    
-    // Calculate the lowest vessel position
-    let lowestY = 0;
-    vessels.forEach(v => {
-        lowestY = Math.max(lowestY, v.y + v.h/2);
-    });
-    
-    // Set fixed hint button position 40 pixels below the lowest vessel
-    hintButtonY = lowestY + 40;
-    
-    // Create share and recipe buttons
-    shareButton = new Button(width * 0.35, height * 0.65, 120, 40, "Share Score", shareScore);
-    recipeButton = new Button(width * 0.65, height * 0.65, 120, 40, "View Recipe", viewRecipe);
-    
-    // Create hint button with white background and grey outline, using the fixed Y position
-    hintButton = new Button(width * 0.5, hintButtonY, 120, 40, "Hint", showHint, 'white', '#FF5252');
-    
-    // Create start button
-    startButton = new Button(width * 0.5, height * 0.7, 180, 60, "Start Cooking!", startGame, '#4CAF50', 'white');
-    
-    // Position demo ingredients
-    arrangeDemoIngredients();
+    // Note: createCanvas is called in initializePage()
+    console.log("Setup function called");
   }
   
-  // Fisher-Yates shuffle algorithm to randomize vessel order
-  function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
+  // DUPLICATE INGREDIENT FIX: Helper function to check if we have enough of each required ingredient
+  // This replaces the simple .includes() and .every() checks that couldn't handle duplicates
+  function canFulfillRecipeRequirements(availableIngredients, requiredIngredients) {
+    // Create a count map for required ingredients
+    const requiredCounts = {};
+    for (const ingredient of requiredIngredients) {
+      requiredCounts[ingredient] = (requiredCounts[ingredient] || 0) + 1;
     }
-    return array;
-  }
-  
-  function arrangeVessels() {
-    let basic_w = 100;
-    let advanced_w = 200; // Double width for advanced vessels
-    let basic_h = 80;
-    let advanced_h = 100; // Slightly taller for advanced vessels
-    let margin = 15; // Space between vessels
-    let vertical_margin = 8; // Vertical spacing between rows
-
-    // First, separate vessels into advanced and basic
-    let advancedVessels = vessels.filter(v => v.isAdvanced);
-    let basicVessels = vessels.filter(v => !v.isAdvanced);
-
-    // Calculate total slots needed
-    let totalSlots = advancedVessels.length * 2 + basicVessels.length;
-    let slotsPerRow = 3; // Maximum slots per row
-    let rows = Math.ceil(totalSlots / slotsPerRow);
-
-    // Calculate maximum height needed for vessels
-    let totalHeight = rows * advanced_h + (rows - 1) * vertical_margin;
-    // Ensure we leave space at the bottom for the hint button
-    let startY = Math.min(180, 180 + (400 - totalHeight) / 2);
-
-    // Create an array to hold our row arrangements
-    let rowArrangements = [];
-    let currentRow = [];
-    let currentSlots = 0;
-
-    // First, try to pair advanced vessels with basic vessels when possible
-    while (advancedVessels.length > 0 || basicVessels.length > 0) {
-        // Reset/create new row if current row is full
-        if (currentSlots >= slotsPerRow) {
-            rowArrangements.push(currentRow);
-            currentRow = [];
-            currentSlots = 0;
-        }
-
-        // If we can fit an advanced vessel (2 slots) and have one available
-        if (currentSlots + 2 <= slotsPerRow && advancedVessels.length > 0) {
-            // Randomly decide whether to add the advanced vessel now or wait
-            if (Math.random() < 0.5 || basicVessels.length === 0) {
-                currentRow.push(advancedVessels.shift());
-                currentSlots += 2;
-                
-                // If we have exactly one slot left and a basic vessel, add it
-                if (currentSlots === 2 && basicVessels.length > 0) {
-                    currentRow.push(basicVessels.shift());
-                    currentSlots += 1;
-                }
-            } else {
-                // Add basic vessels first
-                while (currentSlots + 1 <= slotsPerRow && basicVessels.length > 0 && 
-                       (currentSlots + 3 <= slotsPerRow || advancedVessels.length === 0)) {
-                    currentRow.push(basicVessels.shift());
-                    currentSlots += 1;
-                }
-            }
-        }
-        // If we can't fit an advanced vessel but can fit a basic one
-        else if (currentSlots + 1 <= slotsPerRow && basicVessels.length > 0) {
-            currentRow.push(basicVessels.shift());
-            currentSlots += 1;
-        }
-        // If we can't fit either type but still have vessels, start a new row
-        else if (currentRow.length > 0) {
-            rowArrangements.push(currentRow);
-            currentRow = [];
-            currentSlots = 0;
-        }
+    
+    // Create a count map for available ingredients
+    const availableCounts = {};
+    for (const ingredient of availableIngredients) {
+      availableCounts[ingredient] = (availableCounts[ingredient] || 0) + 1;
     }
-
-    // Add the last row if it has any vessels
-    if (currentRow.length > 0) {
-        rowArrangements.push(currentRow);
+    
+    // Check if we have enough of each required ingredient
+    for (const [ingredient, requiredCount] of Object.entries(requiredCounts)) {
+      const availableCount = availableCounts[ingredient] || 0;
+      if (availableCount < requiredCount) {
+        return false;
+      }
     }
-
-    // Position all vessels based on row arrangements
-    rowArrangements.forEach((row, rowIndex) => {
-        // Calculate total width of this row
-        let rowWidth = row.reduce((width, v) => {
-            return width + (v.isAdvanced ? advanced_w : basic_w);
-        }, 0) + (row.length - 1) * margin;
-
-        // Calculate starting x position to center the row
-        let startX = (width - rowWidth) / 2;
-        let currentX = startX;
-
-        // Position each vessel in the row
-        row.forEach((v) => {
-            // Update vessel dimensions
-            if (v.isAdvanced) {
-                v.w = advanced_w;
-                v.h = advanced_h;
-            } else {
-                v.w = basic_w;
-                v.h = basic_h;
-            }
-
-            // Set vessel position
-            v.x = currentX + v.w / 2;
-            v.y = startY + rowIndex * (advanced_h + vertical_margin);
-            v.originalX = v.x;
-            v.originalY = v.y;
-
-            // Move x position for next vessel
-            currentX += v.w + margin;
-        });
-    });
+    
+    // Also ensure we don't have extra ingredients that aren't required
+    for (const [ingredient, availableCount] of Object.entries(availableCounts)) {
+      const requiredCount = requiredCounts[ingredient] || 0;
+      if (availableCount > requiredCount) {
+        return false;
+      }
+    }
+    
+    return true;
   }
   
   function draw() {
@@ -1197,6 +1075,24 @@ let intermediate_combinations = [
     let hintActive = showingHint && hintVessel;
     
     if (v1.ingredients.length > 0 && v2.ingredients.length > 0 && v1.complete_combinations.length === 0 && v2.complete_combinations.length === 0) {
+      // DUPLICATE INGREDIENT FIX: Check if vessels represent the same ingredient instance
+      // If both vessels have the same ingredient name, they shouldn't combine
+      if (v1.ingredients[0] === v2.ingredients[0]) {
+        console.log("Cannot combine two vessels with the same ingredient:", v1.ingredients[0]);
+        // Check if there's an easter egg that specifically requires two of this ingredient
+        if (typeof checkForEasterEgg === 'function' && easter_eggs && easter_eggs.length > 0) {
+          const eggMatch = checkForEasterEgg([v1.ingredients[0], v2.ingredients[0]]);
+          if (eggMatch) {
+            console.log("Found Easter egg that allows same-ingredient combination:", eggMatch.name);
+            // Allow the combination for easter eggs, but still return null to trigger easter egg display
+            displayEasterEgg(eggMatch, v1, v2);
+            moveHistory.push({type: 'easterEgg'});
+            return null; // Still return null to prevent vessel creation
+          }
+        }
+        return null; // Prevent same-ingredient combinations
+      }
+      
       let U = [...new Set([...v1.ingredients, ...v2.ingredients])];
       let C_candidates = intermediate_combinations.filter(C => U.every(ing => C.required.includes(ing)));
       

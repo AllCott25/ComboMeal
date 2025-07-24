@@ -1,4 +1,5 @@
 // Enhanced move history display for win screen
+// Last Updated: July 10, 2025 (11:15 AM EDT) by APlasker - Converted from magic link to email/password authentication.
 
 // Function to format time as MM:SS - APlasker
 function formatTime(seconds) {
@@ -21,7 +22,7 @@ const LAYOUT = {
     titlePosition: 0.06,      // 6% from top (shifted up 2% total)
     bylinePosition: 0.11,     // 11% from top (shifted up 2% total)
     vesselsStart: 0.205,      // 20.5% from top (shifted up 2.5% total)
-    mistakeCounter: 0.77,    // 77% from top (shifted up 2.5% total)
+    mistakeCounter: 0.76,    // Adjusted from 0.77 to be more centered in the gap for big layout
     recipeCard: 0.905,        // 90.5% from top (maintained)
     vesselMarginMultiplier: 1.0 // Standard vessel spacing
   }
@@ -84,26 +85,23 @@ let firstInactivityMessageShown = false;
       if (typeof filteredMoveHistory[i] === 'object' && 
           (filteredMoveHistory[i].type === 'egg' || filteredMoveHistory[i].type === 'easterEgg')) {
         // Draw Easter Egg counter (nested oval and circle)
-        // Outer white oval
+        // Outer white oval using design system
         fill(255);
-        stroke(0);
-        strokeWeight(2); // Increased to 2px
-        ellipse(x, y, circleSize * 1.1, circleSize * 1.5); // Vertical oval shape
+        DesignSystem.applyStroke('standard', UI_COLORS.text);
+        ellipse(x, y, circleSize * 1.1, circleSize * 1.5);
         
-        // Inner yellow circle
-        fill(COLORS.tertiary); // Use the game's yellow color
-        stroke(0);
-        strokeWeight(1);
+        // Inner yellow circle using design system
+        fill(COLORS.tertiary);
+        DesignSystem.applyStroke('light', UI_COLORS.text);
         circle(x, y, circleSize * 0.8);
         strokeWeight(1);
       } else {
         // Regular counter
         let moveColor = filteredMoveHistory[i];
         
-        // Draw regular counter with 2px black outline
+        // Draw regular counter with standardized outline
         fill(moveColor);
-        stroke(0);
-        strokeWeight(2); // Increased to 2px
+        DesignSystem.applyStroke('standard', UI_COLORS.text);
         circle(x, y, circleSize);
       }
     }
@@ -152,23 +150,19 @@ let firstInactivityMessageShown = false;
         // Check if this combo was completed with a hint - APlasker
         const isHintCombo = completedGreenVessels[i] && completedGreenVessels[i].isHint;
         
-        // Completed combo: 100% opacity circle with white checkmark
-        // Use hint color (red) if completed with hint, otherwise green
+        // Completed combo using design system
         fill(isHintCombo ? COLORS.vesselHint : COLORS.green);
-        stroke('black');
-        strokeWeight(2);
+        DesignSystem.applyStroke('standard', UI_COLORS.text);
         circle(x, y, circleSize * 1.2);
         
-        // Draw white checkmark
-        stroke('white');
-        strokeWeight(3);
+        // Draw white checkmark using design system
+        DesignSystem.applyStroke('emphasis', '#ffffff');
         line(x - circleSize * 0.3, y, x - circleSize * 0.1, y + circleSize * 0.3);
         line(x - circleSize * 0.1, y + circleSize * 0.3, x + circleSize * 0.4, y - circleSize * 0.3);
       } else {
-        // Incomplete combo: 50% opacity green circle
-        fill(COLORS.green + '80'); // Add 80 for 50% opacity in hex
-        stroke('black');
-        strokeWeight(1.5);
+        // Incomplete combo using design system
+        fill(COLORS.green + '80'); // 50% opacity
+        DesignSystem.applyStroke('light', UI_COLORS.text);
         circle(x, y, circleSize);
       }
     }
@@ -615,12 +609,17 @@ let firstInactivityMessageShown = false;
     }
     
     // --- SETUP VERTICAL LAYOUT FOR COMBOS ---
-    // Calculate the vertical spacing within the card
+    // Calculate vertical layout - maintain original spacing but allow 2-line steps within allocated space
     const verticalMargin = cardHeight * 0.02; // 2% top margin (reduced from 3% by 33%)
     const bottomMargin = cardHeight * 0.05; // 5% bottom margin (unchanged)
     const availableHeight = cardHeight - (verticalMargin + bottomMargin); // Available height after margins
     const totalLines = comboInfo.length + 1; // +1 for the "Recipe" header
-    const lineHeight = Math.max(availableHeight / totalLines, 20); // Minimum line height of 20px
+    
+    // Check if we should allow 2-line steps (4 or fewer steps total)
+    const allowTwoLineSteps = totalLines <= 5; // 4 combos + 1 header = 5 total lines
+    
+    // Use original line height calculation - each step gets equal vertical space
+    const lineHeight = Math.max(availableHeight / totalLines, 20); // Original calculation, minimum 20px
     
     // Calculate the total available width for text
     const totalAvailableWidth = textRightMargin - textLeftMargin;
@@ -683,7 +682,7 @@ let firstInactivityMessageShown = false;
     const startY = cardY - cardHeight/2 + verticalMargin + lineHeight/2;
     
     // --- RESET ALL TEXT PROPERTIES FOR CONSISTENCY - APlasker ---
-    textFont(bodyFont);
+    textFont(titleFont); // Use Courier font for recipe card content
     textStyle(NORMAL);
     
     // --- DRAW HEADER ---
@@ -712,7 +711,7 @@ let firstInactivityMessageShown = false;
     textSize(recipeCardFontSize);
     
     for (let i = 0; i < comboInfo.length; i++) {
-      // Calculate y position for this combo (each on its own line)
+      // Calculate y position for this combo (back to original fixed spacing)
       const y = startY + ((i + 1) * lineHeight);
       
       // Get combo information
@@ -747,26 +746,32 @@ let firstInactivityMessageShown = false;
         const stepPrefixWidth = textWidth(stepPrefixes[i]);
         const actualAvailableWidth = textRightMargin - textLeftMargin - stepPrefixWidth;
         
-        // Check if text needs truncation
+        // Check if text needs truncation - but skip for small recipes that can use 2 lines
         if (textWidth(comboText) > actualAvailableWidth) {
-          // First try: Keep everything but remove "the"
-          const withoutThe = `${capitalizedVerb} ${name}`;
-          
-          if (textWidth(withoutThe) <= actualAvailableWidth) {
-            // Success! Use this version
-            comboText = withoutThe;
+          if (allowTwoLineSteps) {
+            // For small recipes, don't truncate yet - let 2-line logic handle it
+            // We'll check 2-line feasibility later and only truncate if 2 lines don't work
           } else {
-            // Still too long, we need to truncate
-            let charIndex = name.length;
-            const verbPlusSpace = `${capitalizedVerb} `;
+            // For larger recipes, use original truncation logic
+            // First try: Keep everything but remove "the"
+            const withoutThe = `${capitalizedVerb} ${name}`;
             
-            // Start from the full name and work backwards
-            while (charIndex > 0 && textWidth(verbPlusSpace + name.slice(0, charIndex)) > actualAvailableWidth) {
-              charIndex--;
+            if (textWidth(withoutThe) <= actualAvailableWidth) {
+              // Success! Use this version
+              comboText = withoutThe;
+            } else {
+              // Still too long, we need to truncate
+              let charIndex = name.length;
+              const verbPlusSpace = `${capitalizedVerb} `;
+              
+              // Start from the full name and work backwards
+              while (charIndex > 0 && textWidth(verbPlusSpace + name.slice(0, charIndex)) > actualAvailableWidth) {
+                charIndex--;
+              }
+              
+              // Use the truncated version
+              comboText = `${capitalizedVerb} ${name.slice(0, charIndex)}`;
             }
-            
-            // Use the truncated version
-            comboText = `${capitalizedVerb} ${name.slice(0, charIndex)}`;
           }
         }
       } else if (hintedCombos.includes(combo.name)) {
@@ -810,6 +815,11 @@ let firstInactivityMessageShown = false;
         let truncatedText = fullText;
         
         if (textWidth(fullText) > maxTextWidth) {
+          if (allowTwoLineSteps) {
+            // For small recipes, don't truncate yet - let 2-line logic handle it
+            truncatedText = fullText;
+          } else {
+            // For larger recipes, use original truncation logic
             // First try removing "the" instead of using ellipsis
             truncatedText = `${capitalizedVerb} ${name} ${progressText}`;
             
@@ -827,6 +837,7 @@ let firstInactivityMessageShown = false;
                 
                 truncatedText = `${capitalizedVerb} ${name.slice(0, charIndex)} ${progressText}`;
             }
+          }
         }
         
         // Check if this combo should be animated
@@ -900,9 +911,9 @@ let firstInactivityMessageShown = false;
             console.log(`Using fallback count for ${combo.name}: ${ingredientCount}`);
           }
           
-          // For other incomplete combos, replace "# ingredients" with "? ? ? ?"
-          // Generate a string of question marks with spaces equal to the number of ingredients
-          let questionMarks = Array(ingredientCount).fill("?").join(" ");
+          // For other incomplete combos, replace "# ingredients" with "?+?+?"
+          // Generate a string of question marks with plus signs between them (no spaces)
+          let questionMarks = Array(ingredientCount).fill("?").join("+");
           comboText = questionMarks;
         }
         // No need to set font size here as we're using the global smallest font size
@@ -910,6 +921,98 @@ let firstInactivityMessageShown = false;
       
       // Add step prefix
       const stepPrefix = stepPrefixes[i] || `Step ${i+1}: `; // Fallback to "Step N: " if we exceed available prefixes
+      
+      // Check if we need to wrap text to 2 lines for this step
+      let comboTextLines = [comboText]; // Default to single line
+      let lineSpacing = 0; // Spacing between lines within the same step
+      
+      if (allowTwoLineSteps) {
+        // Calculate available width for combo text (minus step prefix)
+        textSize(recipeCardFontSize);
+        const stepPrefixWidth = textWidth(stepPrefix);
+        const availableTextWidth = totalAvailableWidth - stepPrefixWidth;
+        
+        // Check if text would benefit from wrapping
+        if (textWidth(comboText) > availableTextWidth) {
+          // Try to split the text intelligently at word boundaries
+          const words = comboText.split(' ');
+          let firstLine = '';
+          let secondLine = '';
+          
+          // Start with as many words as possible on the first line, then move words to second line
+          for (let split = words.length - 1; split >= 1; split--) {
+            const testFirstLine = words.slice(0, split).join(' ');
+            const testSecondLine = words.slice(split).join(' ');
+            
+            if (textWidth(testFirstLine) <= availableTextWidth && 
+                textWidth(testSecondLine) <= availableTextWidth) {
+              firstLine = testFirstLine;
+              secondLine = testSecondLine;
+              break;
+            }
+          }
+          
+          // If we found a good split, use 2 lines within the step's allocated space
+          if (firstLine && secondLine) {
+            comboTextLines = [firstLine, secondLine];
+            lineSpacing = lineHeight * 0.4; // Increased from 30% to 40% for better spacing
+          } else {
+            // If 2-line wrapping failed, fall back to truncation
+            console.log(`2-line wrapping failed for: ${comboText}, applying truncation`);
+            
+            // Apply the same truncation logic as larger recipes
+            if (combo.isCompleted) {
+              // First try: Keep everything but remove "the"
+              const words = comboText.split(' ');
+              const capitalizedVerb = words[0];
+              const name = words.slice(2).join(' '); // Skip "the"
+              const withoutThe = `${capitalizedVerb} ${name}`;
+              
+              if (textWidth(withoutThe) <= availableTextWidth) {
+                comboText = withoutThe;
+              } else {
+                // Still too long, truncate the name
+                let charIndex = name.length;
+                const verbPlusSpace = `${capitalizedVerb} `;
+                
+                while (charIndex > 0 && textWidth(verbPlusSpace + name.slice(0, charIndex)) > availableTextWidth) {
+                  charIndex--;
+                }
+                
+                comboText = `${capitalizedVerb} ${name.slice(0, charIndex)}`;
+              }
+            } else if (hintedCombos.includes(combo.name)) {
+              // For hinted combos, apply similar truncation
+              const words = comboText.split(' ');
+              const capitalizedVerb = words[0];
+              const name = words.slice(2, -1).join(' '); // Skip "the" and progress
+              const progressText = words[words.length - 1];
+              
+              // First try removing "the"
+              let truncatedText = `${capitalizedVerb} ${name} ${progressText}`;
+              
+              if (textWidth(truncatedText) > availableTextWidth) {
+                // Truncate the name
+                let charIndex = name.length;
+                const verbPlusSpace = `${capitalizedVerb} `;
+                
+                while (charIndex > 0 && 
+                       textWidth(`${verbPlusSpace}${name.slice(0, charIndex)} ${progressText}`) > availableTextWidth) {
+                  charIndex--;
+                }
+                
+                truncatedText = `${capitalizedVerb} ${name.slice(0, charIndex)} ${progressText}`;
+              }
+              
+              comboText = truncatedText;
+            }
+            
+            // Update comboTextLines after truncation
+            comboTextLines = [comboText];
+          }
+        }
+      }
+      
       const fullComboText = `${stepPrefix}${comboText}`;
       
       // Calculate step prefix width to position highlight correctly (avoiding the prefix)
@@ -927,8 +1030,8 @@ let firstInactivityMessageShown = false;
       if (combo.isPartialCombo) {
         // Calculate the width of the main text (without number prefix)
         textSize(comboFontSize); // Temporarily set back to combo font size to measure text
-        const mainTextWidth = textWidth(comboText);
-        textSize(prefixFontSize); // Set back to prefix font size
+        // Draw colored highlight behind completed combo text - support multi-line
+        textSize(recipeCardFontSize); // Use combo font size for width calculations
         
         // IMPORTANT: Use the exact same color that the vessel will have when completed
         // This ensures perfect color matching between highlight and future vessel
@@ -939,17 +1042,24 @@ let firstInactivityMessageShown = false;
         const highlightColor = getNextCompletedVesselColor(combo.name);
         fill(highlightColor);
         
-        // Draw parallelogram shape - skewed to the right
+        // Draw parallelogram highlight for each line of text
         const skew = 6; // Amount of skew for parallelogram
-        const highlightHeight = lineHeight * 0.8; // 80% of line height
-        const highlightY = y - highlightHeight/2;
+        const highlightHeight = lineHeight * 0.6; // Consistent height for both single and multi-line (middle ground)
         
-        beginShape();
-        vertex(textLeftMargin + stepPrefixWidth, highlightY); // Top left
-        vertex(textLeftMargin + stepPrefixWidth + mainTextWidth + skew, highlightY); // Top right
-        vertex(textLeftMargin + stepPrefixWidth + mainTextWidth, highlightY + highlightHeight); // Bottom right
-        vertex(textLeftMargin + stepPrefixWidth - skew, highlightY + highlightHeight); // Bottom left
-        endShape(CLOSE);
+        for (let lineIndex = 0; lineIndex < comboTextLines.length; lineIndex++) {
+          const lineY = y + (lineIndex * lineSpacing);
+          const lineText = comboTextLines[lineIndex];
+          const lineTextWidth = textWidth(lineText);
+          
+          const highlightY = lineY - highlightHeight/2;
+          
+          beginShape();
+          vertex(textLeftMargin + stepPrefixWidth, highlightY); // Top left
+          vertex(textLeftMargin + stepPrefixWidth + lineTextWidth + skew, highlightY); // Top right
+          vertex(textLeftMargin + stepPrefixWidth + lineTextWidth, highlightY + highlightHeight); // Bottom right
+          vertex(textLeftMargin + stepPrefixWidth - skew, highlightY + highlightHeight); // Bottom left
+          endShape(CLOSE);
+        }
       }
       
       if (combo.isCompleted) {
@@ -970,7 +1080,12 @@ let firstInactivityMessageShown = false;
         
         // Switch to regular font size for the rest of the text
         textSize(comboFontSize);
-        text(comboText, textLeftMargin + stepPrefixWidth, y);
+        
+        // Draw multi-line text if needed
+        for (let lineIndex = 0; lineIndex < comboTextLines.length; lineIndex++) {
+          const lineY = y + (lineIndex * lineSpacing);
+          text(comboTextLines[lineIndex], textLeftMargin + stepPrefixWidth, lineY);
+        }
       } else if (hintedCombos.includes(combo.name)) {
         // For hinted combos, use hint color (red) and bold text with potential animation
         noStroke();
@@ -1012,7 +1127,12 @@ let firstInactivityMessageShown = false;
         // Draw the rest of the text
         textSize(comboFontSize);
         textStyle(NORMAL); // Reset to normal text style for combo text
-        text(comboText, textLeftMargin + stepPrefixWidth, y);
+        
+        // Draw multi-line text if needed
+        for (let lineIndex = 0; lineIndex < comboTextLines.length; lineIndex++) {
+          const lineY = y + (lineIndex * lineSpacing);
+          text(comboTextLines[lineIndex], textLeftMargin + stepPrefixWidth, lineY);
+        }
       } else {
         // For incomplete combos, just show the question marks
         fill('#333333'); // Darker gray for incomplete
@@ -1024,9 +1144,23 @@ let firstInactivityMessageShown = false;
         
         // Draw the rest of the text (question marks) in normal style
         textStyle(NORMAL);
-        text(comboText, textLeftMargin + stepPrefixWidth, y);
+        
+        // Draw multi-line text if needed - with special kerning for question marks
+        for (let lineIndex = 0; lineIndex < comboTextLines.length; lineIndex++) {
+          const lineY = y + (lineIndex * lineSpacing);
+          const lineText = comboTextLines[lineIndex];
+          
+          // Check if this line contains question marks and plus signs (incomplete combo)
+          if (lineText.includes('?') && lineText.includes('+') && !lineText.includes(' ')) {
+            // Apply 25% kerning to question mark strings like "?+?+?"
+            drawTextWithKerning(lineText, textLeftMargin + stepPrefixWidth, lineY, 0.25);
+          } else {
+            // Normal text rendering for everything else
+            text(lineText, textLeftMargin + stepPrefixWidth, lineY);
+          }
+        }
+              }
       }
-    }
     
     // Restore drawing context
     pop();
@@ -1048,89 +1182,47 @@ let firstInactivityMessageShown = false;
     // Center of the play area for overall positioning
     const centerX = playAreaX + playAreaWidth / 2;
     
-    // --- WRONGO COUNTER SECTION ---
-    const totalErrorSlots = 4; // Show 4 slots for wrongos - APlasker
+    // --- STAR COUNTER SECTION ---
+    const totalStars = 5; // Show 5 stars (changed from 4)
     
-    // Filter moveHistory to only include error markers (black only) - APlasker
-    const filteredMoveHistory = moveHistory.filter(move => 
-      move === 'black' || move === '#333333');
+    // Filter moveHistory to only include error markers (black or #333333)
+    const mistakes = moveHistory.filter(move => 
+      move === 'black' || move === '#333333').length;
     
-    // Limit the number of counters to display
-    const displayCount = Math.min(filteredMoveHistory.length, totalErrorSlots);
+    // Star sizing and spacing (adjust as needed)
+    const starSize = Math.min(Math.max(width * 0.011, 10), 13); // Shrunk by 10%
+    const starSpacing = starSize * 1.5; // Example spacing
     
-    // Update circle sizing parameters to match requested specs - APlasker
-    // Reduced to 75% of original size
-    // Original: Minimum size: 18px for small screens
-    // Now: Minimum size: 13.5px for small screens
-    const circleSize = Math.min(Math.max(width * 0.015, 13.5), 16.5); // 75% of original values
+    // Calculate the total width of all stars
+    const totalStarWidth = (starSize * totalStars) + (starSpacing * (totalStars - 1));
     
-    // Update element spacing to match requested specs - APlasker
-    // Reduced to 75% of original size, then increased by 30% for better spacing
-    const elementSpacing = Math.min(Math.max(width * 0.0075, 3.75), 7.5) * 1.3; // 75% of original values, increased by 30%
-    
-    // Double the spacing between text and first counter, then increase by 30%
-    const textToFirstCounterSpacing = elementSpacing * 2 * 1.3; // Doubled spacing increased by 30%
-    
-    // Calculate the total width of all elements with consistent spacing
-    const totalWidth = (circleSize * totalErrorSlots) + (elementSpacing * (totalErrorSlots - 1)) + textToFirstCounterSpacing;
-    
-    // Calculate label width based on available space - fixed proportion
-    const labelFontSize = Math.max(circleSize * 0.6, 10.5); // Text size for "Mistakes:" (75% of original)
-    textFont(bodyFont);
-    textStyle(BOLD);
-    textSize(labelFontSize); // Set the font size before measuring text width
-    const labelWidth = textWidth("Mistakes:") + textToFirstCounterSpacing; // Use the doubled spacing after colon
-    
-    // Calculate total width needed for the entire mistake counter group
-    const groupWidth = labelWidth + (circleSize * totalErrorSlots) + (elementSpacing * (totalErrorSlots - 1));
-    
-    // Calculate starting position to center the entire group
-    const groupStartX = centerX - (groupWidth / 2);
+    // Calculate starting position to center the stars
+    const groupStartX = centerX - (totalStarWidth / 2);
     
     // --- RESET ALL TEXT PROPERTIES FOR CONSISTENCY - APlasker ---
-    textFont(bodyFont);
+    textFont(bodyFont); // Keep Helvetica for mistake counters (not part of recipe card)
     textStyle(NORMAL);
     
-    // Draw "Mistakes:" label
-    textAlign(LEFT, CENTER); // Changed back to LEFT align for consistent spacing
-    textSize(labelFontSize);
-    textStyle(BOLD);
-    fill('black');
-    noStroke();
-    text("Mistakes:", groupStartX, counterY);
+    // REMOVED "Mistakes:" label
     
-    // Calculate starting position of first counter after label with doubled spacing
-    const firstCounterX = groupStartX + textWidth("Mistakes:") + textToFirstCounterSpacing;
-    
-    // Draw error circles - both filled and empty placeholders
-    for (let i = 0; i < totalErrorSlots; i++) {
-      // Position circles with consistent spacing
-      const x = firstCounterX + (i * (circleSize + elementSpacing));
+    // Draw stars
+    for (let i = 0; i < totalStars; i++) {
+      // Position stars with consistent spacing
+      const x = groupStartX + (i * (starSize + starSpacing)) + starSize / 2; // Centering each star
       const y = counterY;
       
-      if (i < displayCount) {
-        // Filled error counter (black)
-        fill('black');
-        stroke(0, 50); // Use the same subtle border as buttons
-        strokeWeight(1.5); // Reduced from 2px (75% of original)
-        circle(x, y, circleSize);
-        
-        // If there are 5+ wrongos, add red X's to wrongo counters - APlasker
-        if (filteredMoveHistory.length >= 5) {
-          stroke(COLORS.vesselHint); // Changed to burnt orange hint color - APlasker
-          strokeWeight(Math.max(circleSize * 0.1, 1.5)); // Relative stroke weight, min 1.5px (75% of original)
-          // Draw X with the same vertical adjustment as the combo numbers
-          const offsetY = circleSize * 0.05; // Reduced from 0.1 to 0.05 (split the difference)
-          line(x - circleSize/3, y - circleSize/3 + offsetY, x + circleSize/3, y + circleSize/3 + offsetY);
-          line(x + circleSize/3, y - circleSize/3 + offsetY, x - circleSize/3, y + circleSize/3 + offsetY);
-        }
+      let starFillColor;
+      // Stars turn grey if the mistake for their position has occurred
+      if (i < mistakes) {
+        starFillColor = STAR_GREY; // Defined in sketch.js
       } else {
-        // Empty error placeholder - 25% opacity black (reduced from 50%) - APlasker
-        fill('rgba(0, 0, 0, 0.25)');
-        stroke(0, 50); // Use the same subtle border as buttons
-        strokeWeight(1.5); // Reduced from 2px (75% of original)
-        circle(x, y, circleSize);
+        starFillColor = COLORS.vesselHint; // Changed to vessel/logo yellow
       }
+      
+      // Draw star using the drawStar function (expected to be in sketch.js or global)
+      // Assuming drawStar takes: x, y, innerRadius, outerRadius, npoints, fillColor, outlineColor
+      // Using starSize for outerRadius and starSize*0.475 for innerRadius for a typical star shape.
+      drawStar(x, y, starSize * 0.475, starSize, 5, starFillColor, STAR_OUTLINE); // Inner radius adjusted to split the difference.
     }
     
     // Restore drawing context
@@ -1276,48 +1368,332 @@ let firstInactivityMessageShown = false;
       ellipse(px, py, petalSize * 1.2, petalSize * 1.2);
     }
     
-    // Draw center with a slightly different shade
-    fill(255, 255, 255, 100); // Semi-transparent white for a highlight
+    // Draw center with 0% opacity (invisible) - APlasker
+    fill(255, 255, 255, 0); // 0% opacity white (invisible)
     ellipse(x, y, petalSize, petalSize);
   }
 
-  // New function to draw loading animation with color-changing flowers
-  function drawLoadingAnimation() {
-    // Calculate the center of the play area
-    const centerX = width / 2;
-    const centerY = height / 2;
+  // Simple loading screen without wallpaper animation
+  function drawSimpleLoadingScreen() {
+    // Draw the COMPLETE start screen
+    drawTitle();
+    drawByline();
+    drawRecipeStats();
     
-    // Calculate responsive flower size based on screen dimensions
-    const flowerSize = min(max(playAreaWidth * 0.02, 8), 12);
-    
-    // Define the circle of flowers parameters
-    const numFlowers = 8; // Number of flowers in the circle
-    const circleRadius = min(playAreaWidth * 0.15, 80); // Size of the circle
-    
-    // Array of colors to cycle through
-    const colorArray = [
-      COLORS.primary,   // Green
-      COLORS.secondary, // Pink
-      COLORS.peach      // Peach/orange
-    ];
-    
-    // Draw flowers in a circle
-    for (let i = 0; i < numFlowers; i++) {
-      // Calculate position around the circle
-      const angle = (TWO_PI / numFlowers) * i;
-      const x = centerX + cos(angle) * circleRadius;
-      const y = centerY + sin(angle) * circleRadius;
+    // Draw buttons
+    if (typeof startButton !== 'undefined' && typeof tutorialButton !== 'undefined') {
+      // Position buttons for start screen
+      const cookButtonWidth = Math.max(playAreaWidth * 0.25, 120);
+      const buttonHeight = Math.max(playAreaHeight * 0.08, 40);
+      const tutorialButtonWidth = cookButtonWidth * 0.5;
       
-      // Determine flower color by shifting based on frameCount
-      // This creates a cycling color effect with no fading
-      const colorIndex = (i + floor(frameCount / 15)) % colorArray.length;
-      const flowerColor = colorArray[colorIndex];
+      startButton.x = playAreaX + playAreaWidth * 0.5;
+      startButton.y = playAreaY + playAreaHeight * 0.88;
+      startButton.w = cookButtonWidth;
+      startButton.h = buttonHeight;
+      startButton.customCornerRadius = 12;
       
-      // Draw the flower
-      drawFlower(x, y, flowerSize, flowerColor);
+      tutorialButton.x = startButton.x - (cookButtonWidth/2) - (tutorialButtonWidth/2) - 20;
+      tutorialButton.y = startButton.y;
+      tutorialButton.w = tutorialButtonWidth;
+      tutorialButton.h = buttonHeight;
+      tutorialButton.customCornerRadius = 12;
+      tutorialButton.label = "First\nTime?";
+      tutorialButton.textSizeMultiplier = 0.8;
+      
+      tutorialButton.draw();
+      startButton.draw();
     }
     
-    // Center flower removed as requested
+    // Draw version text
+    push();
+    textAlign(CENTER, CENTER);
+    const versionTextSize = Math.max(playAreaWidth * 0.016, 8);
+    textSize(versionTextSize);
+    const versionText = "v20250719.740PM.EDT - APlasker";
+    const combinedText = versionText + " | Say hi!";
+    
+    fill(100); // Gray color for version text
+    const versionWidth = textWidth(versionText);
+    const pipeWidth = textWidth(" | ");
+    const sayHiWidth = textWidth("Say hi!");
+    const totalWidth = versionWidth + pipeWidth + sayHiWidth;
+    const startX = playAreaX + playAreaWidth/2 - totalWidth/2;
+    
+    text(versionText, startX + versionWidth/2, playAreaY + playAreaHeight * 0.985);
+    fill(COLORS.primary);
+    text(" | Say hi!", startX + versionWidth + pipeWidth + sayHiWidth/2, playAreaY + playAreaHeight * 0.985);
+    pop();
+
+    // Show loading message if needed
+    if (isLoadingRecipe) {
+      fill(255);
+      textAlign(CENTER, CENTER);
+      textSize(18);
+      text("Loading recipe...", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight/2 + 30);
+    }
+  }
+
+  // New function to draw loading animation with wallpaper tiles - APlasker (now deprecated)
+  function drawLoadingAnimation() {
+  // Always draw the COMPLETE start screen first - it's behind the wallpaper wall
+  drawTitle();
+  drawByline();
+  drawRecipeStats();
+  
+  // Draw buttons behind wallpaper
+  if (typeof startButton !== 'undefined' && typeof tutorialButton !== 'undefined') {
+    // Position buttons for start screen (same logic as drawStartScreen)
+    const cookButtonWidth = Math.max(playAreaWidth * 0.25, 120);
+    const buttonHeight = Math.max(playAreaHeight * 0.08, 40);
+    const tutorialButtonWidth = cookButtonWidth * 0.5;
+    
+    startButton.x = playAreaX + playAreaWidth * 0.5;
+    startButton.y = playAreaY + playAreaHeight * 0.88;
+    startButton.w = cookButtonWidth;
+    startButton.h = buttonHeight;
+    startButton.customCornerRadius = 12;
+    
+    tutorialButton.x = startButton.x - (cookButtonWidth/2) - (tutorialButtonWidth/2) - 20;
+    tutorialButton.y = startButton.y;
+    tutorialButton.w = tutorialButtonWidth;
+    tutorialButton.h = buttonHeight;
+    tutorialButton.customCornerRadius = 12;
+    tutorialButton.label = "First\nTime?";
+    tutorialButton.textSizeMultiplier = 0.8;
+    
+    // Draw buttons behind wallpaper (but don't check hover during animation)
+    tutorialButton.draw();
+    startButton.draw();
+  }
+  
+  // Draw version text behind wallpaper
+  push();
+  textAlign(CENTER, CENTER);
+  const versionTextSize = Math.max(playAreaWidth * 0.016, 8);
+  textSize(versionTextSize);
+  const versionText = "v20250719.740PM.EDT - APlasker";
+  const combinedText = versionText + " | Say hi!";
+  
+  fill(100); // Gray color for version text
+  const versionWidth = textWidth(versionText);
+  const pipeWidth = textWidth(" | ");
+  const sayHiWidth = textWidth("Say hi!");
+  const totalWidth = versionWidth + pipeWidth + sayHiWidth;
+  const startX = playAreaX + playAreaWidth/2 - totalWidth/2;
+  
+  text(versionText, startX + versionWidth/2, playAreaY + playAreaHeight * 0.985);
+  fill(COLORS.primary);
+  text(" | Say hi!", startX + versionWidth + pipeWidth + sayHiWidth/2, playAreaY + playAreaHeight * 0.985);
+  pop();
+  
+  // Only show wallpaper wall if we have the high-res image ready
+  if (wallpaperHighResImage && wallpaperImageReady) {
+    if (!wallpaperAnimation) {
+      wallpaperAnimation = new WallpaperAnimation();
+      wallpaperAnimationActive = true; // Mark animation as active
+    }
+    
+    wallpaperAnimation.update();
+    if (loadingComplete && wallpaperAnimation.state === 'STATIC') {
+      wallpaperAnimation.startSplitReveal();
+    } else if (wallpaperAnimation.state === 'STATIC') {
+      console.log(`⏳ Waiting for loading completion - loadingComplete: ${loadingComplete}, state: ${wallpaperAnimation.state}`);
+    }
+    
+    // Draw the wallpaper wall (will be static, splitting, or complete)
+    wallpaperAnimation.draw();
+    
+    if (wallpaperAnimation.state === 'READY_FOR_COOK') {
+      console.log("🎯 Loading complete - wallpaper ready for cook transition");
+      return false; // Stop drawing wallpaper, but keep animation active
+    } else if (wallpaperAnimation.state === 'COMPLETE') {
+      if (wallpaperAnimation.closeStartTime !== null) {
+        // This should trigger the start screen display after wallpaper closes
+      }
+      wallpaperAnimationActive = false; // Mark animation as inactive
+      console.log("🎉 Animation complete - ending wallpaper animation");
+    }
+  } else {
+    // BUGFIX: Show loading message and continue if wallpaper fails
+    fill(255);
+    textAlign(CENTER, CENTER);
+    textSize(18);
+    text("Loading wallpaper...", playAreaX + playAreaWidth/2, playAreaY + playAreaHeight/2 + 30);
+    
+    // BUGFIX: Add timeout fallback - if wallpaper hasn't loaded after reasonable time, continue anyway
+    if (!wallpaperLoadingStartTime) {
+      wallpaperLoadingStartTime = millis();
+    } else if (millis() - wallpaperLoadingStartTime > 8000) { // 8 second timeout
+      console.warn("⚠️ Wallpaper loading timeout reached - proceeding without animation");
+      wallpaperImageReady = false;
+      loadingComplete = true;
+      wallpaperLoadingStartTime = null; // Reset for future attempts
+    }
+  }
+}
+
+function drawWallpaperAnimation() {
+  // Continue wallpaper animation even after loading is complete
+  if (wallpaperAnimationActive && wallpaperAnimation) {
+    
+    // Draw different content behind the wall based on animation state
+    if (wallpaperAnimation.state === 'CLOSING') {
+      // During CLOSING: show start screen (what we're closing over)
+      drawTitle();
+      drawByline();
+      drawRecipeStats();
+    } else if (wallpaperAnimation.state === 'OPENING') {
+      // During OPENING: show game screen (what we're revealing)
+      // Set background to game background
+      background(COLORS.background);
+      
+      // Draw the actual game screen elements (game has already started)
+      drawTitle(); // Game title
+      drawByline(); // Game byline
+      
+      // Draw vessels if they exist and game is started
+      if (typeof vessels !== 'undefined' && vessels.length > 0 && typeof gameStarted !== 'undefined' && gameStarted) {
+        for (let vessel of vessels) {
+          vessel.draw();
+        }
+        
+        // Draw game counters and history
+        drawGameCounters();
+        drawMoveHistory();
+        
+        // Draw hint button
+        if (typeof hintButton !== 'undefined') {
+          hintButton.draw();
+        }
+        
+        // Draw help icon
+        if (typeof drawHelpIcon === 'function') {
+          drawHelpIcon();
+        }
+        
+        // Draw timer if active
+        if (typeof gameTimer !== 'undefined' && typeof gameTimerActive !== 'undefined' && gameTimerActive && !gameWon) {
+          push();
+          textAlign(LEFT, TOP);
+          textSize(Math.max(playAreaWidth * 0.022, 13));
+          fill(0); // Black text for better visibility
+          
+          // Position opposite the help button - top left above title
+          const timerX = playAreaX + 10; // 10px from left edge of play area
+          const timerY = playAreaY + 10; // 10px from top edge of play area
+          
+          text(formatTime(gameTimer), timerX, timerY);
+          pop();
+        }
+      }
+    } else if (wallpaperAnimation.state === 'READY_FOR_COOK') {
+      // READY_FOR_COOK: show normal start screen (wallpaper is invisible)
+      drawTitle();
+      drawByline();
+      drawRecipeStats();
+    } else {
+      // Default: show start screen
+      drawTitle();
+      drawByline();
+      drawRecipeStats();
+    }
+    
+    // Draw buttons behind wallpaper only for start screen states (not during OPENING)
+    if (wallpaperAnimation.state === 'CLOSING' || wallpaperAnimation.state === 'STATIC' || wallpaperAnimation.state === 'SPLITTING' || wallpaperAnimation.state === 'READY_FOR_COOK') {
+      if (typeof startButton !== 'undefined' && typeof tutorialButton !== 'undefined') {
+        // Position buttons for start screen (same logic as drawStartScreen)
+        const cookButtonWidth = Math.max(playAreaWidth * 0.25, 120);
+        const buttonHeight = Math.max(playAreaHeight * 0.08, 40);
+        const tutorialButtonWidth = cookButtonWidth * 0.5;
+        
+        startButton.x = playAreaX + playAreaWidth * 0.5;
+        startButton.y = playAreaY + playAreaHeight * 0.88;
+        startButton.w = cookButtonWidth;
+        startButton.h = buttonHeight;
+        startButton.customCornerRadius = 12;
+        
+        tutorialButton.x = startButton.x - (cookButtonWidth/2) - (tutorialButtonWidth/2) - 20;
+        tutorialButton.y = startButton.y;
+        tutorialButton.w = tutorialButtonWidth;
+        tutorialButton.h = buttonHeight;
+        tutorialButton.customCornerRadius = 12;
+        tutorialButton.label = "First\nTime?";
+        tutorialButton.textSizeMultiplier = 0.8;
+        
+        // Draw buttons behind wallpaper (but don't check hover during animation)
+        tutorialButton.draw();
+        startButton.draw();
+      }
+    }
+    
+    // Draw version text behind wallpaper only for start screen states (not during OPENING)
+    if (wallpaperAnimation.state === 'CLOSING' || wallpaperAnimation.state === 'STATIC' || wallpaperAnimation.state === 'SPLITTING' || wallpaperAnimation.state === 'READY_FOR_COOK') {
+      push();
+      textAlign(CENTER, CENTER);
+      const versionTextSize = Math.max(playAreaWidth * 0.016, 8);
+      textSize(versionTextSize);
+      const versionText = "v20250719.740PM.EDT - APlasker";
+      const combinedText = versionText + " | Say hi!";
+      
+      fill(100); // Gray color for version text
+      const versionWidth = textWidth(versionText);
+      const pipeWidth = textWidth(" | ");
+      const sayHiWidth = textWidth("Say hi!");
+      const totalWidth = versionWidth + pipeWidth + sayHiWidth;
+      const startX = playAreaX + playAreaWidth/2 - totalWidth/2;
+      
+      text(versionText, startX + versionWidth/2, playAreaY + playAreaHeight * 0.985);
+      fill(COLORS.primary);
+      text(" | Say hi!", startX + versionWidth + pipeWidth + sayHiWidth/2, playAreaY + playAreaHeight * 0.985);
+      pop();
+    }
+    
+    // Update animation state
+    wallpaperAnimation.update();
+    
+    // Check if loading is complete and we should start the split reveal
+    if (loadingComplete && wallpaperAnimation.state === 'STATIC') {
+      console.log("🎬 Conditions met for split reveal - triggering animation!");
+      wallpaperAnimation.startSplitReveal();
+    }
+    
+    // Draw the wallpaper wall (will be static, splitting, or complete)
+    wallpaperAnimation.draw();
+    
+    // Handle animation completion
+    if (wallpaperAnimation.state === 'READY_FOR_COOK') {
+      // Initial split reveal complete - keep animation active for cook transition
+      console.log("🎯 Split reveal complete - keeping animation ready for cook transition");
+      return false; // Stop drawing wallpaper, but keep animation active
+    } else if (wallpaperAnimation.state === 'COMPLETE') {
+      
+      // Check if this was a cook transition (CLOSING -> OPENING -> COMPLETE)
+      if (wallpaperAnimation.closeStartTime !== null) {
+        console.log("🎮 Cook transition complete - game already started!");
+        // Game was already started when OPENING began
+      }
+      
+      cleanupWallpaperAnimation();
+      wallpaperAnimationActive = false; // Mark animation as inactive
+      console.log("🎉 Animation complete - ending wallpaper animation");
+      return false; // Signal that animation is complete
+    }
+    
+    return true; // Animation still running
+  }
+  
+  return false; // No active animation
+}
+  
+  // Function to clean up wallpaper animation when loading is complete - APlasker
+  function cleanupWallpaperAnimation() {
+    if (wallpaperAnimation) {
+      console.log("🧹 Cleaning up wallpaper animation - loading complete");
+      wallpaperAnimation.active = false;
+      wallpaperAnimation = null;
+    }
+    wallpaperAnimationActive = false; // Clear the animation flag
   }
 
   function draw() {
@@ -1333,7 +1709,7 @@ let firstInactivityMessageShown = false;
       // Draw timer opposite the help button (top left above title) - APlasker
       push();
       textAlign(LEFT, TOP);
-      textSize(Math.max(playAreaWidth * 0.025, 16)); // Slightly bigger: 2.5% of play area width, minimum 16px
+      textSize(Math.max(playAreaWidth * 0.022, 13)); // Increased from 2% to 2.2%, min 13px (up from 12px)
       fill(0); // Black text for better visibility
       
       // Position opposite the help button - top left above title
@@ -1346,8 +1722,8 @@ let firstInactivityMessageShown = false;
     
     // Check if we're still loading recipe data (initial loading state only)
     if (isLoadingRecipe) {
-      // Draw loading animation only during initial loading
-      drawLoadingAnimation();
+      // Draw simple loading screen without wallpaper animation
+      drawSimpleLoadingScreen();
       
       // Draw floral pattern border if there's space - moved here from outside
       drawFloralBorder();
@@ -1356,6 +1732,22 @@ let firstInactivityMessageShown = false;
       drawTopBottomFlowers();
       
       return;
+    }
+    
+    // Check if wallpaper animation is still running (even after loading complete)
+    if (wallpaperAnimationActive) {
+      // Draw floral pattern border FIRST so wallpaper appears on top
+      drawFloralBorder();
+      
+      // Draw top and bottom flowers FIRST so wallpaper appears on top
+      drawTopBottomFlowers();
+      
+      const animationStillRunning = drawWallpaperAnimation();
+      
+      if (animationStillRunning) {
+        // NOTE: drawWallpaperAnimation draws the wallpaper on top of the flowers
+        return; // Don't draw normal game elements while animation is running
+      }
     }
     
     // Only draw decorative flowers after loading is complete
@@ -1370,29 +1762,51 @@ let firstInactivityMessageShown = false;
     
     // Check if there was an error loading recipe data
     if (loadingError) {
-      textAlign(CENTER, CENTER);
-      textSize(24);
-      fill(255, 0, 0);
-      text("Error loading recipe. Using default recipe.", width/2, height/2 - 30);
-      textSize(16);
-      text("Please check your internet connection and refresh the page.", width/2, height/2 + 10);
-      
-      // Display current time in EST for debugging
-      textSize(14);
-      const estTime = getCurrentESTTime();
-      text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
-      
-      // After 3 seconds, continue with default recipe
-      if (frameCount % 90 === 0) { // 3 seconds at 30fps (reduced from 180)
+      // Only show error if we're not in a loading state and have actually tried to load
+      if (!isLoadingRecipe && typeof loadRecipeRetryCount !== 'undefined' && window.loadRecipeRetryCount >= 3) {
+        textAlign(CENTER, CENTER);
+        textSize(24);
+        fill(255, 0, 0);
+        text("Error loading recipe. Using default recipe.", width/2, height/2 - 30);
+        textSize(16);
+        text("Please check your internet connection and refresh the page.", width/2, height/2 + 10);
+        
+        // Display current time in EST for debugging
+        textSize(14);
+        const estTime = getCurrentESTTime();
+        text(`Current time (EST): ${estTime}`, width/2, height/2 + 40);
+        
+        // After 3 seconds, continue with default recipe
+        if (frameCount % 90 === 0) { // 3 seconds at 30fps (reduced from 180)
+          loadingError = false;
+          // Initialize the game with default recipe data
+          initializeGame();
+        }
+        return;
+      } else {
+        // Reset error state if we're still loading or haven't exhausted retries
         loadingError = false;
-        // Initialize the game with default recipe data
-        initializeGame();
+      }
+    }
+
+    // Handle profile screen - APlasker
+    if (window.profileActive) {
+      // Handle profile screen - APlasker
+      if (typeof drawProfileScreen === 'function') {
+        drawProfileScreen();
+      } else {
+        // Fallback while profile screen is being implemented
+        textAlign(CENTER, CENTER);
+        textSize(Math.max(playAreaWidth * 0.05, 18));
+        fill(COLORS.text);
+        text("Profile Screen\\n(Under Development)", playAreaX + playAreaWidth / 2, playAreaY + playAreaHeight / 2);
       }
       return;
     }
-    
+
     // Check if we need to initialize the game after loading data
-    if (vessels.length === 0) {
+    // Don't reinitialize if we're in a win state (vessels not needed for win screen)
+    if (vessels.length === 0 && !gameWon && gameStarted) {
       console.log("No vessels initialized yet, calling initializeGame()");
       initializeGame();
       return;
@@ -1525,9 +1939,19 @@ let firstInactivityMessageShown = false;
         
         // Help icon removed from title screen - APlasker
       }
+      
+      // Draw hamburger menu on title screen
+      if (typeof hamburgerMenu !== 'undefined') {
+        hamburgerMenu.draw();
+      }
     } else if (gameWon) {
       // Draw win screen
       drawWinScreen();
+      
+      // Draw hamburger menu on win screen
+      if (typeof hamburgerMenu !== 'undefined') {
+        hamburgerMenu.draw();
+      }
     } else {
       // If there's a final animation in progress, don't show any transitional win screen
       // The transition will now only be handled by the tan circle and verb animation
@@ -1576,8 +2000,8 @@ let firstInactivityMessageShown = false;
           console.log("STARTING AUTO FINAL COMBINATION SEQUENCE");
           autoFinalCombination = true;
           autoFinalCombinationStarted = true;
-          autoFinalCombinationTimer = 12; // Wait 0.4 seconds before starting the sequence (reduced from 60)
-          // Initialize state machine
+          autoFinalCombinationTimer = 30; // Wait 1 second before starting the sequence
+          // Set the state machine to WAITING
           autoFinalCombinationState = "WAITING";
           // Reset vessels array to ensure clean state
           finalCombinationVessels = [];
@@ -1596,10 +2020,14 @@ let firstInactivityMessageShown = false;
         const hasActiveMovementAnimation = animations.some(anim => 
           anim instanceof VesselMovementAnimation && anim.active);
         
+        // Check for active combine animations (particle effects)
+        const hasActiveCombineAnimation = animations.some(anim => 
+          anim instanceof CombineAnimation && anim.active);
+        
         // Only decrement the timer if there are no active animations that would affect timing
-        if (autoFinalCombinationTimer > 0 && !hasActiveVerbAnimation && !hasActiveMovementAnimation) {
+        if (autoFinalCombinationTimer > 0 && !hasActiveVerbAnimation && !hasActiveMovementAnimation && !hasActiveCombineAnimation) {
           autoFinalCombinationTimer--;
-        } else if (autoFinalCombinationTimer <= 0 && !hasActiveVerbAnimation && !hasActiveMovementAnimation) {
+        } else if (autoFinalCombinationTimer <= 0 && !hasActiveVerbAnimation && !hasActiveMovementAnimation && !hasActiveCombineAnimation) {
           // Only trigger the next step in the sequence if there are no active animations
           processAutoFinalCombination();
         }
@@ -1669,9 +2097,27 @@ let firstInactivityMessageShown = false;
       helpModal.draw();
     }
     
+    // Draw auth modal on top of everything (unified design system)
+    if (typeof drawAuthModal === 'function') {
+      drawAuthModal();
+    }
+    
+    // Draw Terms & Conditions modal on top of auth modal
+      // Terms modal is now handled by HTML/CSS - no need to draw on canvas
+    
+    // Update auth modal animations
+    if (typeof updateAuthModalAnimation === 'function') {
+      updateAuthModalAnimation();
+    }
+    
     // Draw the dragged vessel at the very end to ensure it's on top of everything
     if (draggedVessel && gameStarted && !gameWon) {
       draggedVessel.draw();
+    }
+    
+    // Draw hamburger menu on top of everything (including flowers and animations)
+    if (typeof hamburgerMenu !== 'undefined') {
+      hamburgerMenu.draw();
     }
   }
   
@@ -1683,12 +2129,12 @@ let firstInactivityMessageShown = false;
     // Increased by 15% from the original value
     const titleSize = gameStarted ? 
       Math.max(playAreaWidth * 0.063 * 0.75, 26) : // Game screen: 75% smaller, min 26px (reduced from 35)
-      Math.max(playAreaWidth * 0.063, 35);         // Title screen: original size
+      Math.max(playAreaWidth * 0.08, 45);          // Title screen: larger size (8% of play area, min 45px)
     textSize(titleSize);
     
-    // Use a bold sans-serif font
+    // Use Courier Bold font for titles
     textStyle(BOLD);
-    textFont('Arial, Helvetica, sans-serif');
+    textFont(titleFont);
     
     // Title text
     const title = "COMBO MEAL";
@@ -1704,8 +2150,8 @@ let firstInactivityMessageShown = false;
       totalWidth += letterWidth;
     }
     
-    // Add kerning (50% increase in spacing)
-    const kerningFactor = 0.5; // 50% extra space
+    // Add kerning (0% increase in spacing)
+    const kerningFactor = 0; // 0% extra space
     let totalKerning = 0;
     
     // Calculate total kerning space (only between letters, not at the ends)
@@ -1727,7 +2173,57 @@ let firstInactivityMessageShown = false;
     playAreaY + (playAreaHeight * getCurrentLayout().titlePosition) : // Position based on layout
     playAreaY + (playAreaHeight * 0.32);   // Title screen position
     
-    // Draw each letter with alternating colors
+    // Calculate outline sizes based on screen type
+    const outerSize = gameStarted ? 3 : 6.5;   // Game screen: smaller outlines, Title screen: larger outlines
+    const middleSize = gameStarted ? 2 : 4.5;  // Game screen: smaller outlines, Title screen: larger outlines
+    const innerSize = gameStarted ? 0.5 : 1.5;     // Game screen: smaller outlines, Title screen: larger outlines
+    
+    // IMPROVED OUTLINE APPROACH - Draw outlines for each letter that connect smoothly
+    // First pass: Draw all outline layers for all letters
+    for (let layer = 0; layer < 3; layer++) {
+      let currentX = x; // Reset x position for each layer
+      
+      let layerSize, layerColor;
+      switch (layer) {
+        case 0: // Outer black outline
+          layerSize = outerSize;
+          layerColor = 'black';
+          break;
+        case 1: // Middle peach outline
+          layerSize = middleSize;
+          layerColor = COLORS.peach;
+          break;
+        case 2: // Inner black outline
+          layerSize = innerSize;
+          layerColor = 'black';
+          break;
+      }
+      
+      push();
+      fill(layerColor);
+      textAlign(CENTER, CENTER);
+      textSize(titleSize);
+      
+      for (let i = 0; i < title.length; i++) {
+        // Calculate letter position with bounce effect
+        let offsetY = (i % 2 === 0) ? bounceAmount : -bounceAmount;
+        let letterX = currentX + letterWidths[i]/2;
+        let letterY = titleY + offsetY;
+        
+        // Draw outline for this letter
+        for (let angle = 0; angle < TWO_PI; angle += PI/16) {
+          let outlineOffsetX = cos(angle) * layerSize;
+          let outlineOffsetY = sin(angle) * layerSize;
+          text(title[i], letterX + outlineOffsetX, letterY + outlineOffsetY);
+        }
+        
+        // Move to next letter position
+        currentX += letterWidths[i] * (1 + kerningFactor);
+      }
+      pop();
+    }
+    
+    // Second pass: Draw colored letters on top
     for (let i = 0; i < title.length; i++) {
       // Choose color based on position (cycle through green, yellow, red)
       let letterColor;
@@ -1749,48 +2245,13 @@ let firstInactivityMessageShown = false;
       let letterX = x + letterWidths[i]/2;
       let letterY = titleY + offsetY;
       
-      // SOLID OUTLINE APPROACH - Create smooth solid outlines with multiple text copies
-      push(); // Save drawing state
-      
-      // Set text properties for all layers
+      // Draw the colored letter
+      push();
       textAlign(CENTER, CENTER);
       textSize(titleSize);
-      
-      // Calculate outline sizes
-      const outerSize = 6;  // Outer black outline thickness
-      const middleSize = 4; // Middle peach outline thickness
-      const innerSize = 2;  // Inner black outline thickness
-      
-      // 1. Draw outer black outline (largest) using multiple offset copies
-      fill('black');
-      // Create a circular pattern of offsets for smooth round outline
-      for (let angle = 0; angle < TWO_PI; angle += PI/8) {
-        let offsetX = cos(angle) * outerSize;
-        let offsetY = sin(angle) * outerSize;
-        text(title[i], letterX + offsetX, letterY + offsetY);
-      }
-      
-      // 2. Draw middle peach layer using multiple offset copies
-      fill(COLORS.peach);
-      for (let angle = 0; angle < TWO_PI; angle += PI/8) {
-        let offsetX = cos(angle) * middleSize;
-        let offsetY = sin(angle) * middleSize;
-        text(title[i], letterX + offsetX, letterY + offsetY);
-      }
-      
-      // 3. Draw inner black layer using multiple offset copies
-      fill('black');
-      for (let angle = 0; angle < TWO_PI; angle += PI/8) {
-        let offsetX = cos(angle) * innerSize;
-        let offsetY = sin(angle) * innerSize;
-        text(title[i], letterX + offsetX, letterY + offsetY);
-      }
-      
-      // 4. Draw the final colored letter in the center
       fill(letterColor);
       text(title[i], letterX, letterY);
-      
-      pop(); // Restore drawing state
+      pop();
       
       // Move to the next letter position with kerning
       x += letterWidths[i] * (1 + kerningFactor);
@@ -1811,7 +2272,7 @@ let firstInactivityMessageShown = false;
       textAlign(CENTER, CENTER);
       textSize(placeholderSize);
       textStyle(ITALIC); // Changed from BOLD to ITALIC
-      textFont('Arial, Helvetica, sans-serif');
+      textFont(titleFont); // Use title font for placeholder text
       fill(51, 51, 51, 255); // #333 fully opaque
       
       // Draw the placeholder text with quotation marks
@@ -1839,7 +2300,7 @@ let firstInactivityMessageShown = false;
     textAlign(CENTER, CENTER);
     textSize(bylineSize);
     textStyle(BOLD); // Match the tutorial "Decode the dish..." text style
-    textFont('Arial, Helvetica, sans-serif');
+    textFont('Helvetica, Arial, sans-serif'); // Use Helvetica for dynamic byline
     
     // Apply appropriate opacity based on transition state
     fill(51, 51, 51, bylineOpacity); // #333 with alpha
@@ -1890,7 +2351,7 @@ let firstInactivityMessageShown = false;
     // Use a fixed size based on play area width instead of relying on helpIconSize
     const statsTextSize = Math.max(playAreaWidth * 0.03, 12); // 3% of play area width, min 12px
     textSize(statsTextSize);
-    textFont('Arial, Helvetica, sans-serif');
+    textFont('Helvetica, Arial, sans-serif');
     textStyle(NORMAL);
     
     // Use COLORS.primary (green) to match the help button color
@@ -1961,8 +2422,8 @@ let firstInactivityMessageShown = false;
     const versionTextSize = Math.max(playAreaWidth * 0.016, 8); // 1.6% of width, min 8px
     textSize(versionTextSize);
 
-    // Update version to reflect font size improvements
-    const versionText = "v0.7 - AP";
+    // Update version to reflect complete UI element display
+    const versionText = "v20250719.740PM.EDT - APlasker";
 
     // Combine version and "Say hi!" into one line with pipe separator
     const combinedText = versionText + " | Say hi!";
@@ -2059,212 +2520,8 @@ let firstInactivityMessageShown = false;
     }, 100); // Short delay to ensure clean state
   }
   
-  
   // Add a new class for the special final animation
-  class FinalVerbAnimation extends VerbAnimation {
-    constructor(verb, vessel) {
-      // Get vessel position if available, otherwise use center
-      const startX = vessel ? vessel.x : playAreaX + playAreaWidth/2;
-      const startY = vessel ? vessel.y : playAreaY + playAreaHeight/2;
-      
-      // Call parent constructor with vessel reference, only uppercase (exclamation point added in VerbAnimation)
-      super(verb.toUpperCase(), startX, startY, vessel);
-      
-      // Override properties for more dramatic effect
-      this.maxSize = playAreaWidth; // Limit to exact play area width (was playAreaWidth * 1.2)
-      this.duration = 72; // 2.4 seconds at 30fps (reduced from 144)
-      this.initialSize = this.vesselRef ? Math.max(this.vesselRef.w, this.vesselRef.h) * 0.75 : this.maxSize * 0.5;
-      
-      // Set flag to prevent game win until animation completes
-      this.isFinalAnimation = true;
-      
-      // Stop the timer when final animation starts - APlasker
-      if (typeof gameTimerActive !== 'undefined') {
-        gameTimerActive = false;
-        console.log("Timer stopped at final animation start. Final time:", formatTime(gameTimer));
-      }
-      
-      // Add transition circle properties
-      this.transitionCircleSize = 0;
-      this.transitionCircleOpacity = 255;
-      // Use 110% of whichever dimension is larger (width or height)
-      this.maxCircleSize = max(width, height) * 1.1; 
-      
-      console.log("Creating FINAL verb animation for:", verb, "at position:", startX, startY);
-    }
-    
-    // Override update to signal when to proceed to win screen
-    update() {
-      const result = super.update();
-      
-      // Track frames explicitly for more precise timing
-      const framesPassed = this.progress * this.duration;
-      
-      // Check if we've reached exactly 38 frames (1.25 seconds at 30fps)
-      if (framesPassed >= 38) {
-        console.log("Final verb animation at frame 38 - showing win screen with hard cut transition");
-        showWinScreen();
-        // Mark animation as complete
-        this.active = false;
-        return true;
-      }
-      
-      return result;
-    }
-    
-    // Override draw to make text larger and more dramatic
-    draw() {
-      if (!this.active) return;
-      
-      // Calculate animation phases
-      const growPhase = 0.3; // First 30% of animation is growth
-      const holdPhase = 0.7; // Hold until 70% of animation
-      
-      // Calculate size based on animation phase
-      let currentSize;
-      if (this.progress < growPhase) {
-        // Growing phase - ease in with cubic function
-        const t = this.progress / growPhase;
-        const easedT = t * t * (3 - 2 * t); // Smooth step function
-        // Start at initialSize and grow to maxSize
-        currentSize = map(easedT, 0, 1, this.initialSize, this.maxSize);
-      } else if (this.progress < holdPhase) {
-        // Hold phase - maintain full size
-        currentSize = this.maxSize;
-      } else {
-        // No shrinking, maintain size but fade out
-        currentSize = this.maxSize;
-      }
-      
-      push();
-      
-      // Draw transition circle before the cloud but after saving state
-      // Circle should grow throughout animation but never fade
-      if (this.progress < 0.5) {
-        // Growing phase - from 0 to 110% of largest screen dimension
-        this.transitionCircleSize = map(this.progress, 0, 0.5, 0, this.maxCircleSize);
-      } else {
-        // Maintain full size - no fading
-        this.transitionCircleSize = this.maxCircleSize;
-      }
-      
-      // Draw the tan circle with full opacity (no fade out)
-      const tanColor = color(COLORS.background);
-      tanColor.setAlpha(255); // Always full opacity
-      
-      // Ensure we're at screen center for the circle
-      fill(tanColor);
-      noStroke();
-      // Center in screen, not at animation position
-      ellipse(playAreaX + playAreaWidth/2, playAreaY + playAreaHeight/2, this.transitionCircleSize);
-      
-      // Draw cloud background
-      noStroke();
-      
-      // Draw main cloud with higher opacity
-      let cloudOpacity = min(255, this.opacity * 1.2); // Increase opacity by 20%
-      fill(255, 255, 255, cloudOpacity);
-      
-      beginShape();
-      for (let i = 0; i < this.cloudPoints.length; i++) {
-        const point = this.cloudPoints[i];
-        
-        // Calculate variation using noise for organic cloud shape
-        // Add angle-based phase to ensure more consistent wobbliness around the entire perimeter
-        const phaseOffset = point.angle * 0.3; // Use angle as part of noise input for more consistent variation
-        const noiseVal = noise(point.noiseOffset + frameCount * 0.01, phaseOffset);
-        const variation = map(noiseVal, 0, 1, -point.variationAmount, point.variationAmount);
-        
-        // Calculate radius with variation
-        const radius = (currentSize / 2) * (1 + variation);
-        
-        // Calculate point position
-        const px = this.x + cos(point.angle) * radius;
-        const py = this.y + sin(point.angle) * radius;
-        
-        curveVertex(px, py);
-        
-        // Add extra vertices at the beginning and end for smooth curves
-        if (i === 0) {
-          curveVertex(px, py);
-        } else if (i === this.cloudPoints.length - 1) {
-          curveVertex(px, py);
-          curveVertex(this.x + cos(this.cloudPoints[0].angle) * radius, 
-                    this.y + sin(this.cloudPoints[0].angle) * radius);
-        }
-      }
-      endShape(CLOSE);
-      
-      // Always draw verb text when the cloud is visible (improved visibility)
-      if (currentSize > this.maxSize * 0.1) { // As long as the cloud is at least 10% visible
-        // Calculate text opacity based on progress
-        let textOpacity = this.opacity; // Use the global opacity we're tracking
-        
-        // Calculate maximum allowed text width (80% of play area width)
-        const maxTextWidth = playAreaWidth * 0.8;
-        
-        // Start with a smaller font size than before - 20% of cloud size instead of 25%
-        // This helps avoid overflow on smaller screens while still being dramatic
-        let fontSize = max(min(currentSize * 0.20, 80), 30);
-        
-        // Set text properties for measurement
-        textAlign(CENTER, CENTER);
-        textSize(fontSize);
-        textStyle(BOLD);
-        
-        // Check if verb text fits within max width
-        let verbWidth = textWidth(this.verb);
-        
-        // If text is too wide, either scale down font size or wrap text
-        let textLines = [this.verb];
-        
-        // If text is still too wide even at minimum font size, use text wrapping
-        if (verbWidth > maxTextWidth && fontSize <= 30) {
-          textLines = splitTextIntoLines(this.verb, maxTextWidth);
-        } 
-        // Otherwise, reduce font size until text fits (but don't go below minimum)
-        else if (verbWidth > maxTextWidth) {
-          // Scale down font size until text fits (or until we hit the minimum size)
-          while (verbWidth > maxTextWidth && fontSize > 30) {
-            fontSize -= 2;
-            textSize(fontSize);
-            verbWidth = textWidth(this.verb);
-          }
-        }
-        
-        // Apply the final font size
-        textSize(fontSize);
-        
-        // Draw the text (shadow first, then actual text)
-        const lineHeight = fontSize * 1.2; // Line spacing for multi-line text
-        const startY = this.y - ((textLines.length - 1) * lineHeight / 2);
-        
-        for (let i = 0; i < textLines.length; i++) {
-          const lineY = startY + (i * lineHeight);
-          
-          // Draw text shadow for better visibility
-          fill(0, 0, 0, textOpacity * 0.4);
-          text(textLines[i], this.x + 4, lineY + 4);
-          
-          // Draw main text with stronger color and golden outline
-          let primaryColor = color(COLORS.secondary);
-          primaryColor.setAlpha(textOpacity);
-          
-          // Create an outline color with the same opacity
-          let outlineColor = color(COLORS.tertiary); // Yellow/gold
-          outlineColor.setAlpha(textOpacity);
-          
-          // Draw golden outline for dramatic effect
-          stroke(outlineColor);
-          strokeWeight(3);
-          fill(primaryColor);
-          text(textLines[i], this.x, lineY);
-        }
-      }
-      
-      pop();
-    }
-  }
+  // CLASS FinalVerbAnimation (lines 2062-2268) WAS MOVED TO js/animation.js
   
   // Function to create a final verb animation and delay the win screen
   function createFinalVerbAnimation(verb) {
@@ -2454,5 +2711,46 @@ let firstInactivityMessageShown = false;
     vessel.verbDisplayTime = 119;
     
     return true;
+  }
+  
+  function drawTitleScreen() {
+    // Draw title screen elements
+    drawTitle();
+    drawStartScreen();
+    
+    // Draw hamburger menu if it exists
+    if (typeof hamburgerMenu !== 'undefined') {
+      hamburgerMenu.draw();
+    }
+  }
+
+  function drawWinScreen() {
+    // ... existing win screen code ...
+    
+    // Draw hamburger menu if it exists
+    if (typeof hamburgerMenu !== 'undefined') {
+      hamburgerMenu.draw();
+    }
+  }
+
+  // Helper function to draw text with custom kerning
+  function drawTextWithKerning(textString, x, y, kerningFactor) {
+    let currentX = x;
+    
+    for (let i = 0; i < textString.length; i++) {
+      const char = textString[i];
+      const charWidth = textWidth(char);
+      
+      // Draw the character using p5.js text function with string parameter
+      push();
+      textAlign(LEFT, CENTER); // Ensure consistent alignment for each character
+      text(char, currentX, y);
+      pop();
+      
+      // Move to next position with kerning applied
+      if (i < textString.length - 1) { // Don't apply kerning after the last character
+        currentX += charWidth * (1 + kerningFactor);
+      }
+    }
   }
   

@@ -48,9 +48,9 @@ const StreakSystem = (function() {
     }
   }
   
-  function isValidGrade(grade) {
-    // Valid grades are A, B, C (X is not valid for streak)
-    return ['A', 'B', 'C'].includes(grade);
+  function isValidForStreak(validForStreak) {
+    // Valid for streak if mistakes < 5 (passed as boolean)
+    return validForStreak === true;
   }
   
   // Public API
@@ -61,9 +61,15 @@ const StreakSystem = (function() {
     },
     
     // Record a recipe completion
-    recordCompletion(dayNumber, grade, timeInSeconds) {
-      if (!dayNumber || !isValidGrade(grade)) {
-        console.log('Streak not updated - invalid day number or grade:', { dayNumber, grade });
+    recordCompletion(dayNumber, validForStreak, timeInSeconds) {
+      if (!dayNumber || !isValidForStreak(validForStreak)) {
+        console.log('Streak not updated - invalid day number or not valid for streak:', { dayNumber, validForStreak });
+        return false;
+      }
+      
+      // Check if this is the tutorial recipe - don't count it for streaks
+      if (typeof isTutorialMode !== 'undefined' && isTutorialMode) {
+        console.log('Streak not updated - tutorial mode completion does not count for streaks');
         return false;
       }
       
@@ -84,7 +90,7 @@ const StreakSystem = (function() {
       const completion = {
         dayNumber: dayNumber,
         date: today,
-        grade: grade,
+        validForStreak: validForStreak,
         time: timeInSeconds || 0
       };
       
@@ -101,6 +107,9 @@ const StreakSystem = (function() {
         // Consecutive day number - increment streak
         streakData.currentStreak++;
         streakData.longestStreak = Math.max(streakData.longestStreak, streakData.currentStreak);
+      } else if (streakData.lastCompletedDayNumber === dayNumber) {
+        // Same day completion - don't change streak, just update longest if current is higher
+        streakData.longestStreak = Math.max(streakData.longestStreak, streakData.currentStreak);
       } else {
         // Non-consecutive - reset streak
         streakData.currentStreak = 1;
@@ -113,7 +122,7 @@ const StreakSystem = (function() {
       
       console.log('Streak updated:', {
         dayNumber,
-        grade,
+        validForStreak,
         currentStreak: streakData.currentStreak,
         longestStreak: streakData.longestStreak
       });

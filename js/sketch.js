@@ -1,7 +1,7 @@
 /*
- * Culinary Logic Puzzle v20250526.1135
+ * Culinary Logic Puzzle v20250623.1930PM.EDT
  * Created by APlasker
- * Last Updated: May 26, 2025 (11:35 EDT - URL TRACKING ANALYTICS) by APlasker - URL ANALYTICS SYSTEM
+ * Last Updated: June 23, 2025 (7:30 PM EDT) by APlasker - Future-proofed enhanced streak system with complete migration support.
  *
  * A daily culinary logic puzzle game where players combine ingredients
  * according to recipe logic to create a final dish.
@@ -65,6 +65,10 @@ let intermediate_combinations = [
   let autoFinalCombinationShakeDuration = 30; // 0.5 seconds at 60fps for shake animation - APlasker
   let startedCombinations = []; // Track all combos that have ever been started (partial or completed) - APlasker
   
+  // Profile state variables - APlasker
+  window.profileActive = false; // Whether profile screen is currently active - made global
+  window.previousProfileState = 'title'; // Track where user came from: 'title' or 'win' - made global
+  
   // Byline state variables - APlasker
   let currentByline = "Drop one ingredient on to another to combine!"; // Updated default byline - APlasker
   let nextByline = ""; // Store the upcoming byline message
@@ -78,6 +82,11 @@ let intermediate_combinations = [
   let bylineFadeFrames = 8; // Number of frames for fade transition at 30fps (reduced from 15)
   let isTransitioning = false; // Flag to prevent interrupting transitions
   let transitionDuration = 0; // Duration to display message after transition
+  
+  // APlasker: Define star colors
+  const STAR_YELLOW = '#FFD700'; // Gold-ish yellow
+  const STAR_GREY = '#808080';   // Standard grey
+  const STAR_OUTLINE = '#000000'; // Black
   
   // Success messages to display when combinations are created - APlasker
   const successMessages = [
@@ -117,8 +126,14 @@ let intermediate_combinations = [
   // Store these vessel dimensions globally for consistent calculations
   let basic_w, basic_h, vertical_margin;
   
+  // Session streak tracking - APlasker
+  let sessionStartStreak = 0;
+  
   // Extract all individual ingredients (will be replaced with data from Supabase)
   let ingredients = [...new Set(intermediate_combinations.flatMap(c => c.required))];
+  
+  // DUPLICATE INGREDIENT FIX: Global variable to track ingredient instances
+  let base_ingredient_instances = []; // Will store ingredient instances with metadata
   
   // Global variables
   let gameWon = false;
@@ -145,6 +160,23 @@ let intermediate_combinations = [
   // Global flag to track if any modal is currently active
   let modalActive = false;
   
+  // Global variable for wallpaper SVG - APlasker
+  let wallpaperSVG;
+  let wallpaperSVGHighRes; // High-resolution version for crisp rendering - APlasker
+  let wallpaperAnimation; // Global wallpaper animation instance - APlasker
+  let wallpaperHighResImage; // Final p5.js compatible image - APlasker
+  let wallpaperImageReady = false; // Track when wallpaper image is truly loaded - APlasker
+  let wallpaperAnimationActive = false; // Track if wallpaper animation is running - APlasker
+  let wallpaperLoadingStartTime = null; // Track wallpaper loading timeout - BUGFIX
+  let loadingComplete = false; // Track when loading is complete for split reveal - APlasker
+  
+  // Completion check state variables - APlasker
+  let completionCheckInProgress = false;
+  let completionCheckStartTime = 0;
+  let completionCheckTimeout = 5000; // 5 seconds
+  let showingCompletionError = false;
+  let completionErrorModal = null;
+  
   // Play area constraints
   let maxPlayWidth = 400; // Max width for the play area (phone-sized)
   let playAreaPadding = 20; // Padding around the play area
@@ -163,7 +195,7 @@ let intermediate_combinations = [
     vesselGreen: '#9a9832',   // Updated to match new primary color - APlasker
     vesselHint: '#f7dc30',    // Changed from burnt orange to bright yellow - APlasker
     green: '#9a9832',         // Updated to match new primary color - APlasker
-    peach: '#dd9866',          // Added peach/orange color for tertiary elements - APlasker
+    peach: '#da9356',          // Updated orange color to #da9356 - APlasker
     HintPink: '#cf6d88' 
   };
   
@@ -246,331 +278,7 @@ let intermediate_combinations = [
   }
   
   // Animation class for combining ingredients
-  class CombineAnimation {
-    constructor(x, y, color, targetX, targetY) {
-      this.x = x;
-      this.y = y;
-      this.targetX = targetX;
-      this.targetY = targetY;
-      this.color = color;
-      this.size = 30;
-      this.alpha = 255;
-      this.progress = 0;
-      this.duration = 15; // 0.5 seconds at 30fps (reduced from 30)
-      this.sparkles = [];
-      
-      // Create sparkles
-      for (let i = 0; i < 15; i++) {
-        this.sparkles.push({
-          x: random(-20, 20),
-          y: random(-20, 20),
-          size: random(3, 8),
-          speed: random(0.5, 2),
-          angle: random(TWO_PI)
-        });
-      }
-    }
-    
-    update() {
-      this.progress += 1 / this.duration;
-      if (this.progress >= 1) {
-        return true; // Animation complete
-      }
-      
-      // Update sparkles
-      for (let sparkle of this.sparkles) {
-        sparkle.x += cos(sparkle.angle) * sparkle.speed;
-        sparkle.y += sin(sparkle.angle) * sparkle.speed;
-        sparkle.size *= 0.95;
-      }
-      
-      return false;
-    }
-    
-    draw() {
-      // Easing function for smooth animation
-      let t = this.progress;
-      let easedT = t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2;
-      
-      // Calculate current position
-      let currentX = lerp(this.x, this.targetX, easedT);
-      let currentY = lerp(this.y, this.targetY, easedT);
-      
-      // Draw main particle
-      noStroke();
-      fill(this.color);
-      ellipse(currentX, currentY, this.size * (1 - this.progress * 0.5));
-      
-      // Draw sparkles
-      for (let sparkle of this.sparkles) {
-        fill(this.color);
-        ellipse(currentX + sparkle.x, currentY + sparkle.y, sparkle.size);
-      }
-    }
-  }
-  
-  // Animation class for vessel movement during final combination
-  class VesselMovementAnimation {
-    constructor(vessel, targetX, targetY) {
-      this.vessel = vessel;
-      this.startX = vessel.x;
-      this.startY = vessel.y;
-      this.targetX = targetX;
-      this.targetY = targetY;
-      this.progress = 0;
-      this.duration = 20; // 0.67 seconds at 30fps (reduced from 30)
-      this.active = true;
-      this.completed = false;
-      
-      // Store original position for restoration if needed
-      vessel.originalX = vessel.x;
-      vessel.originalY = vessel.y;
-      
-      console.log(`Created vessel movement animation from (${this.startX}, ${this.startY}) to (${this.targetX}, ${this.targetY})`);
-    }
-    
-    update() {
-      if (this.completed) return true;
-      
-      this.progress += 1 / this.duration;
-      
-      // Prevent progress from exceeding 1
-      this.progress = Math.min(this.progress, 1);
-      
-      // Use cubic easing for smooth movement
-      const t = this.progress;
-      const easedT = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      
-      // Update vessel position
-      this.vessel.x = lerp(this.startX, this.targetX, easedT);
-      this.vessel.y = lerp(this.startY, this.targetY, easedT);
-      
-      // Check if animation is complete
-      if (this.progress >= 1) {
-        this.completed = true;
-        this.active = false;
-        console.log(`Vessel movement complete for ${this.vessel.name || "unnamed vessel"}`);
-        
-        // Ensure the vessel is exactly at the target position
-        this.vessel.x = this.targetX;
-        this.vessel.y = this.targetY;
-        
-        return true;
-      }
-      
-      return false;
-    }
-    
-    draw() {
-      // No drawing needed - the vessel itself will be drawn separately
-      // This animation only updates the vessel's position
-    }
-  }
-  
-  // Animation class for dramatic verb reveals
-  class VerbAnimation {
-    constructor(verb, x, y, vesselRef) {
-      // Transform verb to uppercase and add exclamation mark
-      this.verb = verb.toUpperCase() + "!";
-      this.startX = x; // Starting position (over vessel)
-      this.startY = y;
-      
-      // Calculate halfway point between vessel and center
-      const centerX = playAreaX + playAreaWidth/2;
-      const centerY = playAreaY + playAreaHeight/2;
-      this.targetX = lerp(this.startX, centerX, 0.5); // Go halfway to center
-      this.targetY = lerp(this.startY, centerY, 0.5); // Go halfway to center
-      
-      this.x = this.startX; // Current position
-      this.y = this.startY;
-      this.progress = 0;
-      this.duration = 45; // 1.5 seconds at 30fps (reduced from 60)
-      this.maxSize = playAreaWidth * 0.9; // 90% of play area width
-      this.active = true;
-      this.opacity = 255; // Track opacity separately 
-      this.cloudPoints = [];
-      this.vesselRef = vesselRef; // Reference to the vessel to update its text
-      this.hasTriggeredTextReveal = false; // Flag to track if we've triggered the text reveal
-      
-      // Start at 75% of vessel size if we have a vessel reference
-      this.initialSize = this.vesselRef ? Math.max(this.vesselRef.w, this.vesselRef.h) * 0.75 : 10;
-      
-      // Store the original vessel name and temporarily clear it
-      if (this.vesselRef) {
-        this.vesselName = this.vesselRef.name;
-        this.vesselRef.displayName = null; // Add a displayName property that starts as null
-      }
-      
-      // Debug log to confirm animation creation
-      console.log("Creating VerbAnimation for verb:", this.verb, "for vessel:", this.vesselName);
-      
-      // Generate cloud edge points - increased number of points for smoother outline
-      const numPoints = 36; // Increased from 20 for smoother outline
-      for (let i = 0; i < numPoints; i++) {
-        const angle = (TWO_PI / numPoints) * i;
-        const noiseOffset = random(0, 100);
-        this.cloudPoints.push({
-          angle: angle,
-          noiseOffset: noiseOffset,
-          variationAmount: random(0.12, 0.18) // More consistent variation (was 0.1, 0.25)
-        });
-      }
-    }
-    
-    update() {
-      // Animation phases - adjust for speed
-      const growPhase = 0.3; // First 30% of animation is growth
-      const holdPhase = 0.7; // Hold until 70% of animation
-      const peakRevealPoint = 0.5; // At 50% of animation, reveal the vessel name
-      const fadeOutPoint = 0.8; // Start fading out at 80% 
-      
-      // Adjust progress speed: 25% faster during growth, 50% faster during fade
-      let progressIncrement;
-      if (this.progress < growPhase) {
-        // 25% faster during growth
-        progressIncrement = (1 / this.duration) * 1.25;
-      } else if (this.progress > fadeOutPoint) {
-        // 50% faster during fade out
-        progressIncrement = (1 / this.duration) * 1.5;
-      } else {
-        // Normal speed during hold phase
-        progressIncrement = 1 / this.duration;
-      }
-      
-      // Update progress
-      this.progress += progressIncrement;
-      
-      // Move position from start to center as the animation progresses during growth phase
-      if (this.progress <= growPhase) {
-        const moveT = this.progress / growPhase;
-        const easedMoveT = moveT * moveT * (3 - 2 * moveT); // Cubic easing
-        this.x = lerp(this.startX, this.targetX, easedMoveT);
-        this.y = lerp(this.startY, this.targetY, easedMoveT);
-      }
-      
-      // When we hit the peak, reveal the vessel name
-      if (!this.hasTriggeredTextReveal && this.progress >= peakRevealPoint && this.vesselRef) {
-        console.log("Revealing vessel name:", this.vesselName);
-        this.vesselRef.displayName = this.vesselName;
-        this.hasTriggeredTextReveal = true;
-      }
-      
-      // Handle fade out 
-      if (this.progress > fadeOutPoint) {
-        // Quick fade out calculation - map from fadeOutPoint->1.0 to 255->0
-        this.opacity = map(this.progress, fadeOutPoint, 1.0, 255, 0);
-      }
-      
-      // Log progress at certain points for debugging
-      if (this.progress === 0.1 || this.progress === 0.3 || this.progress === 0.5 || 
-          this.progress === 0.7 || this.progress === 0.9) {
-        console.log(`VerbAnimation at ${(this.progress * 100).toFixed(0)}%: ${this.verb}`);
-      }
-      
-      // Return true when animation is complete to remove it
-      if (this.progress >= 1) {
-        console.log(`VerbAnimation complete: ${this.verb}`);
-        // Ensure vessel name is revealed at the end
-        if (this.vesselRef && !this.vesselRef.displayName) {
-          this.vesselRef.displayName = this.vesselName;
-        }
-        this.active = false;
-        return true;
-      }
-      
-      return false;
-    }
-    
-    draw() {
-      if (!this.active) return;
-      
-      // Calculate animation phases
-      const growPhase = 0.3; // First 30% of animation is growth
-      const holdPhase = 0.7; // Hold until 70% of animation
-      
-      // Calculate size based on animation phase, but start at initialSize rather than 0
-      let currentSize;
-      if (this.progress < growPhase) {
-        // Growing phase - ease in with cubic function, but start at initialSize
-        const t = this.progress / growPhase;
-        const easedT = t * t * (3 - 2 * t); // Smooth step function
-        // Start at initialSize and grow to maxSize
-        currentSize = map(easedT, 0, 1, this.initialSize, this.maxSize);
-      } else if (this.progress < holdPhase) {
-        // Hold phase - maintain full size
-        currentSize = this.maxSize;
-      } else {
-        // No shrinking, maintain size but fade out
-        currentSize = this.maxSize;
-      }
-      
-      // Begin shape
-      push();
-      
-      // Draw cloud background
-      noStroke();
-      
-      // Draw main cloud with higher opacity (255 → 255+20% = ~300, capped at 255)
-      let cloudOpacity = min(255, this.opacity * 1.2); // Increase opacity by 20%
-      fill(255, 255, 255, cloudOpacity);
-      
-      beginShape();
-      for (let i = 0; i < this.cloudPoints.length; i++) {
-        const point = this.cloudPoints[i];
-        
-        // Calculate variation using noise for organic cloud shape
-        // Add angle-based phase to ensure more consistent wobbliness around the entire perimeter
-        const phaseOffset = point.angle * 0.3; // Use angle as part of noise input for more consistent variation
-        const noiseVal = noise(point.noiseOffset + frameCount * 0.01, phaseOffset);
-        const variation = map(noiseVal, 0, 1, -point.variationAmount, point.variationAmount);
-        
-        // Calculate radius with variation
-        const radius = (currentSize / 2) * (1 + variation);
-        
-        // Calculate point position
-        const px = this.x + cos(point.angle) * radius;
-        const py = this.y + sin(point.angle) * radius;
-        
-        curveVertex(px, py);
-        
-        // Add extra vertices at the beginning and end for smooth curves
-        if (i === 0) {
-          curveVertex(px, py);
-        } else if (i === this.cloudPoints.length - 1) {
-          curveVertex(px, py);
-          curveVertex(this.x + cos(this.cloudPoints[0].angle) * radius, 
-                    this.y + sin(this.cloudPoints[0].angle) * radius);
-        }
-      }
-      endShape(CLOSE);
-      
-      // Always draw verb text when the cloud is visible (improved visibility)
-      if (currentSize > this.maxSize * 0.1) { // As long as the cloud is at least 10% visible
-        // Calculate text opacity based on progress
-        let textOpacity = this.opacity; // Use the global opacity we're tracking
-        
-        // Calculate font size (proportional to cloud size), with minimum size
-        const fontSize = max(min(currentSize * 0.2, 70), 20);
-        
-        // Draw text
-        textAlign(CENTER, CENTER);
-        textSize(fontSize);
-        textStyle(BOLD);
-        
-        // Draw text shadow for better visibility
-        fill(0, 0, 0, textOpacity * 0.4);
-        text(this.verb, this.x + 4, this.y + 4);
-        
-        // Draw main text with stronger color
-        let secondaryColor = color(COLORS.secondary);
-        secondaryColor.setAlpha(textOpacity);
-        fill(secondaryColor);
-        text(this.verb, this.x, this.y);
-      }
-      
-      pop();
-    }
-  }
+  // CLASS DEFINITIONS FOR CombineAnimation, VesselMovementAnimation, VerbAnimation REMOVED FROM HERE
   
   // Button class for UI elements
   class Button {
@@ -693,46 +401,237 @@ let intermediate_combinations = [
   function preload() {
     console.log("Preloading assets...");
     
+    // Load wallpaper SVG using HTML5 Canvas for high-quality rendering - APlasker
+    console.log("🚀 Loading wallpaper SVG via HTML5 Canvas...");
+    loadWallpaperSVGHighRes();
+    
     // Use web-safe fonts directly instead of trying to load Google Fonts
-    titleFont = 'Georgia';
-    bodyFont = 'Arial';
-    buttonFont = 'Verdana';
+  titleFont = 'Courier, "Courier New", monospace';
+  bodyFont = 'Helvetica, Arial, sans-serif';
+  buttonFont = 'Helvetica, Arial, sans-serif';
     
     console.log("Using web-safe fonts instead of Google Fonts");
+  }
+  
+  // Function to load SVG at high resolution using HTML5 Canvas - APlasker
+  function loadWallpaperSVGHighRes() {
+    console.log("📐 Loading SVG via HTML5 Canvas for maximum quality...");
+    
+    // Set a timeout to prevent infinite loading - APlasker
+    const loadingTimeout = setTimeout(() => {
+      console.warn("⚠️ Wallpaper loading timeout - proceeding without animation");
+      wallpaperImageReady = false;
+      loadingComplete = true; // Allow game to continue
+    }, 5000); // 5 second timeout
+    
+    // Create an image element to load the SVG
+    const img = new Image();
+    
+    img.onload = function() {
+      clearTimeout(loadingTimeout); // Cancel timeout since loading succeeded
+      console.log("✅ SVG loaded as DOM image");
+      console.log(`📊 Natural SVG dimensions: ${img.naturalWidth}x${img.naturalHeight}`);
+      
+      // Validate image dimensions before proceeding
+      if (img.naturalWidth === 0 || img.naturalHeight === 0) {
+        console.warn("⚠️ Invalid SVG dimensions detected - using fallback");
+        wallpaperImageReady = false;
+        loadingComplete = true;
+        return;
+      }
+      
+      // Create high-resolution canvas (4x natural size for crisp quality)
+      const hiResScale = 4;
+      const canvasWidth = Math.max(img.naturalWidth * hiResScale, 800); // Minimum 800px width
+      const canvasHeight = Math.max(img.naturalHeight * hiResScale, 600); // Minimum 600px height
+      
+      console.log(`🎯 Creating HTML5 canvas: ${canvasWidth}x${canvasHeight} (${hiResScale}x scale)`);
+      
+      try {
+        // Create native HTML5 canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = canvasHeight;
+        const ctx = canvas.getContext('2d');
+        
+        // Enable high-quality rendering
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
+        // Draw SVG to canvas at high resolution
+        ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+        
+        console.log("✅ SVG rendered to HTML5 canvas at high quality");
+        
+        // Convert canvas to p5.js compatible image
+        const dataURL = canvas.toDataURL('image/png');
+        
+        // Load the high-quality canvas as p5.js image
+        wallpaperHighResImage = loadImage(dataURL, 
+          function() {
+            console.log("🎨 High-resolution wallpaper converted to p5.js image successfully!");
+            console.log(`📐 Final p5.js image dimensions: ${wallpaperHighResImage.width}x${wallpaperHighResImage.height}`);
+            wallpaperImageReady = true; // Mark image as truly ready - APlasker
+            console.log("✅ Wallpaper image is now ready for animation");
+          },
+          function() {
+            console.log("❌ Failed to convert canvas to p5.js image - proceeding without animation");
+            wallpaperImageReady = false;
+            loadingComplete = true; // Allow game to continue
+          }
+        );
+      } catch (error) {
+        console.error("❌ Error creating canvas or converting image:", error);
+        wallpaperImageReady = false;
+        loadingComplete = true; // Allow game to continue
+      }
+    };
+    
+    img.onerror = function() {
+      clearTimeout(loadingTimeout); // Cancel timeout since we got an error
+      console.log("❌ Failed to load SVG as DOM image - proceeding without animation");
+      wallpaperImageReady = false;
+      loadingComplete = true; // Allow game to continue without wallpaper
+    };
+    
+    // Start loading the appropriate image based on device type
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      console.log("📱 Mobile device detected - using optimized PNG wallpaper");
+      img.src = 'assets/wallpaper1-2.png'; // Use smaller PNG for mobile
+    } else {
+      console.log("🖥️ Desktop device - using high-quality SVG wallpaper");
+      img.src = 'assets/wallpaper1.svg'; // Use original SVG for desktop
+    }
   }
   
   function setup() {
     createCanvas(windowWidth, windowHeight); // Fullscreen canvas for mobile
     textFont(bodyFont);
     
+    // BUGFIX: Add canvas initialization validation
+    if (!canvas || width === 0 || height === 0) {
+      console.error("❌ Canvas initialization failed - retrying...");
+      setTimeout(() => {
+        try {
+          createCanvas(windowWidth, windowHeight);
+          console.log("✅ Canvas retry successful");
+        } catch (error) {
+          console.error("❌ Canvas retry failed:", error);
+          // Continue anyway with minimal functionality
+        }
+      }, 100);
+    } else {
+      console.log("✅ Canvas initialized successfully:", width, "x", height);
+    }
+    
     // Initialize the touch system
-    touchSystem.init();
+    touchSystem.init(); // MOVED to interaction.js
+    
+    // Explicitly assign p5.js mouse event handlers from interaction.js
+    // window.mousePressed = mousePressed; // Causing: mousePressed is not defined
+    // window.mouseDragged = mouseDragged;
+    // window.mouseReleased = mouseReleased;
     
     // Set frame rate to 30fps for consistent animation timing across devices
     frameRate(30);
     
+    // BUGFIX: Validate window dimensions before calculating play area
+    const safeWindowWidth = windowWidth || window.innerWidth || 800;
+    const safeWindowHeight = windowHeight || window.innerHeight || 600;
+    
     // Calculate play area dimensions
-    playAreaWidth = min(maxPlayWidth, windowWidth - 2 * playAreaPadding);
+    playAreaWidth = min(maxPlayWidth, safeWindowWidth - 2 * playAreaPadding);
     // Set a fixed aspect ratio for the play area (mobile phone-like)
-    playAreaHeight = min(windowHeight - 2 * playAreaPadding, playAreaWidth * 1.8); // 16:9 aspect ratio
+    playAreaHeight = min(safeWindowHeight - 2 * playAreaPadding, playAreaWidth * 1.8); // 16:9 aspect ratio
     
     // Center the play area both horizontally and vertically
-    playAreaX = (windowWidth - playAreaWidth) / 2;
-    playAreaY = (windowHeight - playAreaHeight) / 2;
+    playAreaX = (safeWindowWidth - playAreaWidth) / 2;
+    playAreaY = (safeWindowHeight - playAreaHeight) / 2;
     
-    // Load recipe data from Supabase if not in playtest mode
-    if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
-      loadRecipeData();
-      // Note: initializeGame() will be called from within loadRecipeData() now
-    } else {
-      console.log("Playtest mode: waiting for date selection");
-      isLoadingRecipe = false; // In playtest mode, we'll load the recipe after date selection
+    console.log("✅ Play area calculated:", playAreaX, playAreaY, playAreaWidth, playAreaHeight);
+    
+    // Initialize anonymous authentication automatically, then check completion
+    initializeAuth().then(() => {
+      // Check for any pending completion retries first
+      if (typeof retryPendingCompletions === 'function') {
+        retryPendingCompletions().catch(error => {
+          console.error('Error retrying pending completions:', error);
+        });
+      }
+      
+      // Small delay to ensure auth state is fully set
+      setTimeout(() => {
+        checkTodayCompletion();
+      }, 100);
+    }).catch((error) => {
+      console.error("Auth initialization failed:", error);
+      // Proceed with normal flow if auth fails
+      proceedWithNormalFlow();
+    });
+  }
+  
+  // Function to initialize authentication automatically
+  async function initializeAuth() {
+    try {
+      console.log('Initializing authentication...');
+      
+      // Check if user is already authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        // User is already authenticated
+        window.authState.user = session.user;
+        window.authState.isAnonymous = session.user.is_anonymous || false;
+        window.authState.isAuthenticated = true;
+        
+        console.log('Existing session found:', {
+          email: session.user.email,
+          isAnonymous: window.authState.isAnonymous
+        });
+        
+      } else {
+        // No existing session - sign in anonymously
+        console.log('No existing session, signing in anonymously...');
+        
+        const { data, error } = await supabase.auth.signInAnonymously();
+        
+        if (error) {
+          console.error('Anonymous sign-in failed:', error);
+          // Continue without auth - fallback mode
+          window.authState.user = null;
+          window.authState.isAnonymous = false;
+          window.authState.isAuthenticated = false;
+        } else {
+          // Anonymous sign-in successful
+          window.authState.user = data.user;
+          window.authState.isAnonymous = true;
+          window.authState.isAuthenticated = true;
+          
+          console.log('Anonymous sign-in successful:', data.user.id);
+        }
+      }
+      
+    } catch (error) {
+      console.error('Auth initialization error:', error);
+      // Continue without auth - fallback mode
+      window.authState.user = null;
+      window.authState.isAnonymous = false;
+      window.authState.isAuthenticated = false;
     }
   }
   
   // Function to load recipe data from Supabase
   async function loadRecipeData() {
     try {
+      // Add mobile-specific loading delay to prevent race conditions
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        console.log("Mobile device detected - adding loading delay");
+        await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay for mobile
+      }
+      
       // Check if there's a date parameter in the URL for playtesting
       const urlParams = new URLSearchParams(window.location.search);
       const testDate = urlParams.get('date');
@@ -747,7 +646,23 @@ let intermediate_combinations = [
       
       if (!recipeData) {
         console.error("No recipe data found");
-        return;
+        // Don't set loadingError immediately - try again with retry logic
+        if (typeof loadRecipeRetryCount === 'undefined') {
+          window.loadRecipeRetryCount = 0;
+        }
+        
+        if (window.loadRecipeRetryCount < 3) {
+          window.loadRecipeRetryCount++;
+          console.log(`Recipe load failed, retrying (${window.loadRecipeRetryCount}/3)...`);
+          setTimeout(() => loadRecipeData(), 1000); // Retry after 1 second
+          return;
+        } else {
+          console.error("Recipe loading failed after 3 retries");
+          loadingError = true;
+          isLoadingRecipe = false;
+          loadingComplete = true;
+          return;
+        }
       }
       
       console.log("Loading recipe data from Supabase...");
@@ -762,7 +677,27 @@ let intermediate_combinations = [
       intermediate_combinations = recipeData.intermediateCombinations;
       final_combination = recipeData.finalCombination;
       easter_eggs = recipeData.easterEggs;
-      ingredients = recipeData.baseIngredients;
+      
+      // BUGFIX: Use validated ingredient system based on server flag
+      // Prevents duplicate vessel creation and ensures proper fallback behavior
+      if (recipeData.useInstanceSystem && recipeData.baseIngredientInstances && recipeData.baseIngredientInstances.length > 0) {
+        // Use the multi-instance system for recipes with duplicate ingredients
+        ingredients = recipeData.baseIngredientInstances.map(inst => inst.name);
+        base_ingredient_instances = recipeData.baseIngredientInstances;
+        console.log("✅ Using MULTI-INSTANCE system:", base_ingredient_instances.length, "ingredient instances");
+        console.log("Instance details:", base_ingredient_instances.map(inst => `${inst.name} (${inst.instanceId})`));
+      } else {
+        // Use the traditional system for simple recipes
+        ingredients = recipeData.baseIngredients || [];
+        base_ingredient_instances = ingredients.map((name, index) => ({
+          name: name,
+          instanceId: `${name}_traditional_${index}`,
+          validCombos: [] // Will be populated by combination logic
+        }));
+        console.log("✅ Using TRADITIONAL system:", ingredients.length, "unique ingredients");
+        console.log("Ingredient list:", ingredients);
+      }
+      
       base_ingredients = recipeData.baseIngredients; // Ensure base_ingredients is set for stats
       recipeUrl = recipeData.recipeUrl;
       recipeDescription = recipeData.description || "A delicious recipe that's sure to please everyone at the table!";
@@ -772,6 +707,12 @@ let intermediate_combinations = [
       
       console.log("Recipe data loaded successfully");
       isLoadingRecipe = false;
+      loadingComplete = true; // Trigger split reveal - APlasker
+      
+      // Clean up wallpaper animation now that loading is complete - APlasker
+      if (typeof cleanupWallpaperAnimation === 'function') {
+        cleanupWallpaperAnimation();
+      }
       
       // Set data loaded flag to true for stats display
       recipeDataLoadedForStats = true;
@@ -803,9 +744,24 @@ let intermediate_combinations = [
       }
     } catch (error) {
       console.error("Error loading recipe data:", error);
+      
+      // Enhanced error handling for mobile
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile && error.message && error.message.includes('network')) {
+        console.log("Mobile network error detected - retrying...");
+        setTimeout(() => loadRecipeData(), 2000); // Retry after 2 seconds on mobile
+        return;
+      }
+      
       loadingError = true;
       isLoadingRecipe = false;
+      loadingComplete = true; // Trigger split reveal even on error - APlasker
       isLoadingImage = false;
+      
+      // Clean up wallpaper animation - APlasker
+      if (typeof cleanupWallpaperAnimation === 'function') {
+        cleanupWallpaperAnimation();
+      }
       
       // Set data loaded flag to true even on error, so we can show the title screen
       // with fallback values for the stats
@@ -815,749 +771,8 @@ let intermediate_combinations = [
   
   //draw was here 4-17
 
-  function updateCursor() {
-    let overInteractive = false;
-    
-    if (!gameStarted) {
-      // Check start button
-      if (startButton.isInside(mouseX, mouseY)) {
-        overInteractive = true;
-      }
-      
-      // Check tutorial Say hi link
-      if (typeof isTutorialMouseOverSayHi !== 'undefined' && isTutorialMouseOverSayHi) {
-        overInteractive = true;
-      }
-    } else if (gameWon) {
-      // Check buttons and recipe card
-      if (isMouseOverLetterScore || isMouseOverCard) {
-        overInteractive = true;
-      }
-    } else {
-      // Check vessels
-      for (let v of vessels) {
-        if (v.isInside(mouseX, mouseY)) {
-          overInteractive = true;
-          break;
-        }
-      }
-      
-      // Check hint vessel
-      if (showingHint && hintVessel && hintVessel.isInside(mouseX, mouseY)) {
-        overInteractive = true;
-      }
-      
-      // Check buttons
-      if (!showingHint && hintButton.isInside(mouseX, mouseY)) {
-        overInteractive = true;
-      }
-    }
-    
-    // Set cursor
-    cursor(overInteractive ? HAND : ARROW);
-  }
-  
-  // Add new state variables for win screen touch handling
-  let winScreenTouchState = {
-    startX: 0,
-    startY: 0,
-    element: null,
-    touchMoved: false,
-    processingTouch: false
-  };
-  
-  // Update mousePressed function to track win screen interactions but don't execute them
-  function mousePressed() {
-    // Add safety check for initialization state
-    if (vessels.length === 0 && !isLoadingRecipe) {
-      console.log("Initialization issue detected - reinitializing game");
-      initializeGame();
-      return false;
-    }
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Use helper function to check if interacting with a modal element
-      if (isModalElement(mouseX, mouseY)) {
-        // Allow the event to proceed to HTML elements
-        console.log('Mouse interaction allowed for modal element');
-        return true;
-      }
-      
-      // Otherwise block the interaction
-      console.log('Mouse interaction blocked - modal is active');
-      return false;
-    }
-    
-    // Prevent user interaction during auto-combination sequence
-    if (autoFinalCombination) {
-      return false;
-    }
-    
-    // Check if any easter egg modal is active and handle the click  
-    for (let i = eggModals.length - 1; i >= 0; i--) {
-      if (eggModals[i].active && eggModals[i].checkClick(mouseX, mouseY)) {
-        // Modal was clicked, don't process any other clicks
-        return false;
-      }
-    }
-    
-    // MODIFIED: Win screen handling - track but don't execute actions yet
-    if (gameWon) {
-      // Check if we're clicking on the random recipe hotspot
-      if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(mouseX, mouseY)) {
-        console.log("Random recipe hotspot clicked at:", mouseX, mouseY);
-        isLoadingRandomRecipe = true;
-        loadRandomRecipe().finally(() => {
-          isLoadingRandomRecipe = false;
-        });
-        return false;
-      }
-      
-      // Debugging log to help track click coordinates
-      console.log("Click on win screen:", mouseX, mouseY);
-      
-      // Check if the Say hi link was clicked - add this before other win screen clicks
-      if (typeof handleSayHiLinkInteraction === 'function' && handleSayHiLinkInteraction(mouseX, mouseY)) {
-        console.log("Say hi link handled");
-        return false;
-      }
-      
-      // Special handling for tutorial mode
-      if (isTutorialMode) {
-        console.log("Tutorial win screen click detected, isMouseOverLetterScore:", isMouseOverLetterScore);
-        
-        // MODIFIED: Just track the element but don't execute action yet
-        // Set element in winScreenTouchState
-        if (isMouseOverCard) {
-          console.log("Tutorial recipe card clicked - tracking for release");
-          winScreenTouchState.element = "tutorialRecipe";
-          winScreenTouchState.startX = mouseX;
-          winScreenTouchState.startY = mouseY;
-          winScreenTouchState.touchMoved = false;
-          winScreenTouchState.processingTouch = true;
-        } else if (isMouseOverLetterScore) {
-          console.log("Tutorial score card clicked - tracking for release");
-          winScreenTouchState.element = "tutorialScore";
-          winScreenTouchState.startX = mouseX;
-          winScreenTouchState.startY = mouseY;
-          winScreenTouchState.touchMoved = false;
-          winScreenTouchState.processingTouch = true;
-        }
-        
-        return false;
-      }
-      
-      // Regular (non-tutorial) win screen handling
-      // MODIFIED: Just track the element but don't execute action yet
-      if (isMouseOverLetterScore) {
-        console.log("Share Score clicked - tracking for release");
-        winScreenTouchState.element = "shareScore";
-        winScreenTouchState.startX = mouseX;
-        winScreenTouchState.startY = mouseY;
-        winScreenTouchState.touchMoved = false;
-        winScreenTouchState.processingTouch = true;
-      } else if (isMouseOverCard) {
-        console.log("View Recipe clicked - tracking for release");
-        winScreenTouchState.element = "viewRecipe";
-        winScreenTouchState.startX = mouseX;
-        winScreenTouchState.startY = mouseY;
-        winScreenTouchState.touchMoved = false;
-        winScreenTouchState.processingTouch = true;
-      }
-      
-      return false;
-    }
-    
-    // Tutorial screen - check if Say hi link was clicked
-    if (!gameStarted && typeof tutorialSayHiLinkX !== 'undefined') {
-      const isOverTutorialSayHi = (
-        mouseX > tutorialSayHiLinkX - tutorialSayHiLinkWidth/2 && 
-        mouseX < tutorialSayHiLinkX + tutorialSayHiLinkWidth/2 && 
-        mouseY > tutorialSayHiLinkY - tutorialSayHiLinkHeight/2 && 
-        mouseY < tutorialSayHiLinkY + tutorialSayHiLinkHeight/2
-      );
-      
-      if (isOverTutorialSayHi) {
-        console.log("Say hi link clicked in tutorial");
-        if (typeof showFeedbackModal === 'function') {
-          showFeedbackModal();
-        }
-        return false;
-      }
-    }
-    
-    if (!gameStarted) {
-      // Check if start button was pressed
-      if (startButton.isInside(mouseX, mouseY)) {
-        startButton.handleClick();
-        return;
-      }
-      
-      // Check if tutorial button was pressed - APlasker
-      if (tutorialButton.isInside(mouseX, mouseY)) {
-        tutorialButton.handleClick();
-        return;
-      }
-      
-      // Add playtest date selector logic only in playtest mode
-      if (typeof isPlaytestMode !== 'undefined' && isPlaytestMode) {
-        // Check if date button was pressed
-        if (dateButton && dateButton.isInside(mouseX, mouseY)) {
-          showDatePicker();
-          return;
-        }
-      }
-    } else {
-      // Check if hint button was clicked
-      if (!showingHint && hintButton.isInside(mouseX, mouseY)) {
-        hintButton.handleClick();
-        // Update lastAction when hint is used - APlasker
-        lastAction = frameCount;
-        return;
-      }
-      
-      // Check if a vessel was clicked
-      for (let v of vessels) {
-              if (v.isInside(mouseX, mouseY)) {
-        // Set initial vessel for dragging
-        draggedVessel = v;
-        // Store original position for proper snapback
-        draggedVessel.originalX = v.x;
-        draggedVessel.originalY = v.y;
-        // Store drag offsets
-        draggedVessel.dragOffsetX = mouseX - v.x;
-        draggedVessel.dragOffsetY = mouseY - v.y;
-          
-          // Store offset to maintain relative mouse position
-          draggedVessel.dragOffsetX = mouseX - v.x;
-          draggedVessel.dragOffsetY = mouseY - v.y;
-          
-          // IMMEDIATELY expand text margin before scale animation starts - APlasker
-          // This prevents visual glitching during the transition
-          v.textMargin = 0.85;
-          
-          // Set target scales for body and text (this will happen gradually through update())
-          // Body scales to 105% while text only scales to 102.5% as per 20250413updates_final.txt
-          v.targetBodyScale = 1.05;
-          v.targetTextScale = 1.025;
-          
-          // Keep legacy targetScale for backward compatibility
-          v.targetScale = 1.05;
-          
-          // Update hover state for dragged vessel
-          v.hovering = true;
-          
-          lastAction = frameCount;
-          
-          // Update cursor style for feedback
-          lastMovedFrame = frameCount;
-          break;
-        }
-      }
-    }
-    
-    // Check for help icon click
-    if (!gameWon && isHelpIconHovered) {
-      if (typeof showHelpModal === 'function') {
-        // Help icon is only visible during gameplay now
-        console.log("Help button clicked in game - showing help modal");
-        showHelpModal();
-        return false; // Prevent other click handling
-      }
-    }
-    
-    // Don't process other clicks if help modal is open
-    if (typeof helpModal !== 'undefined' && helpModal !== null && helpModal.active) {
-      return helpModal.checkClick(mouseX, mouseY);
-    }
-  }
-  
-  // Update mouseDragged to track movement for win screen elements
-  function mouseDragged() {
-    // Update win screen touch state if we're tracking a touch
-    if (gameWon && winScreenTouchState.processingTouch) {
-      // Check if we've moved more than the threshold to consider it a drag not a tap
-      const dragDistance = dist(mouseX, mouseY, winScreenTouchState.startX, winScreenTouchState.startY);
-      if (dragDistance > 10) { // 10px threshold
-        winScreenTouchState.touchMoved = true;
-        console.log("Win screen touch moved - will not trigger action on release");
-      }
-    }
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Get the element being dragged over
-      const target = document.elementFromPoint(mouseX, mouseY);
-      
-      // If the target is part of our modal (check parent chain)
-      if (target && (
-          target.closest('#feedback-modal') || 
-          target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'BUTTON')) {
-        // Allow the event to proceed to HTML elements
-        return true;
-      }
-      
-      return false;
-    }
-    
-    // Prevent dragging during auto-combination sequence
-    if (autoFinalCombination) {
-      return false;
-    }
-    
-    if (draggedVessel) {
-      draggedVessel.x = mouseX - draggedVessel.dragOffsetX;
-      draggedVessel.y = mouseY - draggedVessel.dragOffsetY;
-      // Update last action time
-      lastAction = frameCount;
-    }
-  }
-  
-  // Update mouseReleased to execute win screen actions on release if no movement
-  function mouseReleased() {
-    // Handle win screen touch state if we're tracking a touch
-    if (gameWon && winScreenTouchState.processingTouch) {
-      // Only execute the action if the touch didn't move much
-      if (!winScreenTouchState.touchMoved) {
-        console.log("Executing win screen action on release:", winScreenTouchState.element);
-        
-        // Execute the appropriate action based on element
-        if (winScreenTouchState.element === "viewRecipe" || 
-            winScreenTouchState.element === "tutorialRecipe") {
-          // View recipe action
-          console.log("View Recipe triggered (win screen release)");
-          viewRecipe();
-        } else if (winScreenTouchState.element === "shareScore") {
-          // Share score action
-          console.log("Share Score triggered (win screen release)");
-          shareScore();
-        } else if (winScreenTouchState.element === "tutorialScore") {
-          // Tutorial score action - load today's recipe instead of reloading page
-          console.log("Tutorial score action triggered (win screen release)");
-          
-          // Reset tutorial mode
-          isTutorialMode = false;
-          
-          // Reset game state
-          gameStarted = false;
-          gameWon = false;
-          moveHistory = [];
-          hintCount = 0;
-          vessels = [];
-          animations = [];
-          
-          // Set loading state
-          isLoadingRecipe = true;
-          
-          // Load today's recipe and start the game
-          console.log("Loading today's recipe after tutorial");
-          loadRecipeData().then(() => {
-            // Reset auto-combination flags to ensure final animation works properly
-            autoFinalCombination = false;
-            autoFinalCombinationStarted = false;
-            autoFinalCombinationTimer = 0;
-            autoFinalCombinationState = "WAITING";
-            finalCombinationVessels = [];
-            
-            // Start the game automatically once recipe is loaded
-            startGame();
-          }).catch(error => {
-            console.error("Error loading today's recipe:", error);
-            isLoadingRecipe = false;
-            loadingError = true;
-          });
-        }
-      }
-      
-      // Reset the touch state
-      winScreenTouchState.processingTouch = false;
-      winScreenTouchState.element = null;
-      winScreenTouchState.touchMoved = false;
-      
-      return false; // Prevent other handling
-    }
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Get the element being released over
-      const target = document.elementFromPoint(mouseX, mouseY);
-      
-      // If the target is part of our modal (check parent chain)
-      if (target && (
-          target.closest('#feedback-modal') || 
-          target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'BUTTON')) {
-        // Allow the event to proceed to HTML elements
-        return true;
-      }
-      
-      return false;
-    }
-    
-    // Check if help modal was active but is now inactive,
-    // ensure HTML elements are properly cleaned up
-    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && 
-        helpModal.htmlElements && helpModal.htmlElements.length > 0) {
-      helpModal.removeHTMLElements();
-    }
-    
-    if (draggedVessel) {
-      // Reset scales
-      draggedVessel.targetScale = 1;
-      draggedVessel.targetBodyScale = 1;
-      draggedVessel.targetTextScale = 1;
-      
-      let overVessel = null;
-      let overVesselIndex = -1;
-      let overHintVessel = false;
-      
-      // Check if dragged over another vessel
-      for (let i = 0; i < vessels.length; i++) {
-        let v = vessels[i];
-        if (v !== draggedVessel && v.isInside(mouseX, mouseY)) {
-          overVessel = v;
-          overVesselIndex = i;
-          break;
-        }
-      }
-      
-      // Check if dragged over hint vessel
-      if (showingHint && hintVessel && hintVessel.isInside(mouseX, mouseY)) {
-        overHintVessel = true;
-      }
-      
-      // Update last action time
-      lastAction = frameCount;
-      
-      if (overHintVessel) {
-        // Case 1: Dragged a vessel over the hint
-        console.log("Vessel dragged over hint vessel");
-        
-        // Check if this vessel's ingredients can be added to the hint
-        let canAddToHint = false;
-        
-        if (draggedVessel.ingredients.length > 0) {
-          // Check if any of the ingredients in this vessel are required for the hint
-          let matchingIngredients = draggedVessel.ingredients.filter(ing => 
-            hintVessel.required.includes(ing) && !hintVessel.collected.includes(ing)
-          );
-          
-          if (matchingIngredients.length > 0) {
-            // Add ingredients to the hint vessel
-            for (let ing of matchingIngredients) {
-              hintVessel.addIngredient(ing);
-              canAddToHint = true;
-            }
-          }
-        } else if (draggedVessel.name) {
-          // Check if the completed combination matches the hint
-          if (hintVessel.name === draggedVessel.name) {
-            // This is the exact combination the hint is for
-            // Add all ingredients directly
-            for (let ing of hintVessel.required) {
-              if (!hintVessel.collected.includes(ing)) {
-                hintVessel.addIngredient(ing);
-                canAddToHint = true;
-              }
-            }
-          }
-        }
-        
-        if (canAddToHint) {
-          // Create animation
-          // ENHANCEMENT - APlasker - Use hint vessel color for animations going to hint vessel
-          createCombineAnimation(draggedVessel.x, draggedVessel.y, COLORS.vesselHint, hintVessel.x, hintVessel.y);
-          
-          // Remove the vessel
-          vessels = vessels.filter(v => v !== draggedVessel);
-          arrangeVessels();
-          
-          // Check if hint is complete
-          if (hintVessel.isComplete()) {
-            // Convert hint to regular vessel
-            let newVessel = hintVessel.toVessel();
-            
-            // ENHANCEMENT - APlasker - Mark newly created vessels from hints
-            newVessel.isNewlyCombined = true;
-            
-            // Set position strength based on vessel type - always advanced for hint vessels
-            newVessel.positionStrength = 1.0;
-            
-            vessels.push(newVessel);
-            
-            // ENHANCEMENT - APlasker - Assign position based on hint vessel location
-            assignPreferredRow(newVessel, hintVessel.y, hintVessel.x);
-            
-            arrangeVessels();
-            
-            // Create verb animation for the newly created vessel
-            createVerbAnimationForVessel(newVessel);
-            
-            // Reset hint
-            hintVessel = null;
-            showingHint = false;
-            
-            // Check win condition
-            if (vessels.length === 1 && vessels[0].name === final_combination.name) {
-              // Get the verb from the final combination
-              const finalVerb = vessels[0].verb || final_combination.verb || "Complete!";
-              
-              // Create the final animation instead of immediately setting gameWon
-              createFinalVerbAnimation(finalVerb);
-              
-              // gameWon will be set by the animation when it completes
-            }
-          }
-        } else {
-          // Can't add to hint vessel, return to original position with a small shake
-          draggedVessel.x = draggedVessel.originalX;
-          draggedVessel.y = draggedVessel.originalY;
-          draggedVessel.shake();
-          
-          // BUGFIX - APlasker - Add black counter to move history for invalid hint combination
-          moveHistory.push('black');
-          turnCounter++; // Increment turn counter for invalid move
-          
-          // Display a random error message for invalid combination
-          showRandomErrorMessage();
-          
-          console.log("Invalid combination with hint vessel!");
-        }
-      }
-      else if (overVessel) {
-        // Case 2: Dragged a vessel over another vessel (potential combination)
-        console.log("Vessel dragged over another vessel");
-        
-        // Check if this is a valid combination
-        const new_v = combineVessels(draggedVessel, overVessel, mouseX, mouseY);
-        
-        if (new_v) {
-          // Create animation particles
-          if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary || COMPLETED_VESSEL_COLORS.includes(new_v.color)) {
-            // Check if this is the final combination
-            const isFinalCombination = (vessels.length === 1 || vessels.length - 2 + 1 === 1) && new_v.name === final_combination.name;
-            
-            // For green vessels (completed combinations), prioritize verb animation
-            // But skip creating regular VerbAnimation if this is the final combo (we'll use FinalVerbAnimation instead)
-            if (!isFinalCombination) {
-              console.log("Completed combination - using verb animation directly");
-              
-              // Check if the vessel has a verb
-              if (new_v.verb) {
-                console.log("Creating immediate verb animation for:", new_v.verb);
-                // Create verb animation starting exactly at the vessel's center
-                animations.push(new VerbAnimation(new_v.verb, new_v.x, new_v.y, new_v));
-                // Reset the verbDisplayTime to prevent duplicate animations
-                new_v.verbDisplayTime = 119; // Set to 119 instead of 120 to prevent creating another animation
-              } else {
-                // If no verb is set, use a default verb
-                console.log("No verb found, using default verb");
-                new_v.verb = "Mix";
-                new_v.verbDisplayTime = 119;
-                animations.push(new VerbAnimation(new_v.verb, new_v.x, new_v.y, new_v));
-              }
-            } else {
-              console.log("Final combination detected - skipping regular verb animation");
-              // Still set verbDisplayTime to prevent auto-animation
-              new_v.verbDisplayTime = 119;
-            }
-          } else {
-            // For non-green vessels, use the regular combine animation
-          createCombineAnimation(draggedVessel.x, draggedVessel.y, draggedVessel.color, new_v.x, new_v.y);
-          createCombineAnimation(overVessel.x, overVessel.y, overVessel.color, new_v.x, new_v.y);
-          }
-          
-          // Get the index of the dragged vessel
-          let draggedIndex = vessels.indexOf(draggedVessel);
-          
-          // Remove old vessels
-          vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
-          
-          // Mark the new vessel as newly combined for positioning
-          new_v.isNewlyCombined = true;
-          
-          // Set position strength based on vessel type
-          if (new_v.isAdvanced) {
-            // Advanced vessels (yellow/green) get maximum strength
-            new_v.positionStrength = 1.0;
-          } else {
-            // Base vessels are capped at 0.5
-            new_v.positionStrength = 0.5;
-          }
-          
-          // Insert the new vessel at the position of the target vessel
-          // This ensures the new vessel appears close to where the user dropped it
-          vessels.splice(overVesselIndex, 0, new_v);
-          
-          // IMPORTANT: Use appropriate pulse animation based on vessel type
-          console.log("Triggering pulse animation for newly created vessel");
-          
-          // Use bouncePulse for green vessels (completed combinations)
-          if (new_v.color === COLORS.green || new_v.color === COLORS.vesselGreen || new_v.color === COLORS.primary || COMPLETED_VESSEL_COLORS.includes(new_v.color)) {
-            console.log("Using bounce pulse for completed combination");
-            new_v.bouncePulse(); // Use new bounce pulse animation
-          } else {
-            // Use regular pulse for yellow vessels (intermediate combinations)
-            console.log("Using regular pulse for intermediate combination");
-            new_v.pulse(500); // Changed from 1000ms to 500ms (2x faster)
-          }
-          
-          // Debug log to verify flow before assigning preferred row
-          console.log("MOUSE RELEASED: About to assign preferred row to new vessel");
-          
-          // Assign preferred row based on both vessels' positions
-          const avgY = (draggedVessel.y + overVessel.y) / 2;
-          const avgX = (draggedVessel.x + overVessel.x) / 2;
-          assignPreferredRow(new_v, avgY, avgX);
-          
-          // Re-arrange vessels with the new vessel in place
-          arrangeVessels();
-          
-          // NEW: Check for parent combination opportunities after successful combination
-          // This implements Solution 2 for nested combinations
-          setTimeout(() => {
-            const parentVessel = checkForParentCombinations();
-            if (parentVessel) {
-              console.log("Auto-combination triggered after manual combination");
-              // If a parent combination was created, check for additional parent opportunities
-              // This handles deeply nested combinations
-              setTimeout(() => {
-                checkForParentCombinations();
-              }, 100); // Small delay to let animations settle
-            }
-          }, 50); // Small delay to let the manual combination settle first
-          
-          // Check win condition
-          if (vessels.length === 1 && vessels[0].name === final_combination.name) {
-            // ENHANCEMENT - APlasker - Add increased version number to indicate this change was installed 
-            console.log("Win condition met! Completed recipe:", final_combination.name, "- APlasker v2.0");
-            
-            // Get the verb from the final combination
-            const finalVerb = vessels[0].verb || final_combination.verb || "Complete!";
-            
-            // Create the final animation
-            createFinalVerbAnimation(finalVerb);
-          }
-          
-          // Add this to the move history
-          moveHistory.push(new_v.color === 'black' ? 'black' : 'white');
-          
-          // Add one red counter every 10 white counters - Easter Egg feature
-          // APlasker - This is a "random bonus" feature that awards periodic Easter Eggs
-          // The chance increases the longer they play without getting one
-          if (moveHistory.filter(m => m === 'white').length % 10 === 0 && Math.random() < 0.2 + (turnCounter / 100)) {
-            moveHistory.push({type: 'egg'});
-          }
-          
-          // Increment the turn counter
-          turnCounter += 2; // Combining generally counts as 2 turns
-        } else {
-          // If new_v is null, it could mean one of two things:
-          // 1. The combination failed
-          // 2. The ingredients were added directly to the hint vessel
-          
-          // Check if the hint vessel has changed (ingredients were added)
-          if (showingHint && hintVessel && hintVessel.collected.some(ing => 
-              draggedVessel.ingredients.includes(ing) || overVessel.ingredients.includes(ing))) {
-            // Ingredients were added to the hint vessel
-            
-            // Remove the vessels that were combined
-            vessels = vessels.filter(v => v !== draggedVessel && v !== overVessel);
-            arrangeVessels();
-            
-            // Check if the hint is now complete
-            if (hintVessel.isComplete()) {
-              // Convert hint to regular vessel
-              let newVessel = hintVessel.toVessel();
-              
-              // ENHANCEMENT - APlasker - Mark newly created vessels from hints
-              newVessel.isNewlyCombined = true;
-              
-              // Set position strength based on vessel type - always advanced for hint vessels
-              newVessel.positionStrength = 1.0;
-              
-              vessels.push(newVessel);
-              
-              // ENHANCEMENT - APlasker - Assign position based on hint vessel location
-              assignPreferredRow(newVessel, hintVessel.y, hintVessel.x);
-              
-              arrangeVessels();
-              
-              // Create verb animation for the newly created vessel
-              createVerbAnimationForVessel(newVessel);
-              
-              // Reset hint
-              hintVessel = null;
-              showingHint = false;
-            }
-          } else {
-            // APlasker - Check if this was an Easter egg combination
-            const isEasterEgg = typeof eggFound !== 'undefined' && eggFound === true;
-            
-            if (isEasterEgg) {
-              // This was an Easter egg combination, reset the flag
-              console.log("Easter egg was found, not counting as an invalid combination");
-              eggFound = false;
-              
-              // Let vessels snap back to their original positions (handled by the egg modal)
-              // Do not add black counter or show error message
-            } else {
-              // Combination failed - shake both vessels
-              draggedVessel.x = draggedVessel.originalX;
-              draggedVessel.y = draggedVessel.originalY;
-              draggedVessel.shake();
-              overVessel.shake();
-              
-              // Add black counter to move history for invalid combination
-              moveHistory.push('black');
-              turnCounter++; // Increment turn counter for invalid move
-              
-              console.log("Invalid combination!");
-              
-              // Display a random error message for invalid combination
-              showRandomErrorMessage();
-            }
-          }
-        }
-      } else {
-        // Case 3: Dragged a vessel but not over another vessel or hint
-        console.log("Vessel dragged but not combined - returning to original position");
-        
-        // Return the vessel to its original position
-        draggedVessel.snapBack();
-      }
-      
-      // Reset dragged vessel
-      draggedVessel = null;
-      offsetX = 0;
-      offsetY = 0;
-    }
-    
-    // Reset eggFound flag at the end of mouseReleased to ensure it's not carried over to next interaction
-    // This fixes the issue where the first drag after an egg combination doesn't work correctly
-    if (eggFound) {
-      console.log("Resetting eggFound flag at end of mouseReleased()");
-      eggFound = false;
-    }
-    
-    // Reset hover states for all vessels
-    for (let v of vessels) {
-      v.hovering = false;
-    }
-    
-    // Update cursor style
-    lastMovedFrame = frameCount;
-  }
-  
-  function createCombineAnimation(startX, startY, color, targetX, targetY) {
-    for (let i = 0; i < 5; i++) {
-      animations.push(new CombineAnimation(startX, startY, color, targetX, targetY));
-    }
-  }
+  // function createCombineAnimation(startX, startY, color, targetX, targetY) { ... }
+  // This is defined in animation.js
   
   function startGame() {
     // Ensure all necessary initialization has happened before starting game
@@ -1566,7 +781,32 @@ let intermediate_combinations = [
       return;
     }
     
+    // Start cook transition if wallpaper animation exists
+    if (wallpaperAnimation) {
+      console.log("🍳 Starting cook transition with wallpaper animation");
+      wallpaperAnimationActive = true;
+      wallpaperAnimation.startCookTransition();
+      return; // Don't start game immediately, wait for animation
+    }
+    
+    // Fallback: start game immediately if no wallpaper animation
+    console.log("🍳 Starting game immediately (no wallpaper animation)");
+    actuallyStartGame();
+  }
+  
+  function actuallyStartGame() {
+    console.log("🎮 Actually starting the game now!");
+    
+    // Reset loading state for new game - APlasker
+    loadingComplete = false;
     gameStarted = true;
+    
+    // Capture current streak at start of session - APlasker
+    if (typeof StreakSystem !== 'undefined') {
+      const streakInfo = StreakSystem.getStreakInfo();
+      sessionStartStreak = streakInfo.currentStreak || 0;
+      console.log('Session started with streak:', sessionStartStreak);
+    }
     
     // Initialize timer
     startTime = Date.now();
@@ -1586,18 +826,27 @@ let intermediate_combinations = [
         recipeId = recipe.rec_id;
       }
       
-      console.log("Recipe ID for analytics:", recipeId);
-      console.log("Available recipe data:", {
-        recipe_data: recipe_data,
-        final_combination: final_combination,
-        recipe: typeof recipe !== 'undefined' ? recipe : 'undefined'
-      });
-      
       if (recipeId && recipeId !== null && recipeId !== undefined) {
-        console.log("Starting analytics session for recipe:", recipeId);
+        console.log("🚀 Starting analytics session for recipe:", recipeId);
+        
+        // MAGIC LINK FIX: Enhanced logging for magic link users
+        if (window.authState?.isAuthenticated && !window.authState?.isAnonymous) {
+          console.log("🔗 Magic link user starting game session");
+          console.log("Auth state:", {
+            isAuthenticated: window.authState.isAuthenticated,
+            isAnonymous: window.authState.isAnonymous,
+            userEmail: window.authState.user?.email
+          });
+        }
+        
         startGameSession(recipeId).then(sessionId => {
           if (sessionId) {
             console.log("✅ Analytics session started successfully:", sessionId);
+            
+            // MAGIC LINK FIX: Confirm session creation for magic link users
+            if (window.authState?.isAuthenticated && !window.authState?.isAnonymous) {
+              console.log("🔗 Magic link user session confirmed - tracking should now work");
+            }
           } else {
             console.warn("⚠️ Analytics session creation returned null - check Supabase");
           }
@@ -1606,7 +855,6 @@ let intermediate_combinations = [
         });
       } else {
         console.warn("⚠️ No valid recipe ID found for analytics - session not created");
-        console.log("recipe_data:", recipe_data);
       }
     } else {
       console.warn("⚠️ startGameSession function not available");
@@ -1650,6 +898,9 @@ let intermediate_combinations = [
     // Set tutorial mode flag
     isTutorialMode = true;
     
+    // Reset loading state for tutorial - APlasker
+    loadingComplete = false;
+    
     // Reset game state
     gameWon = false;
     turnCounter = 0;
@@ -1682,6 +933,13 @@ let intermediate_combinations = [
     loadTutorialRecipe().then(() => {
       // Once recipe is loaded, start the game
       gameStarted = true;
+      
+      // Capture current streak at start of tutorial session - APlasker
+      if (typeof StreakSystem !== 'undefined') {
+        const streakInfo = StreakSystem.getStreakInfo();
+        sessionStartStreak = streakInfo.currentStreak || 0;
+        console.log('Tutorial session started with streak:', sessionStartStreak);
+      }
       
       // Initialize timer for tutorial mode - APlasker
       startTime = Date.now();
@@ -1792,8 +1050,28 @@ let intermediate_combinations = [
       intermediate_combinations = recipeData.intermediateCombinations;
       final_combination = recipeData.finalCombination;
       easter_eggs = recipeData.easterEggs;
-      ingredients = recipeData.baseIngredients;
-      base_ingredients = recipeData.baseIngredients;
+      
+      // BUGFIX: Use validated ingredient system based on server flag
+      // Prevents duplicate vessel creation and ensures proper fallback behavior
+      if (recipeData.useInstanceSystem && recipeData.baseIngredientInstances && recipeData.baseIngredientInstances.length > 0) {
+        // Use the multi-instance system for recipes with duplicate ingredients
+        ingredients = recipeData.baseIngredientInstances.map(inst => inst.name);
+        base_ingredient_instances = recipeData.baseIngredientInstances;
+        console.log("✅ Using MULTI-INSTANCE system:", base_ingredient_instances.length, "ingredient instances");
+        console.log("Instance details:", base_ingredient_instances.map(inst => `${inst.name} (${inst.instanceId})`));
+      } else {
+        // Use the traditional system for simple recipes
+        ingredients = recipeData.baseIngredients || [];
+        base_ingredient_instances = ingredients.map((name, index) => ({
+          name: name,
+          instanceId: `${name}_traditional_${index}`,
+          validCombos: [] // Will be populated by combination logic
+        }));
+        console.log("✅ Using TRADITIONAL system:", ingredients.length, "unique ingredients");
+        console.log("Ingredient list:", ingredients);
+      }
+      
+      base_ingredients = recipeData.baseIngredients; // Ensure base_ingredients is set for stats
       recipeUrl = recipeData.recipeUrl;
       recipeDescription = recipeData.description || "A tutorial recipe to help you learn the game!";
       recipeAuthor = recipeData.author || "Tutorial";
@@ -1850,272 +1128,385 @@ let intermediate_combinations = [
     }
   }
   
-  // Add touch support for mobile devices
-  function touchStarted() {
-    // Add safety check for initialization state
-    if (vessels.length === 0 && !isLoadingRecipe) {
-      console.log("Initialization issue detected - reinitializing game");
-      initializeGame();
-      return false;
-    }
-    
-    // Use the touch system to get touch position
-    const touchPos = touchSystem.getCurrentTouchPos();
-    if (!touchPos) {
-      // Fall back to p5.js touch position if our system doesn't have data
-      if (touches.length > 0) {
-        touchX = touches[0].x;
-        touchY = touches[0].y;
-      } else {
-        return false; // No touch data available
-      }
-    } else {
-      // Use our normalized touch position
-      touchX = touchPos.x;
-      touchY = touchPos.y;
-    }
-    
-    // Update mouse coordinates to match touch position
-    mouseX = touchX;
-    mouseY = touchY;
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Use helper function to check if interacting with a modal element
-      if (isModalElement(touchX, touchY)) {
-        // Allow the event to proceed to HTML elements
-        console.log('Touch interaction allowed for modal element');
-        return true;
+  // function touchStarted() { ... } // MOVED to interaction.js
+  
+  // Function to check if user has completed today's recipe - APlasker
+  async function checkTodayCompletion() {
+    try {
+      console.log("Checking if user has completed today's recipe...");
+      completionCheckInProgress = true;
+      completionCheckStartTime = Date.now();
+      
+      // Wait for auth to be ready - more robust waiting
+      let authAttempts = 0;
+      while ((!window.authState || !window.authState.hasOwnProperty('isAuthenticated')) && authAttempts < 20) {
+        console.log(`Waiting for auth state to initialize... attempt ${authAttempts + 1}`);
+        await new Promise(resolve => setTimeout(resolve, 200));
+        authAttempts++;
       }
       
-      // Otherwise block the interaction
-      console.log('Touch interaction blocked - modal is active');
-      return false;
-    }
-    
-    // Prevent user interaction during auto-combination sequence
-    if (autoFinalCombination) {
-      return false;
-    }
-    
-    // Check if any easter egg modal is active and handle the click  
-    for (let i = eggModals.length - 1; i >= 0; i--) {
-      if (eggModals[i].active && eggModals[i].checkClick(touchX, touchY)) {
-        // Modal was clicked, don't process any other clicks
-        return false;
-      }
-    }
-    
-    // Prevent default touch behavior to avoid scrolling
-    // Only do this if we're actually handling the touch
-    let touchHandled = false;
-    
-    // Handle the same logic as mousePressed but with touch coordinates
-    if (!gameStarted) {
-      // Check if start button was touched
-      if (startButton.isInside(touchX, touchY)) {
-        startGame();
-        touchHandled = true;
+      if (!window.authState) {
+        console.log("Auth state never initialized, proceeding with normal flow");
+        completionCheckInProgress = false;
+        proceedWithNormalFlow();
+        return;
       }
       
-      // Check if tutorial button was touched - APlasker
-      if (tutorialButton.isInside(touchX, touchY)) {
-        startTutorial();
-        touchHandled = true;
-      }
-      
-      // Tutorial screen - check if Say hi link was touched
-      if (typeof tutorialSayHiLinkX !== 'undefined') {
-        const isOverTutorialSayHi = (
-          touchX > tutorialSayHiLinkX - tutorialSayHiLinkWidth/2 && 
-          touchX < tutorialSayHiLinkX + tutorialSayHiLinkWidth/2 && 
-          touchY > tutorialSayHiLinkY - tutorialSayHiLinkHeight/2 && 
-          touchY < tutorialSayHiLinkY + tutorialSayHiLinkHeight/2
-        );
-        
-        if (isOverTutorialSayHi) {
-          console.log("Say hi link touched in tutorial");
-          if (typeof showFeedbackModal === 'function') {
-            showFeedbackModal();
-            touchHandled = true;
-            return false;
-          }
-        }
-      }
-    } else if (gameWon) {
-      // Check for random recipe hotspot first
-      if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
-        console.log("Random recipe hotspot touched at:", touchX, touchY);
-        isLoadingRandomRecipe = true;
-        loadRandomRecipe().finally(() => {
-          isLoadingRandomRecipe = false;
-        });
-        touchHandled = true;
-        return false;
-      }
-      
-      // Debugging log to help track touch coordinates
-      console.log("Touch on win screen:", touchX, touchY);
-      
-      // Check if the Say hi link was touched (in win screen)
-      if (typeof handleSayHiLinkInteraction === 'function' && handleSayHiLinkInteraction(touchX, touchY)) {
-        console.log("Say hi link handled in win screen");
-        touchHandled = true;
-        return false;
-      }
-      
-      // Special handling for tutorial mode - APlasker
-      if (isTutorialMode) {
-        console.log("Tutorial win screen touch detected");
-        
-        // Use simplified hover detection based on screen position
-        isMouseOverLetterScore = (touchY >= height/2);
-        isMouseOverCard = (touchY < height/2);
-        
-        // Handle recipe card clicks in tutorial mode
-        if (isMouseOverCard) {
-          console.log("Tutorial recipe card touched - opening recipe URL");
-          viewRecipe(); // Allow recipe link functionality
-          touchHandled = true;
-          return false;
-        }
-        
-        // Handle score card click
-        if (isMouseOverLetterScore) {
-          console.log("Tutorial score card touched - loading today's recipe");
-          
-          // Reset tutorial mode
-          isTutorialMode = false;
-          
-          // Reset game state
-          gameStarted = false;
-          gameWon = false;
-          moveHistory = [];
-          hintCount = 0;
-          vessels = [];
-          animations = [];
-          
-          // Set loading state
-          isLoadingRecipe = true;
-          
-          // Load today's recipe and start the game
-          console.log("Loading today's recipe after tutorial (direct touch)");
-          loadRecipeData().then(() => {
-            // Reset auto-combination flags to ensure final animation works properly
-            autoFinalCombination = false;
-            autoFinalCombinationStarted = false;
-            autoFinalCombinationTimer = 0;
-            autoFinalCombinationState = "WAITING";
-            finalCombinationVessels = [];
-            
-            // Start the game automatically once recipe is loaded
-            startGame();
-          }).catch(error => {
-            console.error("Error loading today's recipe:", error);
-            isLoadingRecipe = false;
-            loadingError = true;
-          });
-          
-          touchHandled = true;
-          return false;
-        }
-        
-        touchHandled = true;
-        return false;
-      }
-      
-      // Regular (non-tutorial) win screen handling
-      // Use simpler touch detection on win screen - top half shows recipe, bottom half shares score
-      if (touchY < height/2) {
-        // Top half = view recipe
-        console.log("View Recipe triggered (win screen touch - top half)");
-        viewRecipe();
-        touchHandled = true;
-      } else {
-        // Bottom half = share score
-        console.log("Share Score triggered (win screen touch - bottom half)");
-        shareScore();
-        touchHandled = true;
-      }
-    } else {
-      // Check if hint button was touched
-      if (!showingHint && hintButton.isInside(touchX, touchY)) {
-        showHint();
-        touchHandled = true;
-      }
-      
-      // Check if a vessel was touched
-      for (let v of vessels) {
-        if (v.isInside(touchX, touchY)) {
-          draggedVessel = v;
-          // Store original position for proper snapback
-          draggedVessel.originalX = v.x;
-          draggedVessel.originalY = v.y;
-          offsetX = touchX - v.x;
-          offsetY = touchY - v.y;
-          
-          // IMMEDIATELY expand text margin before scale animation starts - APlasker
-          // This prevents visual glitching during the transition
-          v.textMargin = 0.85;
-          
-          // Set target scales for body and text (this will happen gradually through update())
-          // Body scales to 105% while text only scales to 102.5% as per 20250413updates_final.txt
-          v.targetBodyScale = 1.05;
-          v.targetTextScale = 1.025;
-          
-          // Keep legacy targetScale for backward compatibility
-          v.targetScale = 1.05;
-          
-          triggerHapticFeedback('success'); // Haptic feedback on successful drag
-          touchHandled = true;
-          break;
-        }
-      }
-    }
-    
-    // Update the isMouseOverLetterScore flag for consistent hover state
-    if (gameWon) {
-      // Use simplified hover detection based on screen position
-      isMouseOverLetterScore = (touchY >= height/2);
-      isMouseOverCard = (touchY < height/2);
-    }
-    
-    // Check for help icon touch
-    if (!gameWon && gameStarted) { // Only check for help icon during gameplay
-      // Always use circle hit detection now that we're always in circular mode
-      const touchedHelpButton = dist(touchX, touchY, helpIconX, helpIconY) < helpIconSize/2;
-      
-      if (touchedHelpButton) {
-        if (typeof showHelpModal === 'function') {
-          // In game, show help modal
-          console.log("Help button touched in game - showing help modal");
-          showHelpModal();
-          touchHandled = true;
-          return false; // Prevent other touch handling
-        }
-      }
-      
-      // Don't process other touches if help modal is open
-      if (typeof helpModal !== 'undefined' && helpModal !== null && helpModal.active) {
-        touchHandled = helpModal.checkClick(touchX, touchY);
-        return false;
-      }
-    }
-    
-    if (touchHandled) {
-      return false; // Prevent default only if we handled the touch
-    }
-    
-    // Check for random recipe hotspot last
-    if (gameWon && !isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
-      console.log("Random recipe hotspot touched at:", touchX, touchY);
-      isLoadingRandomRecipe = true;
-      loadRandomRecipe().finally(() => {
-        isLoadingRandomRecipe = false;
+      // If user is not authenticated, proceed with normal flow
+      console.log("Auth state when checking:", {
+        authState: window.authState,
+        isAuthenticated: window.authState?.isAuthenticated,
+        hasUserId: !!window.authState?.user?.id,
+        isAnonymous: window.authState?.isAnonymous
       });
+      
+      if (!window.authState?.isAuthenticated || !window.authState?.user?.id) {
+        console.log("User not authenticated, proceeding with normal flow");
+        completionCheckInProgress = false;
+        proceedWithNormalFlow();
+        return;
+      }
+      
+      const userId = window.authState.user.id;
+      console.log("Checking completions for authenticated user:", userId.substring(0, 8) + '...');
+      
+      // Get today's recipe and user's recent completions in parallel
+      const [todayRecipe, userCompletions] = await Promise.all([
+        fetchTodayRecipe(),
+        getUserCompletions(userId, 10) // Get last 10 completions to be safe
+      ]);
+      
+      // Check for timeout
+      if (Date.now() - completionCheckStartTime > completionCheckTimeout) {
+        throw new Error("Completion check timed out");
+      }
+      
+      if (!todayRecipe) {
+        console.log("Could not load today's recipe, proceeding with normal flow");
+        completionCheckInProgress = false;
+        proceedWithNormalFlow();
+        return;
+      }
+      
+      if (!userCompletions || userCompletions.length === 0) {
+        console.log("No completions found, proceeding with normal flow");
+        completionCheckInProgress = false;
+        proceedWithNormalFlow(todayRecipe);
+        return;
+      }
+      
+      // Check if user completed today's recipe
+      const todayCompletion = userCompletions.find(completion => 
+        completion.rec_id === todayRecipe.rec_id
+      );
+      
+      if (todayCompletion) {
+        console.log("Found completion for today's recipe, loading win screen");
+        loadWinScreenFromCompletion(todayRecipe, todayCompletion);
+      } else {
+        console.log("No completion for today's recipe, proceeding with normal flow");
+        completionCheckInProgress = false;
+        proceedWithNormalFlow(todayRecipe);
+      }
+      
+    } catch (error) {
+      console.error("Error checking today's completion:", error);
+      
+      // Check if we timed out
+      if (Date.now() - completionCheckStartTime > completionCheckTimeout) {
+        showCompletionErrorModal();
+      } else {
+        // Other error, proceed with normal flow
+        completionCheckInProgress = false;
+        proceedWithNormalFlow();
+      }
     }
+  }
+  
+  // Function to proceed with normal game flow (title screen then recipe loading) - APlasker
+  function proceedWithNormalFlow(recipeData = null) {
+    if (recipeData) {
+      // We already have today's recipe data, use it
+      recipe_data = recipeData;
+      recipe = recipeData;
+      intermediate_combinations = recipeData.intermediateCombinations;
+      final_combination = recipeData.finalCombination;
+      easter_eggs = recipeData.easterEggs;
+      
+      // BUGFIX: Use validated ingredient system based on server flag
+      // Prevents duplicate vessel creation and ensures proper fallback behavior
+      if (recipeData.useInstanceSystem && recipeData.baseIngredientInstances && recipeData.baseIngredientInstances.length > 0) {
+        // Use the multi-instance system for recipes with duplicate ingredients
+        ingredients = recipeData.baseIngredientInstances.map(inst => inst.name);
+        base_ingredient_instances = recipeData.baseIngredientInstances;
+        console.log("✅ Using MULTI-INSTANCE system:", base_ingredient_instances.length, "ingredient instances");
+        console.log("Instance details:", base_ingredient_instances.map(inst => `${inst.name} (${inst.instanceId})`));
+      } else {
+        // Use the traditional system for simple recipes
+        ingredients = recipeData.baseIngredients || [];
+        base_ingredient_instances = ingredients.map((name, index) => ({
+          name: name,
+          instanceId: `${name}_traditional_${index}`,
+          validCombos: [] // Will be populated by combination logic
+        }));
+        console.log("✅ Using TRADITIONAL system:", ingredients.length, "unique ingredients");
+        console.log("Ingredient list:", ingredients);
+      }
+      
+      base_ingredients = recipeData.baseIngredients; // Ensure base_ingredients is set for stats
+      recipeUrl = recipeData.recipeUrl;
+      recipeDescription = recipeData.description || "A delicious recipe that's sure to please everyone at the table!";
+      recipeAuthor = recipeData.author || "";
+      
+      isLoadingRecipe = false;
+      loadingComplete = true; // Trigger split reveal - APlasker
+      console.log("🎯 Loading complete flag set to true - split reveal should trigger");
+      recipeDataLoadedForStats = true;
+      
+      initializeGame();
+      
+      // Load image in background
+      if (recipeData.imgUrl) {
+        console.log("Loading recipe image in background from URL:", recipeData.imgUrl);
+        isLoadingImage = true;
+        
+        loadImage(
+          recipeData.imgUrl,
+          (img) => {
+            console.log("Recipe image loaded successfully");
+            recipeImage = img;
+            isLoadingImage = false;
+          },
+          (err) => {
+            console.error("Error loading recipe image:", err);
+            recipeImage = null;
+            isLoadingImage = false;
+          }
+        );
+      }
+    } else {
+      // Load recipe data normally
+      if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
+        loadRecipeData();
+      } else {
+        console.log("Playtest mode: waiting for date selection");
+        isLoadingRecipe = false;
+      }
+    }
+  }
+  
+  // Function to load win screen from completion data - APlasker
+  function loadWinScreenFromCompletion(recipeData, completionData) {
+    try {
+      console.log("Loading win screen from completion data:", completionData);
+      
+      // FIXED: Ensure user is not considered anonymous if we have completion data
+      // If we have completion data, the user must be authenticated with a real account
+      if (window.authState && window.authState.isAuthenticated) {
+        window.authState.isAnonymous = false;
+        console.log("User auth state updated - not anonymous since completion data exists");
+      }
+      
+      // Set recipe data
+      recipe_data = recipeData;
+      recipe = recipeData;
+      intermediate_combinations = recipeData.intermediateCombinations;
+      final_combination = recipeData.finalCombination;
+      easter_eggs = recipeData.easterEggs;
+      
+      // BUGFIX: Use validated ingredient system based on server flag
+      // Prevents duplicate vessel creation and ensures proper fallback behavior
+      if (recipeData.useInstanceSystem && recipeData.baseIngredientInstances && recipeData.baseIngredientInstances.length > 0) {
+        // Use the multi-instance system for recipes with duplicate ingredients
+        ingredients = recipeData.baseIngredientInstances.map(inst => inst.name);
+        base_ingredient_instances = recipeData.baseIngredientInstances;
+        console.log("✅ Using MULTI-INSTANCE system:", base_ingredient_instances.length, "ingredient instances");
+        console.log("Instance details:", base_ingredient_instances.map(inst => `${inst.name} (${inst.instanceId})`));
+      } else {
+        // Use the traditional system for simple recipes
+        ingredients = recipeData.baseIngredients || [];
+        base_ingredient_instances = ingredients.map((name, index) => ({
+          name: name,
+          instanceId: `${name}_traditional_${index}`,
+          validCombos: [] // Will be populated by combination logic
+        }));
+        console.log("✅ Using TRADITIONAL system:", ingredients.length, "unique ingredients");
+        console.log("Ingredient list:", ingredients);
+      }
+      
+      base_ingredients = recipeData.baseIngredients; // Ensure base_ingredients is set for stats
+      recipeUrl = recipeData.recipeUrl;
+      recipeDescription = recipeData.description || "A delicious recipe that's sure to please everyone at the table!";
+      recipeAuthor = recipeData.author || "";
+      
+      // Set game state to won
+      gameWon = true;
+      gameStarted = true;
+      gameTimerActive = false;
+      
+      // Reconstruct game stats from completion data
+      gameTimer = completionData.total_time_seconds || 0;
+      hintCount = completionData.hints_used || 0;
+      moveCount = completionData.mistakes_total || 0; // Assuming mistakes correlate with move count
+      
+      // Reconstruct move history for star calculation
+      moveHistory = [];
+      for (let i = 0; i < completionData.mistakes_total; i++) {
+        moveHistory.push('black'); // Add mistake markers
+      }
+      
+      // Set grades and scores
+      const starScore = completionData.star_score || 0;
+      isAPlus = starScore >= 6;
+      
+      // Calculate letter grade from star score
+      if (starScore >= 6) {
+        letterGrade = 'A+';
+      } else if (starScore >= 5) {
+        letterGrade = 'A';
+      } else if (starScore >= 4) {
+        letterGrade = 'B';
+      } else if (starScore >= 3) {
+        letterGrade = 'C';
+      } else {
+        letterGrade = 'X';
+      }
+      
+      // Initialize other necessary game variables
+      vessels = [];
+      displayedVessels = [];
+      usedIngredients = new Set();
+      combine_animations = [];
+      animations = [];
+      eggModals = [];
+      
+      // Set loading states
+      isLoadingRecipe = false;
+      recipeDataLoadedForStats = true;
+      completionCheckInProgress = false;
+      
+      // CRITICAL: Disable wallpaper animation for win screen to prevent title screen overlap
+      loadingComplete = true;
+      wallpaperAnimationActive = false;
+      if (wallpaperAnimation) {
+        wallpaperAnimation = null; // Clear wallpaper animation entirely
+      }
+      
+      console.log("Win screen state loaded successfully");
+      
+      // Load image in background
+      if (recipeData.imgUrl) {
+        console.log("Loading recipe image in background from URL:", recipeData.imgUrl);
+        isLoadingImage = true;
+        
+        loadImage(
+          recipeData.imgUrl,
+          (img) => {
+            console.log("Recipe image loaded successfully");
+            recipeImage = img;
+            isLoadingImage = false;
+          },
+          (err) => {
+            console.error("Error loading recipe image:", err);
+            recipeImage = null;
+            isLoadingImage = false;
+          }
+        );
+      }
+      
+    } catch (error) {
+      console.error("Error loading win screen from completion:", error);
+      // Fall back to normal flow
+      completionCheckInProgress = false;
+      proceedWithNormalFlow();
+    }
+  }
+  
+  // Function to show completion error modal - APlasker
+  function showCompletionErrorModal() {
+    showingCompletionError = true;
+    completionCheckInProgress = false;
+    modalActive = true;
     
-    return true; // Allow default behavior if not handled
+    // Create error modal
+    completionErrorModal = {
+      visible: true,
+      title: "Loading Error",
+      message: "Your dish is taking longer to prep than we anticipated. Please try ordering again",
+      buttonText: "Refresh",
+      action: () => {
+        window.location.reload();
+      }
+    };
+  }
+  
+  // Function to draw completion error modal - APlasker
+  function drawCompletionErrorModal() {
+    if (!showingCompletionError || !completionErrorModal?.visible) return;
+    
+    // Draw modal overlay
+    push();
+    fill(0, 0, 0, 150);
+    noStroke();
+    rect(0, 0, windowWidth, windowHeight);
+    pop();
+    
+    // Calculate modal dimensions
+    const modalWidth = Math.min(playAreaWidth * 0.8, 400);
+    const modalHeight = Math.min(playAreaHeight * 0.4, 250);
+    const modalX = playAreaX + playAreaWidth / 2;
+    const modalY = playAreaY + playAreaHeight / 2;
+    
+    // Draw modal background
+    push();
+    rectMode(CENTER);
+    fill(255);
+    stroke(COLORS.primary);
+    strokeWeight(2);
+    rect(modalX, modalY, modalWidth, modalHeight, 12);
+    pop();
+    
+    // Draw modal content
+    push();
+    
+    // Title
+    textAlign(CENTER, CENTER);
+    textSize(Math.max(modalWidth * 0.06, 18));
+    textStyle(BOLD);
+    fill(COLORS.text);
+    text(completionErrorModal.title, modalX, modalY - modalHeight * 0.25);
+    
+    // Message
+    textSize(Math.max(modalWidth * 0.04, 14));
+    textStyle(NORMAL);
+    text(completionErrorModal.message, modalX, modalY - modalHeight * 0.05, modalWidth * 0.8);
+    
+    // Button
+    const buttonWidth = modalWidth * 0.3;
+    const buttonHeight = 40;
+    const buttonY = modalY + modalHeight * 0.2;
+    
+    const buttonHovered = dist(mouseX, mouseY, modalX, buttonY) < buttonWidth/2;
+    
+    rectMode(CENTER);
+    fill(buttonHovered ? lerpColor(color(COLORS.primary), color(255), 0.2) : COLORS.primary);
+    stroke(COLORS.primary); // Match stroke to fill color for consistency
+    strokeWeight(3); // Standardized stroke weight
+    rect(modalX, buttonY, buttonWidth, buttonHeight, 8);
+    
+    fill('white');
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(Math.max(buttonHeight * 0.25, 12));
+    textStyle(BOLD);
+    text(completionErrorModal.buttonText, modalX, buttonY);
+    
+    pop();
+    
+    // Handle button click
+    if (buttonHovered) {
+      cursor(HAND);
+    }
   }
   
   // New function to initialize the game after data is loaded
@@ -2126,10 +1517,28 @@ let intermediate_combinations = [
     console.log(`Setting layout type to ${currentLayoutType} based on ${ingredients.length} ingredients`);
 
     // Create vessels for each ingredient
-    ingredients.forEach((ing) => {
-      let v = new Vessel([ing], [], null, 'white', 0, 0, 0, 0); // Size will be set in arrangeVessels
-      vessels.push(v);
-    });
+    // DUPLICATE INGREDIENT FIX: Create vessels with instance tracking
+    if (base_ingredient_instances && base_ingredient_instances.length > 0) {
+      // Create one vessel per ingredient instance
+      base_ingredient_instances.forEach((instance, index) => {
+        let v = new Vessel([instance.name], [], null, 'white', 0, 0, 0, 0); // Size will be set in arrangeVessels
+        
+        // DUPLICATE INGREDIENT FIX: Add instance tracking to vessel
+        v.ingredientInstance = instance; // Store the full instance data
+        v.instanceId = instance.instanceId; // Quick access to instance ID
+        v.validCombos = [...instance.validCombos]; // Which combos this vessel can participate in
+        
+        vessels.push(v);
+      });
+      console.log("Created", vessels.length, "vessels with instance tracking");
+    } else {
+      // Fallback to old method for backward compatibility
+      ingredients.forEach((ing) => {
+        let v = new Vessel([ing], [], null, 'white', 0, 0, 0, 0); // Size will be set in arrangeVessels
+        vessels.push(v);
+      });
+      console.log("Created", vessels.length, "vessels without instance tracking (fallback)");
+    }
     
     // Initialize byline transition variables - APlasker
     nextByline = "";
@@ -2281,208 +1690,12 @@ let intermediate_combinations = [
     return now.toLocaleString('en-US', options);
   }
   
+  // function touchEnded() { ... } // MOVED to interaction.js
   
-  
-  
-  // Add touch release support for mobile devices
-  function touchEnded() {
-    // Use the touch system to get touch position
-    const touchPos = touchSystem.getCurrentTouchPos();
-    if (!touchPos && touches.length > 0) {
-      // Fall back to p5.js touch position if our system doesn't have data
-      mouseX = touches[0].x;
-      mouseY = touches[0].y;
-    } else if (touchPos) {
-      // Use our normalized touch position
-      mouseX = touchPos.x;
-      mouseY = touchPos.y;
-    }
-    
-    // Handle win screen touch state if we're tracking a touch
-    if (gameWon && winScreenTouchState.processingTouch) {
-      // Only execute the action if the touch didn't move much
-      if (!winScreenTouchState.touchMoved) {
-        console.log("Executing win screen action on release:", winScreenTouchState.element);
-        
-        // Execute the appropriate action based on element
-        if (winScreenTouchState.element === "viewRecipe" || 
-            winScreenTouchState.element === "tutorialRecipe") {
-          // View recipe action
-          console.log("View Recipe triggered (win screen release)");
-          viewRecipe();
-        } else if (winScreenTouchState.element === "shareScore") {
-          // Share score action
-          console.log("Share Score triggered (win screen release)");
-          shareScore();
-        } else if (winScreenTouchState.element === "tutorialScore") {
-          // Tutorial score action - load today's recipe instead of returning to title
-          console.log("Tutorial score action triggered (win screen touch release)");
-          
-          // Reset tutorial mode
-          isTutorialMode = false;
-          
-          // Reset game state
-          gameStarted = false;
-          gameWon = false;
-          moveHistory = [];
-          hintCount = 0;
-          vessels = [];
-          animations = [];
-          
-          // Set loading state
-          isLoadingRecipe = true;
-          
-          // Load today's recipe and start the game
-          console.log("Loading today's recipe after tutorial (touch)");
-          loadRecipeData().then(() => {
-            // Start the game automatically once recipe is loaded
-            startGame();
-          }).catch(error => {
-            console.error("Error loading today's recipe:", error);
-            isLoadingRecipe = false;
-            loadingError = true;
-          });
-        }
-      }
-      
-      // Reset the touch state
-      winScreenTouchState.processingTouch = false;
-      winScreenTouchState.element = null;
-      winScreenTouchState.touchMoved = false;
-      
-      return false; // Prevent other handling
-    }
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Get the element being touched
-      const target = document.elementFromPoint(mouseX, mouseY);
-      
-      // If the target is part of our modal (check parent chain)
-      if (target && (
-          target.closest('#feedback-modal') || 
-          target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'BUTTON' ||
-          target.tagName === 'A')) { // Add support for anchor tags
-        
-        // Special handling for Android links
-        if (touchSystem.isAndroid && target.tagName === 'A') {
-          console.log('Android link detected, using special handling');
-          
-          // For Android, we need to manually trigger the link
-          setTimeout(() => {
-            // Use a small timeout to ensure the touch event completes
-            window.open(target.href, target.target || '_self');
-          }, 50);
-          
-          return false; // Prevent default to avoid double-activation
-        }
-        
-        // Allow the event to proceed to HTML elements
-        console.log('Touch event allowed for modal element: ' + (target.tagName || 'unknown'));
-        return true;
-      }
-      
-      return false;
-    }
-    
-    // Check if help modal was active but is now inactive,
-    // ensure HTML elements are properly cleaned up
-    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && 
-        helpModal.htmlElements && helpModal.htmlElements.length > 0) {
-      helpModal.removeHTMLElements();
-    }
-    
-    // Call the mouse event handler
-    mouseReleased();
-    
-    // Prevent default to avoid scrolling
-    return false;
-  }
-  
-  // Add touch move support for mobile devices
-  function touchMoved() {
-    // Use the touch system to get touch position
-    const touchPos = touchSystem.getCurrentTouchPos();
-    if (!touchPos && touches.length > 0) {
-      // Fall back to p5.js touch position if our system doesn't have data
-      touchX = touches[0].x;
-      touchY = touches[0].y;
-    } else if (touchPos) {
-      // Use our normalized touch position
-      touchX = touchPos.x;
-      touchY = touchPos.y;
-    } else {
-      return false; // No touch data available
-    }
-    
-    // Update mouse coordinates to match touch position
-    mouseX = touchX;
-    mouseY = touchY;
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Get the element being touched
-      const target = document.elementFromPoint(touchX, touchY);
-      
-      // If the target is part of our modal (check parent chain)
-      if (target && (
-          target.closest('#feedback-modal') || 
-          target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'BUTTON')) {
-        // Allow the event to proceed to HTML elements
-        return true;
-      }
-      
-      return false;
-    }
-    
-    // Prevent dragging during auto-combination sequence
-    if (autoFinalCombination) {
-      return false;
-    }
-    
-    // Update drag position if we have a dragged vessel
-    if (draggedVessel) {
-      draggedVessel.x = touchX - offsetX;
-      draggedVessel.y = touchY - offsetY;
-      
-      // Ensure vessel scale is maintained during dragging
-      draggedVessel.targetScale = 1.05;
-      
-      // Update cursor style for feedback
-      lastMovedFrame = frameCount;
-      
-      // Check for vessels that are overlapping
-      overVessel = null;
-      for (let vessel of vessels) {
-        if (vessel !== draggedVessel && vessel.isInside(touchX, touchY)) {
-          overVessel = vessel;
-          break;
-        }
-      }
-      
-      // Update last action time
-      lastAction = frameCount;
-    }
-    
-    // If help modal is open, allow it to handle touch movement
-    if (typeof helpModal !== 'undefined' && helpModal !== null && helpModal.active) {
-      return false;
-    }
-    
-    // Prevent default touch behavior (prevents scrolling etc.)
-    return false;
-  }
-  
-
+  // function touchMoved() { ... } // MOVED to interaction.js
   
   // Global variable for card hover state
   let isMouseOverCard = false;
-  
-  
   
   // Function to transition to a new byline message with fade effect
   function updateBylineWithTransition(newMessage, duration = bylineHintDuration) {
@@ -2596,34 +1809,16 @@ let intermediate_combinations = [
     // Always use circle hit detection
     isHelpIconHovered = dist(mouseX, mouseY, helpIconX, helpIconY) < helpIconSize/2;
     
-    // Get the appropriate color (pink when hovered, green normally)
+    // Get the appropriate color (pink when hovered, green normally) - same as hint button
     const buttonColor = isHelpIconHovered ? COLORS.secondary : COLORS.primary;
     
-    // Calculate stroke weights for the three-layer outline
-    const thinBlackOutline = Math.max(helpIconSize * 0.01, 1); // 1% of icon size, min 1px
-    const thickColoredOutline = Math.max(helpIconSize * 0.06, 3); // 6% of icon size, min 3px
-    const outerBlackOutline = Math.max(helpIconSize * 0.05, 3); // 5% of icon size, min 3px
-    
-    // Draw the button shape with three-layer outline
-    fill('white');
-    
-    // First, draw the outer black outline
-    stroke(0);
-    strokeWeight(outerBlackOutline);
-    circle(helpIconX, helpIconY, helpIconSize + thinBlackOutline * 4);
-    
-    // Next, draw the middle thick colored outline
-    stroke(buttonColor);
-    strokeWeight(thickColoredOutline);
-    circle(helpIconX, helpIconY, helpIconSize + thinBlackOutline * 2);
-    
-    // Finally, draw the inner thin black outline
-    stroke(0);
-    strokeWeight(thinBlackOutline);
+    // Draw the button shape with simple green fill (matching hint button style)
+    fill(buttonColor);
+    noStroke();
     circle(helpIconX, helpIconY, helpIconSize);
     
-    // Draw the "?" text
-    fill('black');
+    // Draw the "?" text in white (matching hint button text)
+    fill('white');
     noStroke();
     textAlign(CENTER, CENTER);
     
@@ -2632,12 +1827,8 @@ let intermediate_combinations = [
     textSize(fontSize);
     textStyle(BOLD);
     
-    // Calculate text metrics for perfect centering
-    const textHeight = textAscent() + textDescent();
-    const baselineOffset = (textAscent() - textHeight/2) * 0.1; // Small baseline adjustment
-    
-    // Draw the question mark with baseline adjustment
-    text("?", helpIconX, helpIconY + baselineOffset);
+    // Draw the question mark with optimal centering
+    text("?", helpIconX, helpIconY);
     
     // Reset text style
     textStyle(NORMAL);
@@ -2670,20 +1861,7 @@ let intermediate_combinations = [
     }
   }
   
-  // Helper function to check if a point is interacting with a modal element
-  function isModalElement(x, y) {
-    // Get the element at the specified coordinates
-    const target = document.elementFromPoint(x, y);
-    
-    // Check if the target is part of our modal (check parent chain)
-    return target && (
-      target.closest('#feedback-modal') || 
-      target.tagName === 'INPUT' || 
-      target.tagName === 'TEXTAREA' || 
-      target.tagName === 'BUTTON' ||
-      target.tagName === 'A' // Add support for anchor tags - APlasker
-    );
-  }
+  // function isModalElement(x, y) { ... } // MOVED to interaction.js
   
   function drawTitle() {
     // Set text properties
@@ -2695,7 +1873,7 @@ let intermediate_combinations = [
     
     // Use a bold sans-serif font
     textStyle(BOLD);
-    textFont('Arial, Helvetica, sans-serif');
+    textFont('Helvetica, Arial, sans-serif');
     
     // Title text
     const title = "COMBO MEAL";
@@ -2768,530 +1946,232 @@ let intermediate_combinations = [
     background(COLORS.background);
     
     // Draw the play area
-    // ... existing code ...
+    push(); // Isolate play area drawing
+    fill(COLORS.background); // Use the new unified background color
+    stroke(200); // Light grey border for the play area
+    strokeWeight(1);
+    rect(playAreaX, playAreaY, playAreaWidth, playAreaHeight, 10); // Rounded corners for play area
+    pop(); // End play area drawing
+
+    // Handle different game states
+    if (completionCheckInProgress) {
+      // Draw loading screen for completion check - use the existing floral loading pattern
+      textAlign(CENTER, CENTER);
+      textSize(Math.max(playAreaWidth * 0.05, 18)); // Responsive text size
+      fill(COLORS.text);
+      text("Checking your kitchen...", playAreaX + playAreaWidth / 2, playAreaY + playAreaHeight / 2);
+    } else if (showingCompletionError) {
+      // Draw completion error modal
+      drawCompletionErrorModal();
+    } else if (window.profileActive) {
+      // Handle profile screen - APlasker
+      if (typeof drawProfileScreen === 'function') {
+        drawProfileScreen();
+      }
+      
+      // Update animations for profile screen (like bounce animation)
+      for (let i = animations.length - 1; i >= 0; i--) {
+        if (animations[i].update()) {
+          animations.splice(i, 1);
+        } else {
+          animations[i].draw();
+        }
+      }
+    } else if (isLoadingRecipe) {
+      // Draw loading screen centered in the play area
+      textAlign(CENTER, CENTER);
+      textSize(Math.max(playAreaWidth * 0.05, 18)); // Responsive text size
+      fill(COLORS.text);
+      text("Stirring up today's recipe...", playAreaX + playAreaWidth / 2, playAreaY + playAreaHeight / 2);
+    } else if (loadingError) {
+      // Draw error message centered in the play area
+      textAlign(CENTER, CENTER);
+      textSize(Math.max(playAreaWidth * 0.05, 18));
+      fill(COLORS.secondary); // Use secondary color (pinkish) for error
+      text(`Whoops! Couldn't fetch the recipe.\nTry refreshing?`, playAreaX + playAreaWidth / 2, playAreaY + playAreaHeight / 2);
+    } else if (gameWon) {
+      if (typeof drawWinScreen === 'function') {
+        drawWinScreen();
+      }
+    } else if (!gameStarted) {
+      // Draw title screen elements
+      drawTitleScreen();
+    } else {
+      // Game is active - draw game elements
+
+      // Draw byline message - APlasker
+      // Position byline at the top of the play area
+      const bylineX = playAreaX + playAreaWidth / 2;
+      const bylineY = playAreaY + playAreaHeight * 0.05; // 5% from top of play area
+      const bylineSize = Math.max(playAreaWidth * 0.035, 14); // Responsive text size, min 14px
+
+      textAlign(CENTER, CENTER);
+      textSize(bylineSize);
+      textFont(bodyFont); // Ensure bodyFont is used for byline
+      textStyle(NORMAL);
+
+      // Handle byline transition
+      if (bylineTransitionState === "fading-out") {
+        bylineOpacity -= 255 / bylineFadeFrames;
+        if (bylineOpacity <= 0) {
+          bylineOpacity = 0;
+          currentByline = nextByline;
+          bylineTimer = transitionDuration > 0 ? transitionDuration : (isTutorialMode ? bylineHintDuration * 2 : bylineHintDuration) ; // Use longer duration for tutorial messages
+          bylineTransitionState = "fading-in";
+        }
+      } else if (bylineTransitionState === "fading-in") {
+        bylineOpacity += 255 / bylineFadeFrames;
+        if (bylineOpacity >= 255) {
+          bylineOpacity = 255;
+          bylineTransitionState = "stable";
+          isTransitioning = false; // End transition
+          nextByline = ""; // Clear queued message
+        }
+      } else if (bylineTimer > 0) {
+        bylineTimer--;
+        if (bylineTimer === 0 && !isTutorialMode) { // Don't revert tutorial messages automatically
+          // Revert to default byline if timer runs out and not in tutorial
+          updateBylineWithTransition("Drop one ingredient on to another to combine!");
+        }
+      }
+
+      // Apply opacity and draw byline
+      fill(0, 0, 0, bylineOpacity);
+      text(currentByline, bylineX, bylineY, playAreaWidth * 0.9); // Constrain width
+
+      // Draw game timer - APlasker
+      // Position timer below the byline
+      const timerX = playAreaX + playAreaWidth / 2;
+      const timerY = bylineY + bylineSize * 1.5; // Position below byline with spacing
+      const timerTextSize = Math.max(playAreaWidth * 0.027, 11); // Increased from 2.5% to 2.7%, min 11px (up from 10px)
+
+      textAlign(CENTER, CENTER);
+      textSize(timerTextSize);
+      fill(COLORS.text);
+      if (gameTimerActive) {
+        gameTimer = Math.floor((Date.now() - startTime) / 1000);
+      }
+      text(formatTime(gameTimer), timerX, timerY);
+      
+      // APlasker: Draw mistake stars
+      let mistakes = moveHistory.filter(move => move === 'black').length;
+      const maxStars = 5;
+      const starSize = Math.max(playAreaWidth * 0.025, 10); // Responsive star size
+      const starSpacing = starSize * 1.8; // Spacing between stars
+      const totalStarWidth = (maxStars * starSize) + ((maxStars - 1) * (starSpacing - starSize));
+      let starsX = playAreaX + playAreaWidth * 0.07; // Position stars on the left
+      let starsY = timerY + timerTextSize * 1.0;    // Position stars below the timer
+
+      for (let i = 0; i < maxStars; i++) {
+        let starFillColor = (i >= mistakes) ? STAR_YELLOW : STAR_GREY;
+        // Star points outwards, so use starSize for outer radius and starSize*0.4 for inner
+        drawStar(starsX + i * starSpacing, starsY, starSize * 0.4, starSize, 5, starFillColor, STAR_OUTLINE);
+      }
+
+      // Draw vessels
+      for (let v of vessels) {
+        v.update(); // Update scale and position
+        v.draw();
+      }
+
+      // Draw dragged vessel on top
+      if (draggedVessel) {
+        draggedVessel.update(); // Ensure dragged vessel also updates its scale
+        draggedVessel.draw();
+      }
+      
+      // Draw hint button if not showing hint
+      if (!showingHint && hintButton) {
+        hintButton.draw();
+        hintButton.checkHover(mouseX, mouseY);
+      }
+
+      // Draw hint vessel if showing hint
+      if (showingHint && hintVessel) {
+        hintVessel.draw();
+      }
+      
+      // Draw help icon - APlasker
+      if (gameStarted && !gameWon) {
+          drawHelpIcon();
+      }
+
+      // Draw animations
+      for (let i = animations.length - 1; i >= 0; i--) {
+        if (animations[i].update()) {
+          animations.splice(i, 1);
+        } else {
+          animations[i].draw();
+        }
+      }
+      
+      // Draw Easter egg modals on top of everything else
+      for (let i = eggModals.length - 1; i >= 0; i--) {
+        eggModals[i].update();
+        if (eggModals[i].active) {
+          eggModals[i].draw();
+        } else {
+          // Remove inactive modals
+          eggModals.splice(i, 1);
+        }
+      }
+      
+      // Handle inactivity reminder - APlasker
+      if (gameStarted && !gameWon && !draggedVessel && !modalActive && !isTransitioning) {
+        // Dynamic inactivity threshold based on reminders shown
+        const currentInactivityThreshold = baseInactivityThreshold + (inactivityReminderCount * baseInactivityThreshold * 0.5);
+        
+        if (frameCount - lastAction > currentInactivityThreshold) {
+          if (isTutorialMode && !tutorialMessagesShown.inactivityShown) {
+            // Show tutorial inactivity message once
+            updateBylineWithTransition(tutorialBylines.inactivity, bylineHintDuration * 2); // Longer display for tutorial
+            tutorialMessagesShown.inactivityShown = true;
+          } else if (!isTutorialMode) {
+            // Standard game inactivity message (can repeat)
+            updateBylineWithTransition("Need a hand? Try a hint or check the recipe!", bylineHintDuration);
+          }
+          lastAction = frameCount; // Reset inactivity timer
+          inactivityReminderCount++; // Increment reminder count
+        }
+      }
+    }
+    
+    // After drawing all win screen content, draw the flower animation on top if it's active
+    // This was previously in drawWinScreen but needs to be global for other screens
+    if (persistentFlowerAnimation && persistentFlowerAnimation.active) {
+      persistentFlowerAnimation.draw();
+      persistentFlowerAnimation.update();
+    }
+    
+    // Auth modal and terms modal are now drawn in draw.js for consistency
+  }
+  
+  // Function to draw a single star - APlasker
+  function drawStar(x, y, radius1, radius2, npoints, fillColor, outlineColor) {
+    push();
+    fill(fillColor);
+    stroke(outlineColor);
+    strokeWeight(max(1.5, radius1 * 0.2)); // Responsive stroke weight, made thicker
+    strokeJoin(ROUND); // Added to round the points of the star
+    let angle = TWO_PI / npoints;
+    let halfAngle = angle / 2.0;
+    beginShape();
+    for (let a = -PI/2; a < TWO_PI - PI/2; a += angle) { // Start from -PI/2 to make stars point upwards
+      let sx = x + cos(a) * radius2;
+      let sy = y + sin(a) * radius2;
+      vertex(sx, sy);
+      sx = x + cos(a + halfAngle) * radius1;
+      sy = y + sin(a + halfAngle) * radius1;
+      vertex(sx, sy);
+    }
+    endShape(CLOSE);
+    pop();
   }
   
   // Function to get a random color from COMPLETED_VESSEL_COLORS - APlasker
   function getRandomOutlineColor() {
     // Always return peach color instead of random color
     return COLORS.peach;
-  }
-  
-  // Add this section near the top of the file, after the global variables
-
-  // Cross-platform touch handling system - APlasker
-  let touchSystem = {
-    // Track active touches and their states
-    activeTouches: {},
-    lastTouchId: null,
-    isTouch: false,
-    
-    // Initialize the touch system
-    init: function() {
-      console.log("Initializing cross-platform touch system");
-      this.isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      
-      // Detect Android specifically
-      this.isAndroid = /Android/i.test(navigator.userAgent);
-      
-      // Log platform detection results
-      console.log(`Touch device detected: ${this.isTouch}, Android: ${this.isAndroid}`);
-      
-      // Add passive event listeners for better scroll performance on Android
-      const touchOptions = this.isAndroid ? { passive: false } : undefined;
-      
-      // Add event listeners with the appropriate options
-      document.addEventListener('touchstart', this.handleTouchStart.bind(this), touchOptions);
-      document.addEventListener('touchmove', this.handleTouchMove.bind(this), touchOptions);
-      document.addEventListener('touchend', this.handleTouchEnd.bind(this), touchOptions);
-      
-      return this;
-    },
-    
-    // Handle touch start events
-    handleTouchStart: function(e) {
-      // Convert touch to normalized format and store
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        this.lastTouchId = touch.identifier;
-        this.activeTouches[touch.identifier] = {
-          id: touch.identifier,
-          startX: touch.clientX,
-          startY: touch.clientY,
-          currentX: touch.clientX,
-          currentY: touch.clientY,
-          target: e.target
-        };
-      }
-      
-      // Prevent default only for game canvas to avoid interfering with modals
-      if (e.target.tagName.toLowerCase() === 'canvas') {
-        e.preventDefault();
-      }
-    },
-    
-    // Handle touch move events
-    handleTouchMove: function(e) {
-      // Update stored touch data
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        if (this.activeTouches[touch.identifier]) {
-          this.activeTouches[touch.identifier].currentX = touch.clientX;
-          this.activeTouches[touch.identifier].currentY = touch.clientY;
-        }
-      }
-      
-      // Prevent default only for game canvas
-      if (e.target.tagName.toLowerCase() === 'canvas') {
-        e.preventDefault();
-      }
-    },
-    
-    // Handle touch end events
-    handleTouchEnd: function(e) {
-      // Process ended touches
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const touch = e.changedTouches[i];
-        // Clean up the touch data
-        delete this.activeTouches[touch.identifier];
-      }
-      
-      // Special handling for Android link clicks
-      if (this.isAndroid && e.target.tagName.toLowerCase() === 'a') {
-        // Don't prevent default for links on Android
-        return true;
-      }
-      
-      // Prevent default only for game canvas
-      if (e.target.tagName.toLowerCase() === 'canvas') {
-        e.preventDefault();
-      }
-    },
-    
-    // Get the current primary touch position (for mouse emulation)
-    getCurrentTouchPos: function() {
-      // If we have an active touch, return its position
-      if (this.lastTouchId !== null && this.activeTouches[this.lastTouchId]) {
-        return {
-          x: this.activeTouches[this.lastTouchId].currentX,
-          y: this.activeTouches[this.lastTouchId].currentY
-        };
-      }
-      
-      // Otherwise return null
-      return null;
-    },
-    
-    // Check if we're currently processing touch events
-    isTouchActive: function() {
-      return Object.keys(this.activeTouches).length > 0;
-    }
-  };
-
-  // Replace the touchStarted function with our improved version
-  function touchStarted() {
-    // Add safety check for initialization state
-    if (vessels.length === 0 && !isLoadingRecipe) {
-      console.log("Initialization issue detected - reinitializing game");
-      initializeGame();
-      return false;
-    }
-    
-    // Use the touch system to get touch position
-    const touchPos = touchSystem.getCurrentTouchPos();
-    if (!touchPos) {
-      // Fall back to p5.js touch position if our system doesn't have data
-      if (touches.length > 0) {
-        touchX = touches[0].x;
-        touchY = touches[0].y;
-      } else {
-        return false; // No touch data available
-      }
-    } else {
-      // Use our normalized touch position
-      touchX = touchPos.x;
-      touchY = touchPos.y;
-    }
-    
-    // Update mouse coordinates to match touch position
-    mouseX = touchX;
-    mouseY = touchY;
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Use helper function to check if interacting with a modal element
-      if (isModalElement(touchX, touchY)) {
-        // Allow the event to proceed to HTML elements
-        console.log('Touch interaction allowed for modal element');
-        return true;
-      }
-      
-      // Otherwise block the interaction
-      console.log('Touch interaction blocked - modal is active');
-      return false;
-    }
-    
-    // Prevent user interaction during auto-combination sequence
-    if (autoFinalCombination) {
-      return false;
-    }
-    
-    // Check if any easter egg modal is active and handle the click  
-    for (let i = eggModals.length - 1; i >= 0; i--) {
-      if (eggModals[i].active && eggModals[i].checkClick(touchX, touchY)) {
-        // Modal was clicked, don't process any other clicks
-        return false;
-      }
-    }
-    
-    // Prevent default touch behavior to avoid scrolling
-    // Only do this if we're actually handling the touch
-    let touchHandled = false;
-    
-    // Handle the same logic as mousePressed but with touch coordinates
-    if (!gameStarted) {
-      // Check if start button was touched
-      if (startButton.isInside(touchX, touchY)) {
-        startGame();
-        touchHandled = true;
-      }
-      
-      // Check if tutorial button was touched - APlasker
-      if (tutorialButton.isInside(touchX, touchY)) {
-        startTutorial();
-        touchHandled = true;
-      }
-      
-      // Tutorial screen - check if Say hi link was touched
-      if (typeof tutorialSayHiLinkX !== 'undefined') {
-        const isOverTutorialSayHi = (
-          touchX > tutorialSayHiLinkX - tutorialSayHiLinkWidth/2 && 
-          touchX < tutorialSayHiLinkX + tutorialSayHiLinkWidth/2 && 
-          touchY > tutorialSayHiLinkY - tutorialSayHiLinkHeight/2 && 
-          touchY < tutorialSayHiLinkY + tutorialSayHiLinkHeight/2
-        );
-        
-        if (isOverTutorialSayHi) {
-          console.log("Say hi link touched in tutorial");
-          if (typeof showFeedbackModal === 'function') {
-            showFeedbackModal();
-            touchHandled = true;
-            return false;
-          }
-        }
-      }
-    } else if (gameWon) {
-      // Check for random recipe hotspot first
-      if (!isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
-        console.log("Random recipe hotspot touched at:", touchX, touchY);
-        isLoadingRandomRecipe = true;
-        loadRandomRecipe().finally(() => {
-          isLoadingRandomRecipe = false;
-        });
-        touchHandled = true;
-        return false;
-      }
-      
-      // Debugging log to help track touch coordinates
-      console.log("Touch on win screen:", touchX, touchY);
-      
-      // Check if the Say hi link was touched (in win screen)
-      if (typeof handleSayHiLinkInteraction === 'function' && handleSayHiLinkInteraction(touchX, touchY)) {
-        console.log("Say hi link handled in win screen");
-        touchHandled = true;
-        return false;
-      }
-      
-      // Special handling for tutorial mode - APlasker
-      if (isTutorialMode) {
-        console.log("Tutorial win screen touch detected");
-        
-        // Use simplified hover detection based on screen position
-        isMouseOverLetterScore = (touchY >= height/2);
-        isMouseOverCard = (touchY < height/2);
-        
-        // Handle recipe card clicks in tutorial mode
-        if (isMouseOverCard) {
-          console.log("Tutorial recipe card touched - opening recipe URL");
-          viewRecipe(); // Allow recipe link functionality
-          touchHandled = true;
-          return false;
-        }
-        
-        // Handle score card click
-        if (isMouseOverLetterScore) {
-          console.log("Tutorial score card touched - loading today's recipe");
-          
-          // Reset tutorial mode
-          isTutorialMode = false;
-          
-          // Reset game state
-          gameStarted = false;
-          gameWon = false;
-          moveHistory = [];
-          hintCount = 0;
-          vessels = [];
-          animations = [];
-          
-          // Set loading state
-          isLoadingRecipe = true;
-          
-          // Load today's recipe and start the game
-          console.log("Loading today's recipe after tutorial (direct touch)");
-          loadRecipeData().then(() => {
-            // Reset auto-combination flags to ensure final animation works properly
-            autoFinalCombination = false;
-            autoFinalCombinationStarted = false;
-            autoFinalCombinationTimer = 0;
-            autoFinalCombinationState = "WAITING";
-            finalCombinationVessels = [];
-            
-            // Start the game automatically once recipe is loaded
-            startGame();
-          }).catch(error => {
-            console.error("Error loading today's recipe:", error);
-            isLoadingRecipe = false;
-            loadingError = true;
-          });
-          
-          touchHandled = true;
-          return false;
-        }
-        
-        touchHandled = true;
-        return false;
-      }
-      
-      // Regular (non-tutorial) win screen handling
-      // Use simpler touch detection on win screen - top half shows recipe, bottom half shares score
-      if (touchY < height/2) {
-        // Top half = view recipe
-        console.log("View Recipe triggered (win screen touch - top half)");
-        viewRecipe();
-        touchHandled = true;
-      } else {
-        // Bottom half = share score
-        console.log("Share Score triggered (win screen touch - bottom half)");
-        shareScore();
-        touchHandled = true;
-      }
-    } else {
-      // Check if hint button was touched
-      if (!showingHint && hintButton.isInside(touchX, touchY)) {
-        showHint();
-        touchHandled = true;
-      }
-      
-      // Check if a vessel was touched
-      for (let v of vessels) {
-        if (v.isInside(touchX, touchY)) {
-          draggedVessel = v;
-          // Store original position for proper snapback
-          draggedVessel.originalX = v.x;
-          draggedVessel.originalY = v.y;
-          offsetX = touchX - v.x;
-          offsetY = touchY - v.y;
-          
-          // IMMEDIATELY expand text margin before scale animation starts - APlasker
-          // This prevents visual glitching during the transition
-          v.textMargin = 0.85;
-          
-          // Set target scales for body and text (this will happen gradually through update())
-          // Body scales to 105% while text only scales to 102.5% as per 20250413updates_final.txt
-          v.targetBodyScale = 1.05;
-          v.targetTextScale = 1.025;
-          
-          // Keep legacy targetScale for backward compatibility
-          v.targetScale = 1.05;
-          
-          triggerHapticFeedback('success'); // Haptic feedback on successful drag
-          touchHandled = true;
-          break;
-        }
-      }
-    }
-    
-    // Update the isMouseOverLetterScore flag for consistent hover state
-    if (gameWon) {
-      // Use simplified hover detection based on screen position
-      isMouseOverLetterScore = (touchY >= height/2);
-      isMouseOverCard = (touchY < height/2);
-    }
-    
-    // Check for help icon touch
-    if (!gameWon && gameStarted) { // Only check for help icon during gameplay
-      // Always use circle hit detection now that we're always in circular mode
-      const touchedHelpButton = dist(touchX, touchY, helpIconX, helpIconY) < helpIconSize/2;
-      
-      if (touchedHelpButton) {
-        if (typeof showHelpModal === 'function') {
-          // In game, show help modal
-          console.log("Help button touched in game - showing help modal");
-          showHelpModal();
-          touchHandled = true;
-          return false; // Prevent other touch handling
-        }
-      }
-      
-      // Don't process other touches if help modal is open
-      if (typeof helpModal !== 'undefined' && helpModal !== null && helpModal.active) {
-        touchHandled = helpModal.checkClick(touchX, touchY);
-        return false;
-      }
-    }
-    
-    if (touchHandled) {
-      return false; // Prevent default only if we handled the touch
-    }
-    
-    // Check for random recipe hotspot last
-    if (gameWon && !isLoadingRandomRecipe && isInRandomRecipeHotspot(touchX, touchY)) {
-      console.log("Random recipe hotspot touched at:", touchX, touchY);
-      isLoadingRandomRecipe = true;
-      loadRandomRecipe().finally(() => {
-        isLoadingRandomRecipe = false;
-      });
-    }
-    
-    return true; // Allow default behavior if not handled
-  }
-
-  // Replace touchEnded function with improved version
-  function touchEnded() {
-    // Use the touch system to get touch position
-    const touchPos = touchSystem.getCurrentTouchPos();
-    if (!touchPos && touches.length > 0) {
-      // Fall back to p5.js touch position if our system doesn't have data
-      mouseX = touches[0].x;
-      mouseY = touches[0].y;
-    } else if (touchPos) {
-      // Use our normalized touch position
-      mouseX = touchPos.x;
-      mouseY = touchPos.y;
-    }
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Get the element being touched
-      const target = document.elementFromPoint(mouseX, mouseY);
-      
-      // If the target is part of our modal (check parent chain)
-      if (target && (
-          target.closest('#feedback-modal') || 
-          target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'BUTTON' ||
-          target.tagName === 'A')) { // Add support for anchor tags
-        
-        // Special handling for Android links
-        if (touchSystem.isAndroid && target.tagName === 'A') {
-          console.log('Android link detected, using special handling');
-          
-          // For Android, we need to manually trigger the link
-          setTimeout(() => {
-            // Use a small timeout to ensure the touch event completes
-            window.open(target.href, target.target || '_self');
-          }, 50);
-          
-          return false; // Prevent default to avoid double-activation
-        }
-        
-        // Allow the event to proceed to HTML elements
-        console.log('Touch event allowed for modal element: ' + (target.tagName || 'unknown'));
-        return true;
-      }
-      
-      return false;
-    }
-    
-    // Check if help modal was active but is now inactive,
-    // ensure HTML elements are properly cleaned up
-    if (typeof helpModal !== 'undefined' && helpModal !== null && !helpModal.active && 
-        helpModal.htmlElements && helpModal.htmlElements.length > 0) {
-      helpModal.removeHTMLElements();
-    }
-    
-    // Call the mouse event handler
-    mouseReleased();
-    
-    // Prevent default to avoid scrolling
-    return false;
-  }
-
-  // Replace touchMoved function with improved version
-  function touchMoved() {
-    // Use the touch system to get touch position
-    const touchPos = touchSystem.getCurrentTouchPos();
-    if (!touchPos && touches.length > 0) {
-      // Fall back to p5.js touch position if our system doesn't have data
-      touchX = touches[0].x;
-      touchY = touches[0].y;
-    } else if (touchPos) {
-      // Use our normalized touch position
-      touchX = touchPos.x;
-      touchY = touchPos.y;
-    } else {
-      return false; // No touch data available
-    }
-    
-    // Update mouse coordinates to match touch position
-    mouseX = touchX;
-    mouseY = touchY;
-    
-    // Check if a modal is active - selectively allow interactions with modal elements
-    if (modalActive) {
-      // Get the element being touched
-      const target = document.elementFromPoint(touchX, touchY);
-      
-      // If the target is part of our modal (check parent chain)
-      if (target && (
-          target.closest('#feedback-modal') || 
-          target.tagName === 'INPUT' || 
-          target.tagName === 'TEXTAREA' || 
-          target.tagName === 'BUTTON')) {
-        // Allow the event to proceed to HTML elements
-        return true;
-      }
-      
-      return false;
-    }
-    
-    // Prevent dragging during auto-combination sequence
-    if (autoFinalCombination) {
-      return false;
-    }
-    
-    // Update drag position if we have a dragged vessel
-    if (draggedVessel) {
-      draggedVessel.x = touchX - draggedVessel.dragOffsetX;
-      draggedVessel.y = touchY - draggedVessel.dragOffsetY;
-      
-      // Ensure vessel scale is maintained during dragging
-      draggedVessel.targetScale = 1.05;
-      
-      // Update cursor style for feedback
-      lastMovedFrame = frameCount;
-      
-      // Check for vessels that are overlapping
-      overVessel = null;
-      for (let vessel of vessels) {
-        if (vessel !== draggedVessel && vessel.isInside(touchX, touchY)) {
-          overVessel = vessel;
-          break;
-        }
-      }
-      
-      // Update last action time
-      lastAction = frameCount;
-    }
-    
-    // If help modal is open, allow it to handle touch movement
-    if (typeof helpModal !== 'undefined' && helpModal !== null && helpModal.active) {
-      return false;
-    }
-    
-    // Prevent default touch behavior (prevents scrolling etc.)
-    return false;
   }
 
   // Add a function to fix recipe card link for Android
@@ -3305,7 +2185,7 @@ let intermediate_combinations = [
     console.log("Opening recipe URL:", recipeUrl);
     
     // Special handling for Android
-    if (touchSystem.isAndroid) {
+    if (typeof touchSystem !== 'undefined' && touchSystem.isAndroid) { // Check touchSystem exists
       console.log("Using Android-specific recipe link handling");
       
       // Create and trigger a temporary link element
@@ -3397,36 +2277,6 @@ let intermediate_combinations = [
     
     return `Combo Meal: ${recipeName}\nMoves: ${moves} | Hints: ${hints} | Time: ${time}\nPlay at combomeal.app`;
   }
-
-  // Initialize the touch system in setup
-  function setup() {
-    createCanvas(windowWidth, windowHeight); // Fullscreen canvas for mobile
-    textFont(bodyFont);
-    
-    // Initialize the touch system
-    touchSystem.init();
-    
-    // Set frame rate to 30fps for consistent animation timing across devices
-    frameRate(30);
-    
-    // Calculate play area dimensions
-    playAreaWidth = min(maxPlayWidth, windowWidth - 2 * playAreaPadding);
-    // Set a fixed aspect ratio for the play area (mobile phone-like)
-    playAreaHeight = min(windowHeight - 2 * playAreaPadding, playAreaWidth * 1.8); // 16:9 aspect ratio
-    
-    // Center the play area both horizontally and vertically
-    playAreaX = (windowWidth - playAreaWidth) / 2;
-    playAreaY = (windowHeight - playAreaHeight) / 2;
-    
-    // Load recipe data from Supabase if not in playtest mode
-    if (typeof isPlaytestMode === 'undefined' || !isPlaytestMode) {
-      loadRecipeData();
-      // Note: initializeGame() will be called from within loadRecipeData() now
-    } else {
-      console.log("Playtest mode: waiting for date selection");
-      isLoadingRecipe = false; // In playtest mode, we'll load the recipe after date selection
-    }
-  }
   
   // Helper: Truncate text with ellipsis in the middle if too long for a given width
   function fitTextWithMiddleEllipsis(text, maxWidth, fontSize, minFontSize = 10) {
@@ -3446,117 +2296,1636 @@ let intermediate_combinations = [
     let right = text.length - 1;
     let result = text;
     // Always keep at least 2 chars on each side
-    while (right - left > 4) {
-      const leftPart = text.slice(0, Math.ceil((left + right) / 2 / 2));
-      const rightPart = text.slice(text.length - Math.floor((right - left) / 2 / 2));
-      result = leftPart + '...' + rightPart;
-      if (textWidth(result) <= maxWidth) break;
-      // Remove one more char from each side
-      left++;
-      right--;
+    while (right - left > 4) { // Ensure we have enough characters for "L...R"
+      const mid = Math.floor((left + right) / 2);
+      // Try to keep first two and last two characters
+      const attemptLeft = text.slice(0, 2);
+      const attemptRight = text.slice(text.length - 2, text.length);
+      
+      result = attemptLeft + "..." + attemptRight;
+      textSize(currentFontSize); // Ensure correct font size for width check
+      if (textWidth(result) <= maxWidth) return result;
+
+      // If still too long, shorten by removing one from the right side of the left part
+      // This part needs more robust logic for middle ellipsis
+      // For now, if the "L...R" approach fails, we'll take what we have or just truncate.
+      // A simple approach: if "AA...ZZ" is too long, try "A...Z"
+      if (attemptLeft.length > 1 && attemptRight.length > 1) {
+        result = text.slice(0,1) + "..." + text.slice(text.length-1, text.length);
+        if (textWidth(result) <= maxWidth) return result;
+      }
+      
+      // Fallback: if all else fails, just truncate with ellipsis at end
+      result = text;
+      while (textWidth(result + "...") > maxWidth && result.length > 0) {
+        result = result.slice(0, -1);
+      }
+      return result + "...";
     }
-    return result;
+    // Fallback if text is very short but still too wide (e.g. "WWWW" at small font)
+    result = text;
+    while (textWidth(result + "...") > maxWidth && result.length > 0) {
+        result = result.slice(0, -1);
+    }
+    return result.length > 0 ? result + "..." : "...";
   }
-  
-  // Helper: Split text into up to maxLines lines, each fitting maxWidth. Last line can be ellipsized if needed.
+
+
+  // Function to split text into lines, ensuring it fits within a max width,
+  // and if it exceeds maxLines, truncates the last line with an ellipsis.
+  // Also ensures single words that are too long are handled gracefully.
   function splitTextToLinesWithEllipsis(text, maxWidth, maxLines, fontSize, minFontSize = 10) {
-    textSize(fontSize);
-    let words = text.split(' ');
     let lines = [];
-    let currentLine = words[0] || '';
+      let currentLine = "";
+      let words = text.split(' ');
 
-    // Calculate average word width to determine optimal line breaks
-    let avgWordWidth = words.reduce((sum, word) => sum + textWidth(word), 0) / words.length;
-    let optimalCharsPerLine = Math.floor(maxWidth / (avgWordWidth / words[0].length));
+      textSize(fontSize);
 
-    // NEW: More balanced line breaking logic
-    let hasCompoundWord = words.some(word => word.length > 6); // Check for long words
-    let shouldForceTwoLines = text.length > optimalCharsPerLine * 0.7 || // Reduced from 0.8
-                             (hasCompoundWord && text.length > optimalCharsPerLine * 0.6); // Even lower threshold for compound words
+      for (let i = 0; i < words.length; i++) {
+          let word = words[i];
+          let testLine = currentLine + (currentLine === "" ? "" : " ") + word;
+          
+          // Check if the word itself is too long
+          if (textWidth(word) > maxWidth) {
+              // Word is too long, try to fit it by reducing font or truncating
+              if (currentLine !== "") {
+                  lines.push(currentLine);
+                  currentLine = "";
+              }
 
-    // For very short text (less than 40% of optimal line length), always use one line
-    if (text.length < optimalCharsPerLine * 0.4) { // Reduced from 0.5
-        shouldForceTwoLines = false;
-    }
+              let fittedWord = fitTextWithMiddleEllipsis(word, maxWidth, fontSize, minFontSize);
+              lines.push(fittedWord);
 
-    // NEW: Calculate font size based on width constraints only, not line count
-    let finalFontSize = fontSize;
-    textSize(finalFontSize);
-    
-    // Only reduce font size if single-line text is too wide
-    if (textWidth(text) > maxWidth) {
-        while (textWidth(text) > maxWidth && finalFontSize > minFontSize) {
-            finalFontSize--;
-            textSize(finalFontSize);
-        }
-    }
-    
-    // Use the final font size for all subsequent text operations
-    textSize(finalFontSize);
+              if (lines.length >= maxLines) {
+                  if (i < words.length -1 || textWidth(fittedWord) > maxWidth) { // more words or current word truncated
+                     lines[maxLines-1] = fitTextWithMiddleEllipsis(lines[maxLines-1], maxWidth, fontSize, minFontSize);
+                     if (!lines[maxLines-1].endsWith("...")) lines[maxLines-1] += "...";
+                  }
+                  return lines.slice(0, maxLines);
+              }
+              currentLine = ""; // Reset current line after handling a very long word
+              continue; 
+          }
 
-    // NEW: Try to create more balanced lines
-    if (shouldForceTwoLines && words.length > 1) {
-        // Find the midpoint that creates the most balanced lines
-        let bestBreakIndex = 1;
-        let smallestDiff = Infinity;
-        
-        for (let i = 1; i < words.length; i++) {
-            let firstPart = words.slice(0, i).join(' ');
-            let secondPart = words.slice(i).join(' ');
-            let diff = Math.abs(textWidth(firstPart) - textWidth(secondPart));
-            
-            // Check if this split creates lines that fit
-            if (textWidth(firstPart) <= maxWidth && textWidth(secondPart) <= maxWidth && diff < smallestDiff) {
-                smallestDiff = diff;
-                bestBreakIndex = i;
-            }
-        }
-        
-        // Create the two lines using the best break point
-        lines = [
-            words.slice(0, bestBreakIndex).join(' '),
-            words.slice(bestBreakIndex).join(' ')
-        ];
-    } else {
-        // Regular line breaking logic for single line or when not forcing two lines
-        for (let i = 1; i < words.length; i++) {
-            let testLine = currentLine + ' ' + words[i];
-            let shouldBreak = textWidth(testLine) > maxWidth;
 
-            if (shouldBreak) {
+          if (textWidth(testLine) <= maxWidth) {
+              currentLine = testLine;
+          } else {
                 lines.push(currentLine);
-                currentLine = words[i];
-                if (lines.length === maxLines - 1) {
-                    // Add remaining words to currentLine
-                    for (i++; i < words.length; i++) {
-                        currentLine += ' ' + words[i];
-                    }
-                    break;
-                }
-            } else {
-                currentLine = testLine;
-            }
-        }
+              currentLine = word;
+          }
+
+          if (lines.length >= maxLines -1 && currentLine !== "") { // If we are about to fill the last allowed line
+              if (i < words.length -1 || textWidth(currentLine) > maxWidth ) { // Check if there are more words OR current line itself is too long
+                  // If so, and we are on the last possible line, truncate currentLine with ellipsis
+                  if (lines.length === maxLines -1) {
+                      currentLine = fitTextWithMiddleEllipsis(currentLine, maxWidth, fontSize, minFontSize);
+                       if (!currentLine.endsWith("...")) currentLine += "...";
+                  }
+              }
+          }
+           if (lines.length >= maxLines) break; // Stop if we have enough lines
+      }
+
+      if (currentLine !== "") {
         lines.push(currentLine);
     }
 
-    // If we have more lines than allowed, merge extras into last line
+      // Final check if total lines exceed maxLines
     if (lines.length > maxLines) {
-        lines = lines.slice(0, maxLines - 1).concat([lines.slice(maxLines - 1).join(' ')]);
-    }
-
-    // If last line is too long, use ellipsis
-    if (lines.length === maxLines && textWidth(lines[maxLines - 1]) > maxWidth) {
-        lines[maxLines - 1] = fitTextWithMiddleEllipsis(lines[maxLines - 1], maxWidth, finalFontSize, minFontSize);
+          let lastLine = lines[maxLines - 1];
+          // Ensure the last line has an ellipsis if it was truncated or if there were more lines
+          lines[maxLines-1] = fitTextWithMiddleEllipsis(lastLine, maxWidth, fontSize, minFontSize);
+          if (!lines[maxLines-1].endsWith("...")) lines[maxLines-1] += "...";
+          return lines.slice(0, maxLines);
     }
 
     return lines;
   }
 
-  // Key handling for vintage filter toggle - APlasker
+  // Placeholder for p5.js keyPressed function if needed later
   function keyPressed() {
-    // No key bindings currently active
-    return false; // Prevent default behavior
+    // Check if the currently focused element is an input or textarea
+    const activeEl = document.activeElement;
+    if (activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA")) {
+      // If it is, allow the default browser action (typing into the field)
+      return true;
+    }
+
+    // Handle auth modal keyboard input (unified design system)
+    if (typeof handleAuthModalKeyboard === 'function' && window.authModal && window.authModal.active) {
+      if (handleAuthModalKeyboard(key, keyCode)) {
+        return false; // Auth modal handled the key
+      }
+    }
+
+    // This function can be used for keyboard interactions if desired.
+    // For example, pressing a key to show a hint or reset the game.
+    // Currently, it's not used for core game mechanics.
+
+    // Example: Press 'h' for a hint
+    // if (gameStarted && !gameWon && !showingHint) {
+    //   showHint();
+    // }
+
+    // Example: Press 'r' to reset the game (after win or during play)
+    // if (gameStarted || gameWon) {
+    //   // Reset game state and re-initialize
+    //   // This would involve calling initializeGame() or a similar reset function
+    // }
+    return false; // Prevent default browser action for other key presses
+  }
+  
+  // Function to draw the profile screen - APlasker
+  function drawProfileScreen() {
+    // Use same background as rest of game
+    background(COLORS.background);
+    
+    // Draw floral pattern around the entire screen, outside the play area
+    try {
+      if (typeof drawFloralBorder !== 'undefined') {
+        drawFloralBorder();
+      }
+    } catch (error) {
+      console.log("Error calling drawFloralBorder:", error);
+    }
+    
+    // Play area border removed for cleaner profile screen appearance
+    
+    // =============================================================================
+    // STATS SECTION (25% of screen height)
+    // =============================================================================
+    const statsHeight = playAreaHeight * 0.25;
+    const statsY = playAreaY;
+    
+    // Back button (top-left)
+    const backButtonSize = Math.max(playAreaWidth * 0.08, 30);
+    const backButtonX = playAreaX + backButtonSize / 2 + 10;
+    const backButtonY = statsY + 10 + backButtonSize / 2;
+    
+    // Check if back button is hovered
+    const backButtonHovered = dist(mouseX, mouseY, backButtonX, backButtonY) < backButtonSize / 2;
+    
+    // Draw back button
+    push();
+    fill(backButtonHovered ? COLORS.secondary : COLORS.primary);
+    noStroke(); // No outline to match Cook/Hint buttons
+    circle(backButtonX, backButtonY, backButtonSize);
+    
+    // Draw back arrow
+    fill('white');
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(backButtonSize * 0.4);
+    textFont('Helvetica, Arial, sans-serif'); // Sans serif font to match Cook/Hint buttons
+    textStyle(BOLD);
+    text("←", backButtonX, backButtonY);
+    pop();
+    
+    // Sign Out button (top-right)
+    const signOutButtonWidth = playAreaWidth * 0.2;
+    const signOutButtonHeight = backButtonSize * 0.8;
+    const signOutButtonX = playAreaX + playAreaWidth - signOutButtonWidth/2 - 10;
+    const signOutButtonY = statsY + 10 + signOutButtonHeight/2;
+    
+    // Check if sign out button is hovered
+    const signOutHovered = dist(mouseX, mouseY, signOutButtonX, signOutButtonY) < signOutButtonWidth/2;
+    
+    // Draw sign out button
+    push();
+    rectMode(CENTER);
+    fill(signOutHovered ? lerpColor(color(COLORS.secondary), color(255), 0.2) : COLORS.secondary); // Dark pink button to match game colors
+    noStroke(); // No outline to match Cook/Hint buttons
+    rect(signOutButtonX, signOutButtonY, signOutButtonWidth, signOutButtonHeight, 8);
+    
+    // Sign out button text
+    fill('white');
+    noStroke();
+      textAlign(CENTER, CENTER);
+    textSize(Math.max(signOutButtonHeight * 0.25, 10));
+    textFont('Helvetica, Arial, sans-serif'); // Sans serif font to match Cook/Hint buttons
+    textStyle(BOLD);
+    text("Sign Out", signOutButtonX, signOutButtonY);
+    pop();
+    
+    // "COMBO MEAL" title (enlarged for profile screen prominence)
+    const titleY = statsY + statsHeight * 0.4;
+    const titleText = "COMBO MEAL";
+    const titleSize = Math.max(playAreaWidth * 0.0825, 30); // Increased by 50% from 0.055 to 0.0825, min from 20 to 30
+    
+    push();
+    textAlign(CENTER, CENTER);
+    textSize(titleSize);
+    textStyle(BOLD);
+    textFont(titleFont); // Use Courier font like game screen
+    
+    // Calculate letter spacing for kerning effect
+    let titleX = playAreaX + playAreaWidth / 2;
+    let totalWidth = 0;
+    let letterWidths = [];
+    
+    // Calculate individual letter widths
+    for (let i = 0; i < titleText.length; i++) {
+      let letterWidth = textWidth(titleText[i]);
+      letterWidths.push(letterWidth);
+      totalWidth += letterWidth;
+    }
+    
+    // Add kerning (0% increase in spacing like game screen)
+    const kerningFactor = 0; // 0% extra space like game screen
+    let totalKerning = 0;
+    for (let i = 0; i < titleText.length - 1; i++) {
+      totalKerning += letterWidths[i] * kerningFactor;
+    }
+    
+    // Starting position
+    let x = titleX - (totalWidth + totalKerning) / 2;
+    
+    // Bubble Pop effect parameters (exact copy from game screen)
+    const bounceAmount = 2 * Math.sin(frameCount * 0.05); // Subtle bounce animation
+    
+    // Calculate outline sizes (scaled proportionally with larger title)
+    const outerSize = Math.max(titleSize * 0.1, 3);   // Scale with title size, min 3px
+    const middleSize = Math.max(titleSize * 0.067, 2);  // Scale with title size, min 2px  
+    const innerSize = Math.max(titleSize * 0.017, 0.5); // Scale with title size, min 0.5px
+    
+    // IMPROVED OUTLINE APPROACH - Draw outlines for each letter (exact copy from game screen)
+    // First pass: Draw all outline layers for all letters
+    for (let layer = 0; layer < 3; layer++) {
+      let currentX = x; // Reset x position for each layer
+      
+      let layerSize, layerColor;
+      switch (layer) {
+        case 0: // Outer black outline
+          layerSize = outerSize;
+          layerColor = 'black';
+          break;
+        case 1: // Middle peach outline
+          layerSize = middleSize;
+          layerColor = COLORS.peach;
+          break;
+        case 2: // Inner black outline
+          layerSize = innerSize;
+          layerColor = 'black';
+          break;
+      }
+      
+      push();
+      fill(layerColor);
+      textAlign(CENTER, CENTER);
+      textSize(titleSize);
+      
+      for (let i = 0; i < titleText.length; i++) {
+        // Calculate letter position with alternating bounce effect (exact copy from game screen)
+        let offsetY = (i % 2 === 0) ? bounceAmount : -bounceAmount;
+        let letterX = currentX + letterWidths[i]/2;
+        let letterY = titleY + offsetY;
+        
+        // Draw outline for this letter
+        for (let angle = 0; angle < TWO_PI; angle += PI/16) {
+          let outlineOffsetX = cos(angle) * layerSize;
+          let outlineOffsetY = sin(angle) * layerSize;
+          text(titleText[i], letterX + outlineOffsetX, letterY + outlineOffsetY);
+        }
+        
+        // Move to next letter position
+        currentX += letterWidths[i] * (1 + kerningFactor);
+      }
+      pop();
+    }
+    
+    // Second pass: Draw colored letters on top (exact copy from game screen)
+    for (let i = 0; i < titleText.length; i++) {
+      // Choose color based on position (exact copy from game screen)
+      let letterColor;
+      switch (i % 3) {
+        case 0:
+          letterColor = '#cfc23f'; // Mustard yellow from game screen
+          break;
+        case 1:
+          letterColor = '#f7dc30'; // Bright yellow from game screen
+          break;
+        case 2:
+          letterColor = COLORS.secondary; // Pink from game screen
+          break;
+      }
+      
+      // Calculate letter position with alternating bounce effect (exact copy from game screen)
+      let offsetY = (i % 2 === 0) ? bounceAmount : -bounceAmount;
+      let letterX = x + letterWidths[i]/2;
+      let letterY = titleY + offsetY;
+      
+      // Draw the colored letter
+      push();
+      textAlign(CENTER, CENTER);
+      textSize(titleSize);
+      fill(letterColor);
+      text(titleText[i], letterX, letterY);
+      pop();
+      
+      // Move to the next letter position with kerning
+      x += letterWidths[i] * (1 + kerningFactor);
+    }
+    pop();
+    
+    // Draw 4-card stats grid in lower part of stats section
+    const userId = window.authState?.user?.id;
+    if (userId && typeof getUserProfile === 'function') {
+      if (!window.profileData || window.profileData.loading) {
+        // Show loading state
+        textAlign(CENTER, CENTER);
+        textSize(Math.max(playAreaWidth * 0.04, 16));
+        textStyle(NORMAL);
+        fill(COLORS.text);
+        text("Loading your stats...", playAreaX + playAreaWidth / 2, statsY + statsHeight * 0.7);
+        
+        // Load profile data
+        if (!window.profileData) {
+          window.profileData = { loading: true };
+          window.recipeNamesCache = null;
+          window.recipeImagesCache = null;
+          window.loadingRecipeNames = false;
+          window.loadingRecipeImages = false;
+          
+          getUserProfile(userId).then(profile => {
+            if (profile) {
+          console.log("Profile loaded with unique recipes:", profile.unique_recipes?.length || 0);
+              window.profileData = profile;
+          
+          // Initialize lazy loading with first batch of recipes
+          allUniqueRecipes = profile.unique_recipes || [];
+          hasMoreRecipes = allUniqueRecipes.length >= recipesPerPage;
+          
+          // Note: Animation will be triggered when recipe names/images are loaded, not here
+            } else {
+              window.profileData = { error: true };
+            }
+          }).catch(error => {
+            console.error("Error loading profile:", error);
+            window.profileData = { error: true };
+          });
+        }
+      } else if (window.profileData.error) {
+        // Show error state
+        textAlign(CENTER, CENTER);
+        textSize(Math.max(playAreaWidth * 0.035, 14));
+        textStyle(NORMAL);
+        fill(COLORS.secondary);
+        text("Error loading stats", playAreaX + playAreaWidth / 2, statsY + statsHeight * 0.7);
+      } else {
+        // Draw 4-card stats grid
+        const cardHeight = statsHeight * 0.4;
+        const cardWidth = playAreaWidth * 0.18;
+        const cardSpacing = playAreaWidth * 0.04;
+        const totalCardsWidth = (cardWidth * 4) + (cardSpacing * 3);
+        const cardsStartX = playAreaX + (playAreaWidth - totalCardsWidth) / 2;
+        const cardsY = statsY + statsHeight * 0.55;
+        
+        const metrics = [
+          { 
+            label: "Current\nStreak", 
+            value: window.profileData.current_streak || 0,
+            x: cardsStartX 
+          },
+          { 
+            label: "Best\nStreak", 
+            value: window.profileData.longest_streak || 0,
+            x: cardsStartX + cardWidth + cardSpacing
+          },
+          { 
+            label: "Recipes\nMade", 
+            value: window.profileData.recipes_made || 0,
+            x: cardsStartX + (cardWidth + cardSpacing) * 2
+          },
+          { 
+            label: "Average\nScore", 
+            value: (window.profileData.average_star_score || 0).toFixed(1),
+            x: cardsStartX + (cardWidth + cardSpacing) * 3,
+            suffix: "⭐"
+          }
+        ];
+        
+        push();
+        rectMode(CORNER);
+        
+        metrics.forEach(metric => {
+          // Draw card background
+          fill(255); // Pure white background
+          stroke(COLORS.primary);
+          strokeWeight(1);
+          rect(metric.x, cardsY, cardWidth, cardHeight, 8);
+          
+          // Draw label
+          fill(COLORS.text);
+          noStroke();
+          textAlign(CENTER, TOP);
+          textSize(Math.max(cardWidth * 0.1, 10));
+          textStyle(NORMAL);
+          text(metric.label, metric.x + cardWidth/2, cardsY + cardHeight * 0.15);
+          
+          // Draw value
+          textAlign(CENTER, BOTTOM);
+          textSize(Math.max(cardWidth * 0.22, 16));
+          textStyle(BOLD);
+          fill(COLORS.primary);
+          const displayValue = metric.value + (metric.suffix || "");
+          text(displayValue, metric.x + cardWidth/2, cardsY + cardHeight * 0.85);
+        });
+        
+        pop();
+      }
+    }
+    
+    // =============================================================================
+    // RECIPE SECTION (75% of screen height)
+    // =============================================================================
+    const recipesY = statsY + statsHeight;
+    const recipesHeight = playAreaHeight * 0.75;
+    
+    // Recipe box (bottom third of recipe section)
+    const greenBoxHeight = recipesHeight * 0.33;
+    const greenBoxY = recipesY + recipesHeight - greenBoxHeight;
+    const greenBoxWidth = playAreaWidth * 0.95;
+    const greenBoxX = playAreaX + (playAreaWidth - greenBoxWidth) / 2;
+    
+    // Cards scroll area (top two-thirds of recipe section)
+    const cardScrollAreaHeight = recipesHeight - greenBoxHeight;
+    
+    // =============================================================================
+    // 3D RECIPE BOX CHARACTER (drawn behind Recipe CardTops)
+    // =============================================================================
+    
+    push();
+    rectMode(CORNER);
+    
+    // Calculate dimensions for 3D lid effect
+    const lidTopHeight = greenBoxHeight / 3; // Lid top is 1/3 of box height
+    const trapezoidHeight = greenBoxHeight * 0.4; // Trapezoid height for good proportion
+    const trapezoidBottomWidth = greenBoxWidth * 0.75; // Bottom is 75% of box width
+    const trapezoidTopWidth = greenBoxWidth; // Top matches box width
+    
+    // Calculate positions for each layer
+    const lidTopY = greenBoxY - lidTopHeight - trapezoidHeight;
+    const trapezoidY = greenBoxY - trapezoidHeight;
+    const trapezoidBottomX = greenBoxX + (greenBoxWidth - trapezoidBottomWidth) / 2; // Center the trapezoid bottom
+    
+    // LAYER 1: Base Recipe Box (bottom, right angles)
+    // Draw shadow for base box
+    fill(0, 0, 0, 40);
+    noStroke();
+    rect(greenBoxX + 4, greenBoxY + 4, greenBoxWidth, greenBoxHeight); // No rounded corners
+    
+    // Store orange recipe box coordinates to draw AFTER cards (so cards go behind it)
+    window.orangeRecipeBox = {
+      x: greenBoxX,
+      y: greenBoxY,
+      w: greenBoxWidth,
+      h: greenBoxHeight,
+      squareWidth: greenBoxWidth / 3,
+      squareHeight: greenBoxHeight / 2
+    };
+    
+    // =============================================================================
+    // CUTE RECIPE BOX FACE - APlasker
+    // =============================================================================
+    
+    // Store face coordinates to draw later with the box
+    window.recipeBoxFace = {
+      leftEyeX: greenBoxX + (greenBoxWidth / 3),
+      rightEyeX: greenBoxX + (greenBoxWidth / 3) * 2,
+      eyeY: greenBoxY + (greenBoxHeight / 2),
+      eyeSize: Math.min(greenBoxWidth / 3, greenBoxHeight / 2) * 0.22,
+      mouthX: greenBoxX + (greenBoxWidth / 3) * 1.5,
+      mouthY: greenBoxY + (greenBoxHeight / 2) * 1.5,
+      mouthWidth: (greenBoxWidth / 3) * 0.25,
+      mouthHeight: (greenBoxHeight / 2) * 0.15,
+      leftCheekX: greenBoxX + (greenBoxWidth / 3) * 0.5,
+      leftCheekY: greenBoxY + (greenBoxHeight / 2) * 1.5,
+      rightCheekX: greenBoxX + (greenBoxWidth / 3) * 2.5,
+      rightCheekY: greenBoxY + (greenBoxHeight / 2) * 1.5,
+      cheekFlowerSize: Math.min(greenBoxWidth / 3, greenBoxHeight / 2) * 0.12
+    };
+
+    // LAYER 2: Trapezoid Lid (middle, light green)
+    // Draw light green trapezoid lid (no shadow)
+    fill(COLORS.primary); // Light green color
+    stroke(0);
+    strokeWeight(3); // Increased from 2 for bolder outline
+    quad(
+      trapezoidBottomX, greenBoxY, // Bottom left (shares border with box top)
+      trapezoidBottomX + trapezoidBottomWidth, greenBoxY, // Bottom right
+      greenBoxX + greenBoxWidth, trapezoidY, // Top right
+      greenBoxX, trapezoidY // Top left
+    );
+    
+    // LAYER 3: Lid Top Rectangle (top, orange)
+    // Draw lid top shadow
+    fill(0, 0, 0, 40);
+    noStroke();
+    rect(greenBoxX + 4, lidTopY + 4, greenBoxWidth, lidTopHeight); // Shadow offset
+    
+    // Draw orange lid top (shares border with trapezoid top)
+    fill(COLORS.peach); // Same orange as recipe box
+    stroke(0);
+    strokeWeight(3); // Increased from 2 for bolder outline
+    rect(greenBoxX, lidTopY, greenBoxWidth, lidTopHeight);
+    
+    pop();
+    
+    // Handle recipe completions with simplified card design
+    if (window.profileData && !window.profileData.loading && !window.profileData.error) {
+        if (window.profileData.unique_recipes && window.profileData.unique_recipes.length > 0) {
+        
+        // Show loading state if either names or images are not loaded
+        if (!window.recipeNamesCache || !window.recipeImagesCache) {
+          // Initialize loading flags if they don't exist
+          if (typeof window.loadingRecipeNames === 'undefined') {
+            window.loadingRecipeNames = false;
+          }
+          if (typeof window.loadingRecipeImages === 'undefined') {
+            window.loadingRecipeImages = false;
+          }
+          
+          // Fetch recipe names if not cached and not currently loading
+          if (!window.recipeNamesCache && !window.loadingRecipeNames) {
+            console.log("Fetching recipe names for unique recipes...");
+            window.loadingRecipeNames = true;
+            const recipeIds = allUniqueRecipes.map(comp => comp.rec_id);
+            getRecipeNames(recipeIds).then(recipeMap => {
+              console.log("Recipe names fetched:", recipeMap);
+              window.recipeNamesCache = recipeMap;
+              window.loadingRecipeNames = false;
+              
+              // Check if both names and images are now loaded to trigger animation
+              if (window.recipeImagesCache && !profileDataLoaded) {
+                console.log("Both recipe names and images loaded - triggering bounce animation");
+                animations.push(new RecipeBounceAnimation());
+                profileDataLoaded = true;
+              }
+            }).catch(error => {
+              console.error("Error fetching recipe names:", error);
+            window.recipeNamesCache = {};
+              window.loadingRecipeNames = false;
+          });
+          }
+          
+          // Also fetch recipe images for modal display if not cached and not currently loading
+          if (!window.recipeImagesCache && !window.loadingRecipeImages) {
+            console.log("Fetching recipe images for unique recipes...");
+            window.loadingRecipeImages = true;
+            const recipeIds = allUniqueRecipes.map(comp => comp.rec_id);
+            getRecipeImages(recipeIds).then(imageMap => {
+              console.log("Recipe images fetched:", imageMap);
+              window.recipeImagesCache = imageMap;
+              window.loadingRecipeImages = false;
+              
+              // Check if both names and images are now loaded to trigger animation
+              if (window.recipeNamesCache && !profileDataLoaded) {
+                console.log("Both recipe names and images loaded - triggering bounce animation");
+                animations.push(new RecipeBounceAnimation());
+                profileDataLoaded = true;
+              }
+            }).catch(error => {
+              console.error("Error fetching recipe images:", error);
+              window.recipeImagesCache = {};
+              window.loadingRecipeImages = false;
+            });
+          }
+          
+          // Show loading state while either is loading
+          push();
+          textAlign(CENTER, CENTER);
+            textSize(Math.max(playAreaWidth * 0.035, 14));
+            textStyle(NORMAL);
+            fill(COLORS.text);
+          text("Loading recipe details...", playAreaX + playAreaWidth / 2, recipesY + cardScrollAreaHeight / 2);
+          pop();
+          } else {
+          // Display simplified recipe cards using lazy loaded data
+          const recipes = allUniqueRecipes;
+          
+          // Recipe CardTop dimensions - overlapping design (reduced by 2% to fit inside box)
+          const cardWidth = greenBoxWidth * 0.98;
+          const cardHeight = 80; // Fixed height for recipe card tops
+          const cardOverlap = cardHeight * 0.05; // 5% overlap
+          const cardX = greenBoxX + (greenBoxWidth - cardWidth) / 2; // Center the narrower cards
+          
+          // Initialize scroll position
+          if (typeof recipeListScrollY === 'undefined') {
+            recipeListScrollY = 0;
+          }
+          
+          // FIXED: Calculate scroll limits to allow proper stacking behavior
+          const totalContentHeight = recipes.length * (cardHeight - cardOverlap);
+          // Allow much more scrolling to enable stacking at the top
+          recipeListMaxScroll = totalContentHeight + cardScrollAreaHeight;
+          
+          // Constrain scroll position - negative values bring cards up
+          recipeListScrollY = constrain(recipeListScrollY, -recipeListMaxScroll, 0);
+          
+          // Apply momentum scrolling
+          if (!recipeListScrolling && Math.abs(recipeListVelocity) > 0.1) {
+            recipeListScrollY += recipeListVelocity;
+            recipeListVelocity *= recipeListFriction;
+            recipeListScrollY = constrain(recipeListScrollY, -recipeListMaxScroll, 0);
+          }
+          
+          // Check if we need to load more recipes (lazy loading)
+          // Trigger when user has scrolled near the bottom
+          const scrolledNearBottom = Math.abs(recipeListScrollY) > recipeListMaxScroll * 0.8;
+          if (scrolledNearBottom && hasMoreRecipes && !recipesLoading && window.profileData) {
+            loadMoreRecipes();
+          }
+          
+          // Store clickable cards for interaction
+          let clickableCards = [];
+          
+          // Draw recipe card tops in forward order so earlier cards go behind later cards when stacked
+          for (let recipeIndex = 0; recipeIndex < recipes.length; recipeIndex++) {
+            const completion = recipes[recipeIndex];
+          
+                        // Calculate base card position with scroll and overlap - cards start 12px ABOVE the recipe box
+            let baseCardY = greenBoxY - 12 + (recipeIndex * (cardHeight - cardOverlap)) - Math.abs(recipeListScrollY);
+            
+            // STACKING BEHAVIOR: Clamp cards that hit the top edge of viewing area
+            const topEdge = recipesY;
+            let cardY = Math.max(baseCardY, topEdge);
+            
+            // BOUNCE ANIMATION: Apply bounce offset to the first recipe card - APlasker
+            if (recipeIndex === 0) {
+              // Find active RecipeBounceAnimation
+              for (let anim of animations) {
+                if (anim instanceof RecipeBounceAnimation && anim.active) {
+                  cardY += anim.getBounceOffset();
+                  break;
+                }
+              }
+            }
+            
+            // RECIPE BOX BOUNDARY: Prevent last 5 cards from going too far above the recipe box
+            // This makes it look like the rest of the cards are still close to the box!
+            const cardsFromEnd = recipes.length - 1 - recipeIndex; // 0 = last card, 1 = second to last, etc.
+            const isInLastGroup = cardsFromEnd < 5; // Last 5 cards move together
+            
+            if (isInLastGroup) {
+              // Calculate where the absolute last card would be
+              const lastCardIndex = recipes.length - 1;
+              const lastCardBaseY = greenBoxY - 12 + (lastCardIndex * (cardHeight - cardOverlap)) - Math.abs(recipeListScrollY);
+              const lastCardY = Math.max(lastCardBaseY, topEdge);
+              
+              // Check if the last card would go too far above the recipe box
+              // We want the final position to be right at the recipe box edge when fully scrolled
+              const maxDistanceAboveBox = 0; // Keep cards at the recipe box edge when fully scrolled
+              const lastCardBottom = lastCardY + cardHeight;
+              if (lastCardBottom < greenBoxY - maxDistanceAboveBox) {
+                // Calculate the offset needed to keep last card's bottom at the ideal position
+                const boundaryOffset = (greenBoxY - maxDistanceAboveBox - cardHeight) - lastCardY;
+                
+                // Apply this same offset to the current card in the group
+                cardY += boundaryOffset;
+              }
+            }
+            
+            // Skip cards that are completely below the visible area
+            if (cardY > recipesY + cardScrollAreaHeight) {
+              continue;
+            }
+            
+            // Get recipe info with proper null checking
+            const recipeInfo = window.recipeNamesCache && window.recipeNamesCache[completion.rec_id] ? window.recipeNamesCache[completion.rec_id] : null;
+              const recipeName = recipeInfo?.name || `Recipe #${completion.rec_id.slice(0, 8)}`;
+              const dayNumber = recipeInfo?.day_number || '?';
+              
+            // Format completion date
+            const completionDate = new Date(completion.completed_at);
+            const completionDateStr = completionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            
+            // Get recipe date from cache if available
+            const recipeDate = recipeInfo?.date || null;
+            let recipeDateStr = '';
+            if (recipeDate) {
+              const date = new Date(recipeDate);
+              recipeDateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+            
+            // Since cards are now clamped to stay within viewing area, they're always fully visible
+            const visibleCardTop = cardY;
+            const visibleCardBottom = cardY + cardHeight;
+            const visibleHeight = cardHeight;
+            
+            // Add to clickable cards for interaction
+            clickableCards.push({
+              completion: completion,
+              recipeName: recipeName,
+              dayNumber: dayNumber,
+              completionDateStr: completionDateStr,
+              recipeDateStr: recipeDateStr,
+              starScore: completion.star_score || 0,
+              bounds: {
+                x: cardX,
+                y: visibleCardTop,
+                w: cardWidth,
+                h: visibleHeight
+              },
+              fullBounds: {
+                x: cardX,
+                y: cardY,
+                w: cardWidth,
+                h: cardHeight
+              }
+            });
+              
+                        // Draw card (now always fully visible due to stacking behavior)
+              push();
+              rectMode(CORNER);
+            
+            // Card background with shadow - rounded top, flat bottom (more rounded to match recipe cards)
+            fill(0, 0, 0, 30);
+            noStroke();
+            // Draw shadow with rounded top corners only - increased radius to match recipe cards
+            drawRoundedTopRect(cardX + 3, cardY + 3, cardWidth, cardHeight, Math.max(cardWidth * 0.02, 8));
+            
+                        fill(255, 255, 255, 255); // Changed to 100% opacity (was 240)
+                stroke(COLORS.primary);
+                strokeWeight(2);
+            // Draw card with rounded top corners only - increased radius to match recipe cards
+            drawRoundedTopRect(cardX, cardY, cardWidth, cardHeight, Math.max(cardWidth * 0.02, 8));
+              
+            // Draw flowers in the corners of the card tops (match recipe cards)
+            const flowerSize = Math.max(cardWidth * 0.01, 2); // 1% of card width, min 2px
+            const cornerOffset = cardWidth * 0.04; // 4% of card width from edges
+            
+            // Draw flowers in each corner (only top corners for card tops)
+            drawFlower(cardX + cornerOffset, cardY + cornerOffset, flowerSize, COLORS.primary); // Top-left
+            drawFlower(cardX + cardWidth - cornerOffset, cardY + cornerOffset, flowerSize, COLORS.peach); // Top-right
+            
+            // === RECIPE NAME (optimized sizing for CardTops) ===
+              textAlign(CENTER, CENTER);
+            const recipeNameSize = min(max(cardWidth * 0.08, 12), 18); // Optimized: 8% of card width, min 12px, max 18px
+            const maxTitleWidth = cardWidth * 0.9;
+            
+            textSize(recipeNameSize);
+            fill(COLORS.secondary); // Pink color like recipe cards
+              textStyle(BOLD);
+            textFont('Courier, "Courier New", monospace'); // Courier font like recipe cards
+            
+            let displayName = recipeName;
+            const titleWidth = textWidth(displayName);
+            
+            // Use scale factor for dynamic sizing
+            let scaleFactor = 1.0;
+            if (titleWidth > maxTitleWidth) {
+              scaleFactor = maxTitleWidth / titleWidth;
+              textSize(recipeNameSize * scaleFactor);
+            }
+            
+            text(displayName, cardX + cardWidth/2, cardY + cardHeight * 0.25);
+            textStyle(NORMAL);
+            
+            // === AUTHOR (optimized sizing for CardTops) ===
+            if (recipeInfo?.author) {
+              textAlign(CENTER, CENTER);
+              textSize(min(max(cardWidth * 0.04, 6), 8)); // Optimized: 4% of card width, min 6px, max 8px
+              fill('#333333'); // Match win screen color
+              textStyle(BOLD); // Match win screen style
+              textFont('Courier, "Courier New", monospace'); // Match win screen font (same as recipe name)
+              
+              let authorText = `By ${recipeInfo.author}`;
+              text(authorText, cardX + cardWidth/2, cardY + cardHeight * 0.45);
+              textStyle(NORMAL);
+            }
+                
+            // === DATE AND STARS (bottom row) ===
+            const bottomRowY = cardY + cardHeight * 0.75;
+            textFont('Helvetica, Arial, sans-serif'); // Standard font for date/stars
+            textStyle(NORMAL);
+            
+            // Recipe date (left side)
+            if (recipeDateStr) {
+              textAlign(LEFT, CENTER);
+              let dateTextSize = Math.max(cardWidth * 0.025, 10);
+              textSize(dateTextSize);
+              fill(120, 120, 120); // Gray color for date
+              
+              // Scale date text to fit left half
+              const maxDateWidth = cardWidth * 0.4;
+              while (textWidth(recipeDateStr) > maxDateWidth && dateTextSize > 8) {
+                dateTextSize *= 0.95;
+                textSize(dateTextSize);
+              }
+              
+              text(recipeDateStr, cardX + 15, bottomRowY);
+              }
+              
+            // Star rating (right side)
+            textAlign(RIGHT, CENTER);
+            let starTextSize = Math.max(cardWidth * 0.025, 10);
+            textSize(starTextSize);
+            fill(255, 215, 0); // Gold color for stars
+            
+            const starScore = completion.star_score || 0;
+            const starsText = "⭐".repeat(Math.max(0, starScore));
+            
+            // Scale star text to fit right half
+            const maxStarWidth = cardWidth * 0.4;
+            while (textWidth(starsText) > maxStarWidth && starTextSize > 8) {
+              starTextSize *= 0.95;
+              textSize(starTextSize);
+            }
+            
+            text(starsText, cardX + cardWidth - 15, bottomRowY);
+            
+            pop(); // End card drawing
+          }
+          
+          // Store clickable cards globally for interaction
+          window.clickableRecipeCards = clickableCards;
+          
+          // Show loading indicator if loading more recipes
+          if (recipesLoading) {
+            push();
+                textAlign(CENTER, CENTER);
+            textSize(Math.max(playAreaWidth * 0.03, 12));
+              textStyle(NORMAL);
+            fill(COLORS.primary);
+            text("Loading more recipes...", playAreaX + playAreaWidth / 2, recipesY + cardScrollAreaHeight - 30);
+              pop();
+          }
+          
+          // Draw recipe box top line over the cards so it's not cut off
+          if (window.recipeBoxTopLine) {
+              push();
+              stroke(0);
+            strokeWeight(3); // Same as recipe box outline
+            line(window.recipeBoxTopLine.x1, window.recipeBoxTopLine.y1, 
+                 window.recipeBoxTopLine.x2, window.recipeBoxTopLine.y2);
+              pop();
+          }
+        }
+                } else {
+        // No completed recipes - show message
+              push();
+                textAlign(CENTER, CENTER);
+        textSize(Math.max(playAreaWidth * 0.04, 16));
+              textStyle(NORMAL);
+        fill(COLORS.text);
+        text("Complete recipes to fill your box!", playAreaX + playAreaWidth / 2, recipesY + cardScrollAreaHeight / 2);
+              pop();
+      }
+    }
+    
+    // =============================================================================
+    // DRAW ORANGE RECIPE BOX AFTER CARDS (so cards appear behind it) - APlasker
+    // =============================================================================
+    if (window.orangeRecipeBox) {
+              push();
+      rectMode(CORNER);
+      
+      // Draw main orange recipe box base (right angles, no rounded corners)
+      fill(COLORS.peach); // Use peach/orange color for recipe box
+              stroke(0);
+      strokeWeight(3); // Increased from 2 for bolder outline
+      rect(window.orangeRecipeBox.x, window.orangeRecipeBox.y, window.orangeRecipeBox.w, window.orangeRecipeBox.h); // No rounded corners
+      
+      // Draw the cute recipe box face if face data exists
+      if (window.recipeBoxFace) {
+        const face = window.recipeBoxFace;
+              
+        // Draw eyes (medium circles)
+        fill('black');
+        noStroke();
+        circle(face.leftEyeX, face.eyeY, face.eyeSize);
+        circle(face.rightEyeX, face.eyeY, face.eyeSize);
+        
+        // Draw cute teacup-style smile (smooth bezier curve for natural appearance)
+        strokeWeight(Math.max(5, face.mouthWidth * 0.2)); // Extra thick stroke weight
+        strokeCap(ROUND); // Round line caps for smoother appearance
+        stroke('black');
+        noFill();
+        
+        // Use bezier curve for smooth, gradual smile instead of simple arc
+        const smileStartX = face.mouthX - face.mouthWidth/2;
+        const smileEndX = face.mouthX + face.mouthWidth/2;
+        const smileY = face.mouthY - face.mouthHeight/4; // Adjust Y position for bezier curve
+        const controlYOffset = face.mouthHeight * 0.6; // Control point offset for smooth curve
+        
+        bezier(
+          smileStartX, smileY, // Start point
+          smileStartX + face.mouthWidth * 0.2, smileY + controlYOffset, // First control point (gentle curve)
+          smileEndX - face.mouthWidth * 0.2, smileY + controlYOffset, // Second control point (gentle curve) 
+          smileEndX, smileY // End point
+        );
+        
+        // Draw rosy cheeks with floral pattern (bottom left and bottom right)
+        drawFlower(face.leftCheekX, face.leftCheekY, face.cheekFlowerSize, COLORS.secondary); // Pink floral pattern
+        drawFlower(face.rightCheekX, face.rightCheekY, face.cheekFlowerSize, COLORS.secondary); // Pink floral pattern
+      }
+      
+              pop();
+    }
+    
+    // =============================================================================
+    // RECIPE BOX TABS - Yellow index card tabs (drawn in front of cards) - APlasker
+    // =============================================================================
+    
+    // Tab dimensions
+    const tabWidth = greenBoxWidth / 6; // 1/6th as wide as recipe box
+    const tabHeight = greenBoxHeight / 8; // 1/8th as tall as recipe box
+    const tabY = greenBoxY - tabHeight; // Bottom of tab shares border with top of box
+    const tabCornerRadius = Math.max(tabWidth * 0.15, 5); // Rounded top corners
+    
+    // First tab - starts 10% from left side
+    const tab1X = greenBoxX + (greenBoxWidth * 0.1);
+    
+    // Second tab - starts 25% from left side  
+    const tab2X = greenBoxX + (greenBoxWidth * 0.25);
+            
+    // Draw tab shadows
+            push();
+            fill(0, 0, 0, 30);
+            noStroke();
+    drawRoundedTopRect(tab1X + 2, tabY + 2, tabWidth, tabHeight, tabCornerRadius); // Tab 1 shadow
+    drawRoundedTopRect(tab2X + 2, tabY + 2, tabWidth, tabHeight, tabCornerRadius); // Tab 2 shadow
+    
+    // Draw yellow tabs with rounded top corners
+    fill('#f7dc30'); // Bright yellow color (same as COMBO MEAL title)
+    stroke(0);
+    strokeWeight(3); // Increased from 2 for bolder outline
+    drawRoundedTopRect(tab1X, tabY, tabWidth, tabHeight, tabCornerRadius); // Tab 1
+    drawRoundedTopRect(tab2X, tabY, tabWidth, tabHeight, tabCornerRadius); // Tab 2
+            pop();
+    
+
+    
+    // =============================================================================
+    // RECIPE CARD MODAL - APlasker - UPDATED to be exact replica of win screen recipe card
+    // =============================================================================
+    if (recipeModalActive || recipeModalAnimating) {
+      // Handle modal opacity animation
+      if (recipeModalAnimating) {
+        if (recipeModalActive) {
+          // Fade in
+          recipeModalOpacity += 51; // Fast fade in
+          if (recipeModalOpacity >= 255) {
+            recipeModalOpacity = 255;
+            recipeModalAnimating = false;
+          }
+        } else {
+          // Fade out
+          recipeModalOpacity -= 51; // Fast fade out
+          if (recipeModalOpacity <= 0) {
+            recipeModalOpacity = 0;
+            recipeModalAnimating = false;
+            selectedRecipeCard = null; // Clear selected card data
+            window.selectedRecipeFullData = null; // Clear full recipe data
+          }
+        }
+      }
+      
+      if (recipeModalOpacity > 0 && selectedRecipeCard) {
+        // Draw modal overlay
+        push();
+        fill(0, 0, 0, recipeModalOpacity * 0.6); // Semi-transparent overlay
+        noStroke();
+        rect(0, 0, windowWidth, windowHeight);
+        pop();
+        
+        // Calculate recipe card size to match win screen exactly
+        const cardWidth = min(playAreaWidth * 0.95, 600); // Match win screen: min(playAreaWidth, 600) but allow 95% of play area
+        const cardHeight = playAreaHeight * 0.45; // Match win screen: playAreaHeight * 0.45
+        
+        // Position card slightly above center for better visual balance
+        const cardX = playAreaX + playAreaWidth / 2;
+        const cardY = playAreaY + playAreaHeight * 0.4; // Raised from 50% to 40% from top
+        
+        // Draw modal content - just the recipe card itself (no modal background container)
+        if (recipeModalOpacity > 200) { // Only show content when mostly opaque
+          
+          // Fetch full recipe data if not already loaded
+          if (!window.selectedRecipeFullData && selectedRecipeCard.completion) {
+            console.log("Fetching full recipe data for rec_id:", selectedRecipeCard.completion.rec_id);
+            
+            // Initialize loading state
+            window.selectedRecipeFullData = { loading: true };
+            
+            // Fetch the full recipe details
+            fetchRecipeByRecId(selectedRecipeCard.completion.rec_id).then(fullRecipeData => {
+              if (fullRecipeData) {
+                console.log("Full recipe data loaded:", fullRecipeData);
+                window.selectedRecipeFullData = fullRecipeData;
+              } else {
+                console.error("Failed to load recipe data");
+                window.selectedRecipeFullData = { error: true };
+              }
+            }).catch(error => {
+              console.error("Error loading recipe data:", error);
+              window.selectedRecipeFullData = { error: true };
+            });
+          }
+          
+          push();
+          
+          if (window.selectedRecipeFullData && window.selectedRecipeFullData.loading) {
+            // Show loading state on the card
+            // Draw card background for loading state
+            push();
+            rectMode(CENTER);
+            fill(255, 255, 255, recipeModalOpacity);
+            stroke(COLORS.primary);
+            strokeWeight(2);
+            rect(cardX, cardY, cardWidth, cardHeight, max(cardWidth * 0.02, 8));
+            pop();
+            
+            textAlign(CENTER, CENTER);
+            textSize(Math.max(cardWidth * 0.04, 16));
+            textStyle(NORMAL);
+            fill(COLORS.text);
+            text("Loading recipe details...", cardX, cardY);
+            
+          } else if (window.selectedRecipeFullData && window.selectedRecipeFullData.error) {
+            // Show error state on the card
+            // Draw card background for error state
+            push();
+            rectMode(CENTER);
+            fill(255, 255, 255, recipeModalOpacity);
+            stroke(COLORS.primary);
+            strokeWeight(2);
+            rect(cardX, cardY, cardWidth, cardHeight, max(cardWidth * 0.02, 8));
+            pop();
+            
+            textAlign(CENTER, CENTER);
+            textSize(Math.max(cardWidth * 0.035, 14));
+            textStyle(NORMAL);
+            fill(COLORS.secondary);
+            text("Error loading recipe details", cardX, cardY);
+            
+          } else if (window.selectedRecipeFullData && !window.selectedRecipeFullData.loading) {
+            // Draw the complete recipe card - exact replica of win screen
+            const recipeData = window.selectedRecipeFullData;
+            
+            // === RECIPE CARD (Direct replica of win screen, no container) ===
+            
+            // Draw Recipe Card with drop shadow (exactly like win screen)
+            push();
+            rectMode(CENTER);
+            fill(0, 0, 0, 30);
+            noStroke();
+            rect(cardX + 5, cardY + 5, cardWidth, cardHeight, max(cardWidth * 0.02, 8));
+            
+            // Card background (exactly like win screen)
+            fill(255);
+            stroke(220);
+            strokeWeight(1);
+            rect(cardX, cardY, cardWidth, cardHeight, max(cardWidth * 0.02, 8));
+            pop();
+            
+            // Draw flowers in the corners of the recipe card (exactly like win screen)
+            const flowerSize = max(cardWidth * 0.01, 2);
+            const cornerOffset = cardWidth * 0.04;
+            
+            drawFlower(cardX - cardWidth/2 + cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.primary);
+            drawFlower(cardX + cardWidth/2 - cornerOffset, cardY - cardHeight/2 + cornerOffset, flowerSize, COLORS.peach);
+            drawFlower(cardX - cardWidth/2 + cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.peach);
+            drawFlower(cardX + cardWidth/2 - cornerOffset, cardY + cardHeight/2 - cornerOffset, flowerSize, COLORS.primary);
+            
+            // === RECIPE NAME (adjusted for 5:4 ratio) ===
+            textAlign(CENTER, CENTER);
+            const recipeNameSize = min(max(cardWidth * 0.08, 16), 28); // Size relative to card width
+            const maxTitleWidth = cardWidth * 0.9;
+            
+            textSize(recipeNameSize);
+            fill(COLORS.secondary);
+            textStyle(BOLD);
+            
+            const recipeName = recipeData.recipeName || selectedRecipeCard.recipeName;
+            const titleWidth = textWidth(recipeName);
+            
+            let scaleFactor = 1.0;
+            if (titleWidth > maxTitleWidth) {
+              scaleFactor = maxTitleWidth / titleWidth;
+              textSize(recipeNameSize * scaleFactor);
+            }
+            
+            text(recipeName, cardX, cardY - cardHeight/2 + cardHeight * 0.12); // Adjusted position
+            textStyle(NORMAL);
+            
+            // === AUTHOR (adjusted for 5:4 ratio) ===
+            textAlign(CENTER, CENTER);
+            if (recipeData.author && recipeData.author.trim() !== "") {
+              // Use original sizing rule but ensure recipe name is always larger
+              const originalAuthorSize = min(max(cardWidth * 0.04, 8), 10); // Updated rule: 4% of card width, min 8px, max 10px
+              const actualRecipeNameSize = min(max(cardWidth * 0.08, 16), 28);
+              const scaledRecipeNameSize = scaleFactor < 1.0 ? actualRecipeNameSize * scaleFactor : actualRecipeNameSize;
+              
+              // Ensure recipe name is at least 2px larger than author (safeguard for edge cases)
+              const authorSize = min(originalAuthorSize, scaledRecipeNameSize - 2);
+              const finalAuthorSize = max(authorSize, 8); // Minimum 8px
+              
+              textSize(finalAuthorSize);
+              fill('#333333');
+              textStyle(BOLD);
+              text(`By ${recipeData.author}`, cardX, cardY - cardHeight/2 + cardHeight * 0.20); // Adjusted position
+              textStyle(NORMAL);
+            }
+            
+            // === RECIPE IMAGE (reduced by 10% from win screen) ===
+            const imageWidth = cardWidth * 0.54; // Reduced from 60% to 54% (10% smaller)
+            const imageHeight = imageWidth; // Keep square
+            let imageX = cardX - cardWidth/2 + cardWidth * 0.35; // Match win screen: 35% from left edge
+            let imageY = cardY - cardHeight/2 + cardHeight * 0.62; // Lowered from 56% to 62% from top
+            
+            push();
+            rectMode(CENTER);
+            imageMode(CENTER);
+            textAlign(CENTER, CENTER);
+            
+            // Check if we have the loaded image from cache
+            const recipeImageInfo = window.recipeImagesCache?.[selectedRecipeCard.completion.rec_id];
+            const hasLoadedImage = recipeImageInfo && recipeImageInfo.loadedImage;
+            
+            if (!hasLoadedImage || !recipeImageInfo.loadedImage) {
+              // Draw recipe image placeholder (exactly like win screen)
+              fill(240);
+              stroke(220);
+              strokeWeight(1);
+              rect(imageX, imageY, imageWidth, imageHeight, max(cardWidth * 0.02, 8));
+              
+              fill(180);
+              textSize(min(max(playAreaWidth * 0.025, 10), 14));
+              text("Recipe Image", imageX, imageY);
+            } else {
+              // Draw the actual recipe image (exactly like win screen)
+              const img = recipeImageInfo.loadedImage;
+              const imgRatio = img.width / img.height;
+              const boxRatio = imageWidth / imageHeight;
+              
+              let sx = 0, sy = 0, sw = img.width, sh = img.height;
+              
+              if (imgRatio > boxRatio) {
+                sw = img.height * boxRatio;
+                sx = (img.width - sw) / 2;
+              } else if (imgRatio < boxRatio) {
+                sh = img.width / boxRatio;
+                sy = (img.height - sh) / 2;
+              }
+              
+              const cornerRadius = max(cardWidth * 0.02, 8);
+              
+              push();
+              noStroke();
+              fill(255);
+              rect(imageX, imageY, imageWidth, imageHeight, cornerRadius);
+              drawingContext.clip();
+              
+              image(img, imageX, imageY, imageWidth, imageHeight, sx, sy, sw, sh);
+              
+              pop();
+              
+              noFill();
+              stroke(220);
+              strokeWeight(1);
+              rect(imageX, imageY, imageWidth, imageHeight, cornerRadius);
+            }
+            
+            pop();
+            
+            // === RECIPE DESCRIPTION (match win screen exactly) ===
+            const descriptionX = cardX - cardWidth/2 + cardWidth * 0.67; // Match win screen: 67% from left
+            const descriptionWidth = cardWidth * 0.3; // Match win screen: 30% of card width
+            const descriptionY = cardY - cardHeight/2 + cardHeight * 0.25; // Match win screen: 25% from top
+            
+            push();
+            fill('#666');
+            textAlign(LEFT, TOP);
+            textSize(min(max(playAreaWidth * 0.03, 10), 12)); // Updated: 3% of play area width, min 10px, max 12px
+            
+            const maxDescriptionHeight = cardHeight * 0.60; // Match win screen: 60% of card height
+            const description = recipeData.description || "A delicious recipe from your collection!";
+            
+            text(description, descriptionX, descriptionY, descriptionWidth, maxDescriptionHeight);
+            pop();
+            
+            // === "VIEW FULL RECIPE" LINK (match win screen exactly) ===
+            const recipeDetailsX = cardX - cardWidth/2 + cardWidth * 0.67; // Match win screen: 67% from left
+            const recipeDetailsY = cardY + cardHeight/2 - cardHeight * 0.15; // Match win screen: 15% from bottom
+            
+            // Check if mouse is over the recipe details link
+            const linkHovered = mouseX > recipeDetailsX && mouseX < recipeDetailsX + descriptionWidth &&
+                                mouseY > recipeDetailsY - 10 && mouseY < recipeDetailsY + 20;
+            
+            push();
+            textAlign(LEFT, CENTER);
+            textSize(min(max(playAreaWidth * 0.035, 12), 14)); // Updated: 3.5% of play area width, min 12px, max 14px
+            textStyle(BOLD);
+            fill(linkHovered ? COLORS.primary : '#666');
+            text("Make this recipe for real! →", recipeDetailsX, recipeDetailsY, descriptionWidth);
+            textStyle(NORMAL);
+            pop();
+            
+            // Store button data for click handling
+            window.recipeModalButtons = {
+              fullRecipe: {
+                x: recipeDetailsX + descriptionWidth/2, 
+                y: recipeDetailsY, 
+                w: descriptionWidth, 
+                h: 30,
+                url: recipeData.recipeUrl || "https://www.example.com/recipe"
+              }
+              // Close button removed - modal can be closed by tapping outside
+            };
+            
+            // === STATS SECTION BELOW RECIPE CARD ===
+            const statsY = cardY + cardHeight/2 + 30; // 30px gap below recipe card
+            const statsHeight = 45; // Reduced height since no headers
+            
+            // Determine if Easter egg was found from completion data
+            const eggFound = selectedRecipeCard.completion?.egg_found || false;
+            
+            // Calculate grid dimensions based on whether egg was found
+            const numStats = eggFound ? 4 : 3; // 4 stats if egg found, 3 otherwise
+            const statCardWidth = cardWidth / numStats - 10; // Divide width evenly with 10px spacing
+            const statCardHeight = statsHeight;
+            
+            // Draw stats grid
+            push();
+            rectMode(CORNER);
+            
+            const hintsUsed = selectedRecipeCard.completion?.hints_used || 0;
+            const starCount = Math.max(0, selectedRecipeCard.starScore);
+            
+            const stats = [
+              {
+                value: "⭐".repeat(starCount),
+                color: "#FFD700"
+              },
+              {
+                value: formatTime(selectedRecipeCard.completion?.total_time_seconds || 0),
+                color: COLORS.primary
+              },
+              {
+                value: `${hintsUsed} Hint${hintsUsed === 1 ? '' : 's'}`,
+                color: COLORS.secondary
+              }
+            ];
+            
+            // Only add egg stat if egg was found
+            if (eggFound) {
+              stats.push({
+                value: "🍳🥚", // Egg-in-pan emoji
+                color: "#FFA500"
+              });
+            }
+            
+            // Draw each stat card
+            for (let i = 0; i < stats.length; i++) {
+              const stat = stats[i];
+              const statX = cardX - cardWidth/2 + i * (statCardWidth + 10) + 5; // 5px left margin
+              
+              // Draw stat card background - white instead of grey
+              fill(255); // Pure white background
+              stroke(stat.color);
+              strokeWeight(2);
+              rect(statX, statsY, statCardWidth, statCardHeight, 8);
+              
+              // Draw value centered in the card
+              fill(stat.color);
+              noStroke();
+              textAlign(CENTER, CENTER);
+              
+              // Adjust text size for stars to ensure they fit
+              if (i === 0) { // Stars
+                let starTextSize = Math.max(statCardWidth * 0.15, 12);
+                textSize(starTextSize);
+                // Check if stars fit, reduce size if needed
+                while (textWidth(stat.value) > statCardWidth - 10 && starTextSize > 8) {
+                  starTextSize *= 0.9;
+                  textSize(starTextSize);
+                }
+              } else {
+                textSize(Math.max(statCardWidth * 0.18, 14));
+              }
+              
+              textStyle(BOLD);
+              text(stat.value, statX + statCardWidth/2, statsY + statCardHeight/2);
+            }
+            
+            pop();
+            
+            if (linkHovered) {
+              cursor(HAND);
+            }
+          }
+          
+          pop();
+        }
+      }
+    }
+    
+    // =============================================================================
+    // SIGN OUT CONFIRMATION MODAL - APlasker
+    // =============================================================================
+    if (signOutModalActive || signOutModalAnimating) {
+      // Handle modal opacity animation - FIXED: Faster animation
+      if (signOutModalAnimating) {
+        if (signOutModalActive) {
+          // Fade in - much faster
+          signOutModalOpacity += 51; // Increased from 15 to 51 for faster fade in (5 frames instead of 17)
+          if (signOutModalOpacity >= 255) {
+            signOutModalOpacity = 255;
+            signOutModalAnimating = false;
+          }
+        } else {
+          // Fade out - much faster
+          signOutModalOpacity -= 51; // Increased from 15 to 51 for faster fade out
+          if (signOutModalOpacity <= 0) {
+            signOutModalOpacity = 0;
+            signOutModalAnimating = false;
+            // Modal is now fully hidden
+          }
+        }
+      }
+      
+      if (signOutModalOpacity > 0) {
+        // Draw modal overlay
+    push();
+        fill(0, 0, 0, signOutModalOpacity * 0.5); // Semi-transparent overlay
+        noStroke();
+        rect(0, 0, windowWidth, windowHeight);
+        pop();
+        
+        // Draw modal box
+        const modalWidth = Math.min(playAreaWidth * 0.8, 300);
+        const modalHeight = Math.min(playAreaHeight * 0.4, 200);
+        const modalX = playAreaX + playAreaWidth / 2;
+        const modalY = playAreaY + playAreaHeight / 2;
+        
+        push();
+        rectMode(CENTER);
+        fill(255, 255, 255, signOutModalOpacity);
+        stroke(COLORS.primary);
+    strokeWeight(2);
+        rect(modalX, modalY, modalWidth, modalHeight, 12);
+        pop();
+        
+        // Draw modal content
+        if (signOutModalOpacity > 200) { // Only show text when mostly opaque
+          push();
+          
+          // Title - Updated text and improved spacing
+          textAlign(CENTER, CENTER);
+          textSize(Math.max(modalWidth * 0.06, 14));
+          textStyle(BOLD);
+          fill(COLORS.text);
+          text("Sign Out?", modalX, modalY - modalHeight * 0.3); // More space from top
+          
+          // User email - Better vertical spacing
+          textSize(Math.max(modalWidth * 0.045, 12));
+          textStyle(NORMAL);
+          fill(COLORS.text);
+          const userEmail = window.authState?.user?.email || "Current User";
+          text(`Currently signed in as:`, modalX, modalY - modalHeight * 0.1); // More even spacing
+          text(userEmail, modalX, modalY + modalHeight * 0.05); // Keep same position
+          
+          // Improved button positioning with better spacing
+          const buttonWidth = modalWidth * 0.3;
+          const buttonHeight = 35;
+          const buttonY = modalY + modalHeight * 0.3; // Moved down for more even spacing
+          const buttonSpacing = modalWidth * 0.25;
+          
+          // Cancel button - Use standard secondary button styling
+          const cancelX = modalX - buttonSpacing;
+          const cancelHovered = dist(mouseX, mouseY, cancelX, buttonY) < buttonWidth/2;
+          
+          rectMode(CENTER);
+          fill(cancelHovered ? lerpColor(color(255), color(COLORS.primary), 0.1) : 255);
+          stroke(COLORS.primary); // Standard secondary button stroke
+          strokeWeight(3); // Standardized stroke weight
+          rect(cancelX, buttonY, buttonWidth, buttonHeight, 8);
+          
+              fill(COLORS.primary); // Standard secondary button text color
+          noStroke();
+          textAlign(CENTER, CENTER);
+          textSize(Math.max(buttonHeight * 0.25, 12));
+          textStyle(BOLD);
+          text("Cancel", cancelX, buttonY);
+          
+          // Sign Out button - Using same pink as Sign Out button
+          const confirmX = modalX + buttonSpacing;
+          const confirmHovered = dist(mouseX, mouseY, confirmX, buttonY) < buttonWidth/2;
+          
+          fill(confirmHovered ? lerpColor(color(COLORS.secondary), color(255), 0.2) : COLORS.secondary);
+          stroke(COLORS.secondary); // Match stroke to fill color for consistency
+          strokeWeight(3); // Standardized stroke weight
+          rect(confirmX, buttonY, buttonWidth, buttonHeight, 8);
+          
+          fill('white');
+          noStroke();
+          textAlign(CENTER, CENTER);
+          textSize(Math.max(buttonHeight * 0.25, 12));
+          textStyle(BOLD);
+          text("Sign Out", confirmX, buttonY);
+          
+    pop();
+        }
+      }
+    }
+    
+    // Handle cursor changes
+    if (backButtonHovered || signOutHovered) {
+      cursor(HAND);
+    } else if (signOutModalActive && signOutModalOpacity > 200) {
+      // Check modal button hovers - Updated coordinates for new spacing
+      const modalWidth = Math.min(playAreaWidth * 0.8, 300);
+      const modalHeight = Math.min(playAreaHeight * 0.4, 200);
+      const modalX = playAreaX + playAreaWidth / 2;
+      const modalY = playAreaY + playAreaHeight / 2;
+      const buttonWidth = modalWidth * 0.3;
+      const buttonY = modalY + modalHeight * 0.3; // Updated to match new button position
+      const buttonSpacing = modalWidth * 0.25;
+      
+      const cancelX = modalX - buttonSpacing; // Updated positioning
+      const confirmX = modalX + buttonSpacing; // Updated positioning
+      
+      if (dist(mouseX, mouseY, cancelX, buttonY) < buttonWidth/2 || 
+          dist(mouseX, mouseY, confirmX, buttonY) < buttonWidth/2) {
+      cursor(HAND);
+      } else {
+        cursor(ARROW);
+      }
+    } else {
+      cursor(ARROW);
+    }
+  }
+  
+  // Profile screen state variables for scrolling - APlasker
+  let recipeListScrollY = 0; // Current scroll position
+  let recipeListMaxScroll = 0; // Maximum scroll distance
+  let recipeListScrolling = false; // Whether user is actively scrolling
+  let recipeListTouchStartY = 0; // Touch start position for scrolling
+  let recipeListVelocity = 0; // Scroll velocity for momentum
+  let recipeListFriction = 0.9; // Friction for momentum decay
+  let recipeListTotalScrollDistance = 0; // Track total scroll distance for tap/scroll detection
+  let profileDataLoaded = false; // Track if profile data has finished loading for the first time - APlasker
+  
+  // Lazy loading state variables - APlasker
+  let allUniqueRecipes = []; // All loaded unique recipes
+  let recipesLoading = false; // Whether we're currently loading more recipes
+  let hasMoreRecipes = true; // Whether there are more recipes to load
+  let recipesPerPage = 20; // How many recipes to load at once
+  
+  // Sign out modal state variables - APlasker
+  let signOutModalActive = false;
+  let signOutModalOpacity = 0;
+  let signOutModalAnimating = false;
+  let signOutModalButtons = { cancel: null, confirm: null };
+  
+  // Function to show sign out confirmation modal - APlasker
+  function showSignOutModal() {
+    signOutModalActive = true;
+    signOutModalAnimating = true;
+    signOutModalOpacity = 0;
+    
+    // Create modal buttons
+    const modalWidth = Math.min(playAreaWidth * 0.8, 300);
+    const modalHeight = Math.min(playAreaHeight * 0.4, 200);
+    const modalX = playAreaX + playAreaWidth / 2;
+    const modalY = playAreaY + playAreaHeight / 2;
+    
+    const buttonWidth = modalWidth * 0.35;
+    const buttonHeight = 40;
+    const buttonY = modalY + modalHeight * 0.15;
+    
+    signOutModalButtons.cancel = {
+      x: modalX - modalWidth * 0.15,
+      y: buttonY,
+      w: buttonWidth,
+      h: buttonHeight,
+      label: "Cancel"
+    };
+    
+    signOutModalButtons.confirm = {
+      x: modalX + modalWidth * 0.15,
+      y: buttonY,
+      w: buttonWidth,
+      h: buttonHeight,
+      label: "Sign Out"
+    };
+  }
+  
+  // Function to hide sign out modal - APlasker
+  function hideSignOutModal() {
+    signOutModalActive = false; // Immediately set to false so fade out works
+    signOutModalAnimating = true;
+    // Modal will be fully hidden when opacity reaches 0
+  }
+  
+  // Recipe modal state variables - APlasker
+  let recipeModalActive = false;
+  let recipeModalOpacity = 0;
+  let recipeModalAnimating = false;
+  let selectedRecipeCard = null; // Stores the recipe data for the selected card
+  
+  // Function to show recipe card modal - APlasker
+  function showRecipeCardModal(recipeData) {
+    selectedRecipeCard = recipeData;
+    recipeModalActive = true;
+    recipeModalAnimating = true;
+    recipeModalOpacity = 0;
+  }
+  
+  // Function to hide recipe card modal - APlasker
+  function hideRecipeCardModal() {
+    recipeModalActive = false;
+    recipeModalAnimating = true;
+    // Modal will fade out and be fully hidden when opacity reaches 0
+  }
+  
+  // Function to load more recipes for lazy loading - APlasker
+  async function loadMoreRecipes() {
+    if (recipesLoading || !hasMoreRecipes || !window.authState?.user?.id) {
+      return;
+    }
+    
+    console.log("Loading more recipes...");
+    recipesLoading = true;
+    
+    try {
+      const userId = window.authState.user.id;
+      const currentCount = allUniqueRecipes.length;
+      
+      // Load more recipes from the current offset
+      const moreRecipes = await loadMoreUniqueRecipes(userId, currentCount, recipesPerPage);
+      
+      if (moreRecipes && moreRecipes.length > 0) {
+        // Add new recipes to our collection
+        allUniqueRecipes.push(...moreRecipes);
+        
+        // Update names and images caches for new recipes
+        const newRecipeIds = moreRecipes.map(comp => comp.rec_id);
+        
+        // Load recipe names for new recipes
+        const [newRecipeNames, newRecipeImages] = await Promise.all([
+          getRecipeNames(newRecipeIds),
+          getRecipeImages(newRecipeIds)
+        ]);
+        
+        // Merge with existing caches
+        if (newRecipeNames) {
+          window.recipeNamesCache = { ...window.recipeNamesCache, ...newRecipeNames };
+        }
+        if (newRecipeImages) {
+          window.recipeImagesCache = { ...window.recipeImagesCache, ...newRecipeImages };
+        }
+        
+        // Check if we have more recipes to load
+        hasMoreRecipes = moreRecipes.length >= recipesPerPage;
+        
+        console.log(`Loaded ${moreRecipes.length} more recipes. Total: ${allUniqueRecipes.length}, Has more: ${hasMoreRecipes}`);
+      } else {
+        // No more recipes to load
+        hasMoreRecipes = false;
+        console.log("No more recipes to load");
+      }
+    } catch (error) {
+      console.error("Error loading more recipes:", error);
+    } finally {
+      recipesLoading = false;
+    }
+  }
+
+  // Helper function to draw rectangle with only top corners rounded
+  function drawRoundedTopRect(x, y, w, h, radius) {
+    push();
+    beginShape();
+    // Start from bottom left
+    vertex(x, y + h);
+    // Bottom right
+    vertex(x + w, y + h);
+    // Top right with curve
+    vertex(x + w, y + radius);
+    quadraticVertex(x + w, y, x + w - radius, y);
+    // Top edge
+    vertex(x + radius, y);
+    // Top left with curve
+    quadraticVertex(x, y, x, y + radius);
+    // Left edge back to start
+    vertex(x, y + h);
+    endShape(CLOSE);
+    pop();
+  }
+  
+  // Helper function for security monitoring
+  // Note: Actual monitoring functions are implemented in Supabase SQL
+  
+  function windowResized() {
+    // Existing resize code...
+    
+    // Update auth modal HTML input positions if active
+    if (typeof window.authModal !== 'undefined' && 
+        window.authModal.active && 
+        typeof updateHtmlInputPositions === 'function') {
+      updateHtmlInputPositions();
+    }
   }
   
   

@@ -251,8 +251,8 @@ function drawStarIcon(x, y, size) {
   // Use bright yellow color (#f7dc30) for star
   fill('#f7dc30');
   
-  // Add subtle outline with same visual weight as vessels
-  stroke(0, 50); // Use the same subtle border as buttons
+  // Add black outline to match game screen stars
+  stroke(0); // Use solid black outline like game screen stars
   strokeWeight(2);
   
   // Set parameters for a 5-pointed star
