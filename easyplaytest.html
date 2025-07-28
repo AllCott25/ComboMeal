@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culinary Logic Puzzle - Easy Playtest</title>
+    
+    <style>
+        /* Playtest selector styles */
+        .playtest-selector {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #F5F1E8;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        
+        .playtest-container {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+        }
+        
+        .playtest-title {
+            font-size: 28px;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .playtest-subtitle {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .playtest-select {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            background-color: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        
+        .playtest-select:hover {
+            border-color: #778F5D;
+        }
+        
+        .playtest-select:focus {
+            outline: none;
+            border-color: #778F5D;
+            box-shadow: 0 0 0 3px rgba(119, 143, 93, 0.1);
+        }
+        
+        .playtest-button {
+            width: 100%;
+            padding: 14px 24px;
+            background-color: #778F5D;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        
+        .playtest-button:hover {
+            background-color: #66804f;
+            transform: translateY(-1px);
+        }
+        
+        .playtest-button:active {
+            transform: translateY(0);
+        }
+        
+        .playtest-button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .playtest-error {
+            color: #d32f2f;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        .playtest-loading {
+            color: #666;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+        
+        /* Hide the selector when game starts */
+        .playtest-hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Playtest Date Selector -->
+    <div id="playtestSelector" class="playtest-selector">
+        <div class="playtest-container">
+            <h1 class="playtest-title">Easy Playtest Mode</h1>
+            <p class="playtest-subtitle">Select a recipe date to load the game</p>
+            
+            <select id="recipeSelect" class="playtest-select">
+                <option value="">Loading recipes...</option>
+            </select>
+            
+            <button id="loadRecipeBtn" class="playtest-button" disabled>
+                Load Recipe
+            </button>
+            
+            <div id="playtestMessage" class="playtest-loading" style="display: none;"></div>
+            <div id="playtestError" class="playtest-error" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <!-- Load all the game scripts in the same order as index.html -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- P5.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+    
+    <!-- Easy Playtest Script (must load before other game scripts) -->
+    <script>
+        // Easy playtest functionality
+        let easyPlaytestSelectedDate = null;
+        let easyPlaytestActive = true;
+        
+        // Prevent the game from starting automatically
+        window.easyPlaytestPreventAutoStart = true;
+        
+        // Function to load available recipes
+        async function loadRecipeList() {
+            try {
+                // Initialize Supabase if not already done
+                if (typeof window.supabase === 'undefined') {
+                    // Wait a bit for scripts to load
+                    setTimeout(loadRecipeList, 500);
+                    return;
+                }
+                
+                // Query all recipes
+                const { data: recipes, error } = await supabase
+                    .from('recipes')
+                    .select('date, name, rec_id')
+                    .order('date', { ascending: false });
+                
+                if (error) {
+                    throw error;
+                }
+                
+                if (!recipes || recipes.length === 0) {
+                    document.getElementById('recipeSelect').innerHTML = '<option value="">No recipes found</option>';
+                    return;
+                }
+                
+                // Group recipes by date and create options
+                const recipesByDate = {};
+                recipes.forEach(recipe => {
+                    const date = recipe.date;
+                    if (!recipesByDate[date]) {
+                        recipesByDate[date] = [];
+                    }
+                    recipesByDate[date].push(recipe.name);
+                });
+                
+                // Create select options
+                const selectElement = document.getElementById('recipeSelect');
+                selectElement.innerHTML = '<option value="">Choose a recipe date...</option>';
+                
+                Object.keys(recipesByDate).forEach(date => {
+                    const option = document.createElement('option');
+                    option.value = date;
+                    const recipeNames = recipesByDate[date].join(', ');
+                    option.textContent = `${date} - ${recipeNames}`;
+                    selectElement.appendChild(option);
+                });
+                
+                // Enable the select
+                selectElement.disabled = false;
+                
+            } catch (error) {
+                console.error('Error loading recipes:', error);
+                document.getElementById('recipeSelect').innerHTML = '<option value="">Error loading recipes</option>';
+                document.getElementById('playtestError').textContent = 'Error: ' + error.message;
+                document.getElementById('playtestError').style.display = 'block';
+            }
+        }
+        
+        // Function to start the game with selected date
+        async function startWithSelectedRecipe() {
+            const selectedDate = document.getElementById('recipeSelect').value;
+            if (!selectedDate) {
+                document.getElementById('playtestError').textContent = 'Please select a recipe date';
+                document.getElementById('playtestError').style.display = 'block';
+                return;
+            }
+            
+            try {
+                // Show loading message
+                document.getElementById('playtestMessage').textContent = 'Loading recipe...';
+                document.getElementById('playtestMessage').style.display = 'block';
+                document.getElementById('playtestError').style.display = 'none';
+                document.getElementById('loadRecipeBtn').disabled = true;
+                
+                // Store the selected date
+                easyPlaytestSelectedDate = selectedDate;
+                
+                // Override the date functions
+                window.getCurrentDateEST = function() {
+                    return easyPlaytestSelectedDate;
+                };
+                
+                // Hide the selector
+                document.getElementById('playtestSelector').classList.add('playtest-hidden');
+                
+                // Now start the game
+                if (typeof window.setup === 'function') {
+                    window.setup();
+                }
+                if (typeof window.startGame === 'function') {
+                    window.startGame();
+                }
+                
+            } catch (error) {
+                console.error('Error starting game:', error);
+                document.getElementById('playtestError').textContent = 'Error: ' + error.message;
+                document.getElementById('playtestError').style.display = 'block';
+                document.getElementById('playtestMessage').style.display = 'none';
+                document.getElementById('loadRecipeBtn').disabled = false;
+            }
+        }
+        
+        // Set up event listeners when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Enable the load button when a recipe is selected
+            document.getElementById('recipeSelect').addEventListener('change', function() {
+                const hasSelection = this.value !== '';
+                document.getElementById('loadRecipeBtn').disabled = !hasSelection;
+                if (hasSelection) {
+                    document.getElementById('playtestError').style.display = 'none';
+                }
+            });
+            
+            // Handle load button click
+            document.getElementById('loadRecipeBtn').addEventListener('click', startWithSelectedRecipe);
+            
+            // Start loading recipes after a short delay to ensure scripts are loaded
+            setTimeout(loadRecipeList, 1000);
+        });
+        
+        // Override the setup function to prevent auto-start
+        if (window.setup) {
+            const originalSetup = window.setup;
+            window.setup = function() {
+                if (!window.easyPlaytestPreventAutoStart || !easyPlaytestActive) {
+                    originalSetup();
+                }
+            };
+        }
+    </script>
+    
+    <!-- Configuration - loads environment-specific settings -->
+    <script src="js/config.js"></script>
+    <!-- Design System - must load before other game scripts -->
+    <script src="js/design-system.js"></script>
+    <!-- Our Supabase Integration -->
+    <script src="js/supabase.js"></script>
+    <!-- Streak System -->
+    <script src="js/streak.js"></script>
+    <!-- User Migration System -->
+    <script src="js/user-migration.js"></script>
+    <!-- VesselSystem Module - Load before main game script -->
+    <script src="js/modules/VesselSystem.js"></script>
+    <!-- Animation  Script -->
+    <script src="js/animation.js"></script>
+    <!-- Interaction Script -->
+    <script src="js/interaction.js"></script>
+    <!-- Menu System -->
+    <script src="js/menu.js"></script>
+    <!-- Authentication Modal -->
+    <script src="js/auth-modal.js"></script>
+    <!-- Main Game Script -->
+    <script src="js/sketch.js"></script>
+    <!-- GameLogic Script -->
+    <script src="js/GameLogic.js"></script>
+    <!-- Draw Script -->
+    <script src="js/draw.js"></script>
+    <!-- WinScreen Script -->
+    <script src="js/WinScreen.js"></script>
+    <!-- Egg Script -->
+    <script src="js/egg.js"></script>
+    <!-- Help Modal Script -->
+    <script src="js/help.js"></script>
+</body>
+</html>
