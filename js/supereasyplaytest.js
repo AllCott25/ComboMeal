@@ -270,6 +270,41 @@ async function loadGameWithRecipe(recipe) {
 async function loadGameScripts() {
     console.log('📦 Loading game scripts...');
     
+    // Set flags BEFORE loading any scripts to prevent wallpaper loading
+    window.skipWallpaperAnimation = true;
+    window.wallpaperImageReady = false;
+    window.loadingComplete = true;
+    
+    // Store the original Image constructor
+    window.OriginalImage = window.Image;
+    
+    // Override Image constructor to prevent wallpaper loading
+    window.Image = function() {
+        const img = new window.OriginalImage();
+        const originalSrcSetter = Object.getOwnPropertyDescriptor(window.OriginalImage.prototype, 'src').set;
+        
+        Object.defineProperty(img, 'src', {
+            set: function(value) {
+                // Block wallpaper image loading
+                if (value && (value.includes('wallpaper') || value.includes('assets/wallpaper'))) {
+                    console.log('🚫 Blocked wallpaper loading:', value);
+                    // Trigger error to skip wallpaper
+                    setTimeout(() => {
+                        if (img.onerror) img.onerror();
+                    }, 0);
+                    return;
+                }
+                // Allow other images
+                originalSrcSetter.call(this, value);
+            },
+            get: function() {
+                return this._src;
+            }
+        });
+        
+        return img;
+    };
+    
     const scripts = [
         'js/config.js',
         'js/design-system.js',
@@ -302,6 +337,11 @@ async function loadGameScripts() {
     
     window.gameScriptsLoaded = true;
     console.log('✅ All game scripts loaded');
+    
+    // Restore original Image constructor after scripts are loaded
+    if (window.OriginalImage) {
+        window.Image = window.OriginalImage;
+    }
 }
 
 /**
@@ -420,6 +460,13 @@ function setupGameEnvironment(recipeData) {
         window.SuperEasyPlaytest.originalFunctions.checkTodayCompletion = window.checkTodayCompletion;
     }
     
+    // Override loadWallpaperImage BEFORE scripts load to prevent CORS issues
+    window.loadWallpaperImage = function() {
+        console.log('🖼️ Skipping wallpaper loading in playtest mode');
+        window.wallpaperImageReady = false;
+        window.loadingComplete = true;
+    };
+    
     // Override date function to return our recipe's date
     window.getCurrentDateEST = function() {
         if (window.SuperEasyPlaytest.isActive && window.SuperEasyPlaytest.selectedRecipe) {
@@ -496,7 +543,7 @@ function initializeP5Game() {
         
         // Expose p5 functions globally (needed by the game code)
         const p5Functions = ['createCanvas', 'background', 'fill', 'stroke', 'strokeWeight',
-            'rect', 'ellipse', 'line', 'text', 'textSize', 'textAlign',
+            'rect', 'ellipse', 'circle', 'line', 'text', 'textSize', 'textAlign',
             'push', 'pop', 'translate', 'rotate', 'scale', 'loadImage',
             'image', 'tint', 'noTint', 'color', 'loadFont', 'textFont',
             'noStroke', 'noFill', 'smooth', 'noSmooth', 'cursor', 'noCursor',

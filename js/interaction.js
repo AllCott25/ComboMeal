@@ -847,6 +847,11 @@ function touchMoved() {
 
 // Helper function to check if a point is interacting with a modal element
 function isModalElement(x, y) {
+  // Validate coordinates
+  if (!isFinite(x) || !isFinite(y) || x === null || y === null || x === undefined || y === undefined) {
+    return false;
+  }
+  
   // Get the element at the given coordinates
   const element = document.elementFromPoint(x, y);
   
