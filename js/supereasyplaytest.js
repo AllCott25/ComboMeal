@@ -437,9 +437,9 @@ async function fetchRecipeData(date, recipeId) {
         
         // Fetch ingredients for all combinations
         const allCombinationIds = combinations.map(c => c.combo_id);
-        const { data: ingredientRelations, error: ingredientError } = await supabase
-            .from('ingredient_combo')
-            .select('*, ingredients(*)')
+        const { data: ingredients, error: ingredientError } = await supabase
+            .from('ingredients')
+            .select('*')
             .in('combo_id', allCombinationIds);
             
         if (ingredientError) throw ingredientError;
@@ -448,19 +448,45 @@ async function fetchRecipeData(date, recipeId) {
         const uniqueIngredients = new Map();
         const ingredientsByCombination = {};
         
-        ingredientRelations.forEach(rel => {
-            if (rel.ingredients) {
-                uniqueIngredients.set(rel.ingredients.ingredient_id, rel.ingredients.name);
-                
-                if (!ingredientsByCombination[rel.combo_id]) {
-                    ingredientsByCombination[rel.combo_id] = [];
-                }
-                ingredientsByCombination[rel.combo_id].push({
-                    ingredient_id: rel.ingredients.ingredient_id,
-                    name: rel.ingredients.name
-                });
+        ingredients.forEach(ing => {
+            uniqueIngredients.set(ing.ing_id, ing.name);
+            
+            if (!ingredientsByCombination[ing.combo_id]) {
+                ingredientsByCombination[ing.combo_id] = [];
             }
+            ingredientsByCombination[ing.combo_id].push({
+                ingredient_id: ing.ing_id,
+                name: ing.name
+            });
         });
+        
+        // Process combinations to match expected format
+        const finalCombo = combinations.find(c => c.is_final);
+        const intermediateCombos = combinations.filter(c => !c.is_final);
+        
+        // Get only base ingredients for the baseIngredients array
+        const baseIngredients = ingredients
+            .filter(ing => ing.is_base === true)
+            .map(ing => ing.name);
+        
+        // Format intermediate combinations with their required ingredients
+        const intermediateCombinations = intermediateCombos.map(combo => {
+            const comboIngredients = ingredientsByCombination[combo.combo_id] || [];
+            return {
+                name: combo.name,
+                required: comboIngredients.map(ing => ing.name),
+                verb: combo.verb || "mix",
+                combo_id: combo.combo_id
+            };
+        });
+        
+        // Format final combination
+        const finalCombination = finalCombo ? {
+            name: finalCombo.name,
+            required: intermediateCombinations.map(c => c.name), // Final requires intermediate combos
+            verb: finalCombo.verb || "prepare",
+            combo_id: finalCombo.combo_id
+        } : null;
         
         // Return in expected format
         return {
@@ -470,10 +496,13 @@ async function fetchRecipeData(date, recipeId) {
             imgUrl: recipe.img_url,
             day_number: recipe.day_number,
             date: recipe.date,
-            finalCombination: combinations.find(c => c.is_final),
-            intermediateCombinations: combinations.filter(c => !c.is_final),
-            ingredients: Array.from(uniqueIngredients.values()),
-            ingredientsByCombination: ingredientsByCombination
+            finalCombination: finalCombination,
+            intermediateCombinations: intermediateCombinations,
+            baseIngredients: [...new Set(baseIngredients)], // Deduplicated base ingredients
+            ingredients: Array.from(uniqueIngredients.values()), // All ingredients
+            ingredientsByCombination: ingredientsByCombination,
+            description: recipe.description,
+            author: recipe.author
         };
         
     } catch (error) {
@@ -538,13 +567,153 @@ function setupGameEnvironment(recipeData) {
         }
     };
     
+    // Store original startGame if it exists
+    if (window.startGame) {
+        window.SuperEasyPlaytest.originalFunctions.startGame = window.startGame;
+    }
+    
+    // Override startGame to work in playtest mode
+    window.startGame = function() {
+        console.log('🎮 StartGame called in playtest mode');
+        
+        // Store vessels before any reset might happen
+        const vesselBackup = window.vessels ? [...window.vessels] : [];
+        
+        // Check if we have vessels
+        if (!window.vessels || window.vessels.length === 0) {
+            console.warn('⚠️ No vessels available yet');
+            return;
+        }
+        
+        // Force game state to be ready
+        window.isLoadingRecipe = false;
+        window.wallpaperAnimation = null;
+        window.wallpaperAnimationActive = false;
+        
+        // Store original actuallyStartGame if it exists
+        const originalActuallyStartGame = window.actuallyStartGame;
+        
+        // Override actuallyStartGame to preserve vessels
+        window.actuallyStartGame = function() {
+            console.log('🚀 Starting game with vessel preservation');
+            
+            // Store vessels again in case they were modified
+            const currentVessels = window.vessels ? [...window.vessels] : vesselBackup;
+            
+            // Call original function
+            if (originalActuallyStartGame) {
+                originalActuallyStartGame.call(this);
+            }
+            
+            // Restore vessels if they were cleared
+            if (window.vessels.length === 0 && currentVessels.length > 0) {
+                console.log('🔧 Restoring vessels that were cleared during start');
+                window.vessels = currentVessels;
+                window.displayedVessels = currentVessels;
+            }
+            
+            // Ensure game state is set
+            window.gameStarted = true;
+            window.isLoadingRecipe = false;
+        };
+        
+        // Call actuallyStartGame
+        if (window.actuallyStartGame) {
+            window.actuallyStartGame();
+        } else {
+            console.error('❌ actuallyStartGame function not found');
+        }
+    };
+    
     // Set the recipe data globally
     window.recipeData = recipeData;
+    window.recipe_data = recipeData; // Some parts of the game use recipe_data instead
     
     // Store ingredients globally (needed by some game systems)
-    if (recipeData && recipeData.ingredients) {
-        window.ingredients = recipeData.ingredients;
-        console.log(`📦 Loaded ${recipeData.ingredients.length} ingredients:`, recipeData.ingredients);
+    if (recipeData && recipeData.baseIngredients) {
+        window.ingredients = recipeData.baseIngredients;
+        window.base_ingredients = recipeData.baseIngredients;
+        console.log(`📦 Loaded ${recipeData.baseIngredients.length} base ingredients:`, recipeData.baseIngredients);
+    }
+    
+    // Store combinations globally
+    if (recipeData && recipeData.intermediateCombinations) {
+        window.intermediate_combinations = recipeData.intermediateCombinations;
+        console.log(`🔄 Loaded ${recipeData.intermediateCombinations.length} intermediate combinations`);
+    }
+    
+    if (recipeData && recipeData.finalCombination) {
+        window.final_combination = recipeData.finalCombination;
+        console.log(`🎯 Loaded final combination: ${recipeData.finalCombination.name}`);
+    }
+    
+    // Set up global variables that menu system expects
+    if (typeof window.playAreaWidth === 'undefined') {
+        window.playAreaWidth = 800; // Default play area width
+    }
+    if (typeof window.playAreaX === 'undefined') {
+        window.playAreaX = 0; // Default play area X position
+    }
+    if (typeof window.COLORS === 'undefined') {
+        window.COLORS = {
+            background: '#F5F1E8',
+            primary: '#778F5D',
+            secondary: '#C9B5A0',
+            text: '#2D3A2E'
+        };
+    }
+    if (typeof window.Button === 'undefined') {
+        // Basic Button class for menu compatibility
+        window.Button = class Button {
+            constructor(x, y, width, height, text, callback) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.text = text;
+                this.callback = callback;
+                this.hovered = false;
+                this.color = '#778F5D';
+                this.textColor = 'white';
+            }
+            draw() {
+                // Basic button drawing for fallback
+                if (typeof rect !== 'undefined' && typeof fill !== 'undefined') {
+                    push();
+                    fill(this.hovered ? 200 : this.color);
+                    rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                    fill(this.textColor);
+                    textAlign(CENTER, CENTER);
+                    text(this.text, this.x, this.y);
+                    pop();
+                }
+            }
+            checkHover(mx, my) {
+                this.hovered = mx > this.x - this.width/2 && 
+                              mx < this.x + this.width/2 && 
+                              my > this.y - this.height/2 && 
+                              my < this.y + this.height/2;
+                return this.hovered;
+            }
+            checkClick() {
+                if (this.hovered && this.callback) {
+                    this.callback();
+                    return true;
+                }
+                return false;
+            }
+            isInside(mx, my) {
+                return mx > this.x - this.width/2 && 
+                       mx < this.x + this.width/2 && 
+                       my > this.y - this.height/2 && 
+                       my < this.y + this.height/2;
+            }
+            handleClick() {
+                if (this.callback) {
+                    this.callback();
+                }
+            }
+        };
     }
     
     // Disable animations for better performance
@@ -553,6 +722,8 @@ function setupGameEnvironment(recipeData) {
     
     // Disable wallpaper loading in playtest mode to avoid CORS issues
     window.wallpaperImageReady = false;
+    window.wallpaperAnimation = null; // Ensure no wallpaper animation is set
+    window.wallpaperAnimationActive = false;
     
     // Skip authentication
     window.isPlaytestMode = true;
@@ -565,6 +736,13 @@ function setupGameEnvironment(recipeData) {
             window.loadingComplete = true;
         };
     }
+    
+    // Initialize game state variables
+    window.gameStarted = false;
+    window.gameWon = false;
+    window.isLoadingRecipe = false;
+    window.vessels = window.vessels || [];
+    window.displayedVessels = window.displayedVessels || [];
     
     console.log('✅ Game environment ready');
 }
@@ -613,7 +791,9 @@ function initializeP5Game() {
             'quadraticVertex', 'curve', 'curveVertex', 'arc', 'triangle', 'quad',
             'mousePressed', 'mouseReleased', 'mouseMoved', 'mouseDragged',
             'mouseClicked', 'mouseWheel', 'keyPressed', 'keyReleased', 'keyTyped',
-            'windowResized', 'deviceMoved', 'deviceTurned', 'deviceShaken'
+            'windowResized', 'deviceMoved', 'deviceTurned', 'deviceShaken',
+            'lerpColor', 'red', 'green', 'blue', 'alpha', 'hue', 'saturation', 'brightness',
+            'colorMode', 'RGB', 'HSB', 'HSL'
         ];
         
         // Expose functions to window
@@ -738,6 +918,18 @@ function initializeP5Game() {
         
         // Run draw
         p.draw = function() {
+            // Always update global mouse/touch positions
+            window.mouseX = p.mouseX;
+            window.mouseY = p.mouseY;
+            window.pmouseX = p.pmouseX;
+            window.pmouseY = p.pmouseY;
+            window.mouseIsPressed = p.mouseIsPressed;
+            window.touches = p.touches;
+            
+            // Update other frequently used variables
+            window.frameCount = p.frameCount;
+            window.deltaTime = p.deltaTime;
+            
             if (window.draw) {
                 window.draw();
             }
@@ -745,24 +937,42 @@ function initializeP5Game() {
         
         // Handle mouse events
         p.mousePressed = function() {
+            // Update global mouse position first
+            window.mouseX = p.mouseX;
+            window.mouseY = p.mouseY;
+            window.pmouseX = p.pmouseX;
+            window.pmouseY = p.pmouseY;
+            
             if (window.mousePressed) {
                 return window.mousePressed();
             }
         };
         
         p.mouseReleased = function() {
+            // Update global mouse position first
+            window.mouseX = p.mouseX;
+            window.mouseY = p.mouseY;
+            window.pmouseX = p.pmouseX;
+            window.pmouseY = p.pmouseY;
+            
             if (window.mouseReleased) {
                 return window.mouseReleased();
             }
         };
         
         p.touchStarted = function() {
+            // Update touch positions
+            window.touches = p.touches;
+            
             if (window.touchStarted) {
                 return window.touchStarted();
             }
         };
         
         p.touchEnded = function() {
+            // Update touch positions
+            window.touches = p.touches;
+            
             if (window.touchEnded) {
                 return window.touchEnded();
             }
