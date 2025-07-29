@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Easy Playtest</title>
+</head>
+<body>
+    <h1>Easy Playtest Test Page</h1>
+    <p>Open the browser console to see debug output.</p>
+    <p>Steps to test:</p>
+    <ol>
+        <li>Open easyplaytest.html</li>
+        <li>Select a recipe date from the dropdown</li>
+        <li>Click "Load Recipe"</li>
+        <li>The game should start with the selected recipe</li>
+        <li>Complete the recipe and click "Cook!" again</li>
+        <li>The same recipe should load (not today's recipe)</li>
+        <li>There should be no duplicate vessels</li>
+    </ol>
+    
+    <h2>Expected Console Output:</h2>
+    <pre>
+[EasyPlaytest] Returning selected date: [your-selected-date]
+[EasyPlaytest] Loading recipe data for selected date: [your-selected-date]
+[EasyPlaytest] Clearing [N] existing vessels (if returning to title)
+[EasyPlaytest] Fetching recipe for selected date: [your-selected-date]
+    </pre>
+    
+    <h2>Common Issues Fixed:</h2>
+    <ul>
+        <li>✓ Today's recipe loading instead of selected recipe</li>
+        <li>✓ Duplicate vessels when returning to title screen</li>
+        <li>✓ Early recipe fetching before date selection</li>
+        <li>✓ Completion check interfering with playtest mode</li>
+    </ul>
+</body>
+</html>

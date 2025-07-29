@@ -148,9 +148,46 @@
         // Easy playtest functionality
         let easyPlaytestSelectedDate = null;
         let easyPlaytestActive = true;
+        let originalFetchTodayRecipe = null;
+        let originalCheckTodayCompletion = null;
+        let originalLoadRecipeData = null;
+        let loadRecipeDataOverrideApplied = false;
         
         // Prevent the game from starting automatically
         window.easyPlaytestPreventAutoStart = true;
+        
+        // Override getCurrentDateEST immediately
+        window.getCurrentDateEST = function() {
+            if (easyPlaytestSelectedDate) {
+                console.log("[EasyPlaytest] Returning selected date:", easyPlaytestSelectedDate);
+                return easyPlaytestSelectedDate;
+            }
+            // If no date selected yet, return a placeholder date
+            console.log("[EasyPlaytest] No date selected yet, returning placeholder");
+            return '2024-01-01';
+        };
+        
+        // Store original functions and override them to prevent early fetches
+        window.fetchTodayRecipe = async function() {
+            if (!easyPlaytestSelectedDate) {
+                console.log("[EasyPlaytest] Preventing early fetchTodayRecipe call");
+                return null;
+            }
+            if (originalFetchTodayRecipe) {
+                return originalFetchTodayRecipe();
+            }
+            return null;
+        };
+        
+        window.checkTodayCompletion = async function() {
+            if (!easyPlaytestSelectedDate) {
+                console.log("[EasyPlaytest] Preventing early checkTodayCompletion call");
+                return;
+            }
+            if (originalCheckTodayCompletion) {
+                return originalCheckTodayCompletion();
+            }
+        };
         
         // Function to load available recipes
         async function loadRecipeList() {
@@ -229,20 +266,38 @@
                 // Store the selected date
                 easyPlaytestSelectedDate = selectedDate;
                 
-                // Override the date functions
-                window.getCurrentDateEST = function() {
-                    return easyPlaytestSelectedDate;
-                };
+                // Clear any existing game state
+                if (window.vessels) {
+                    console.log("[EasyPlaytest] Clearing existing vessels");
+                    window.vessels = [];
+                }
+                if (window.recipeData) {
+                    console.log("[EasyPlaytest] Clearing existing recipe data");
+                    window.recipeData = null;
+                }
+                if (window.gameStarted) {
+                    window.gameStarted = false;
+                }
+                if (window.gameWon) {
+                    window.gameWon = false;
+                }
                 
                 // Hide the selector
                 document.getElementById('playtestSelector').classList.add('playtest-hidden');
                 
-                // Now start the game
+                // Now restore original functions if they exist and start the game
+                console.log("[EasyPlaytest] Starting game with selected date:", selectedDate);
+                
+                // If the game hasn't initialized yet, wait for it
                 if (typeof window.setup === 'function') {
                     window.setup();
-                }
-                if (typeof window.startGame === 'function') {
-                    window.startGame();
+                } else {
+                    // Wait for p5.js to load
+                    setTimeout(() => {
+                        if (typeof window.setup === 'function') {
+                            window.setup();
+                        }
+                    }, 500);
                 }
                 
             } catch (error) {
@@ -315,5 +370,106 @@
     <script src="js/egg.js"></script>
     <!-- Help Modal Script -->
     <script src="js/help.js"></script>
+    
+    <!-- Capture original functions and override setup after all scripts load -->
+    <script>
+        // Wait for all scripts to load
+        window.addEventListener('load', function() {
+            console.log("[EasyPlaytest] All scripts loaded, capturing original functions");
+            
+            // Capture original loadRecipeData if it hasn't been captured yet
+            if (!originalLoadRecipeData && window.loadRecipeData && !loadRecipeDataOverrideApplied) {
+                originalLoadRecipeData = window.loadRecipeData;
+                loadRecipeDataOverrideApplied = true;
+                
+                // Override loadRecipeData
+                window.loadRecipeData = async function() {
+                    if (!easyPlaytestSelectedDate) {
+                        console.log("[EasyPlaytest] No date selected for loadRecipeData");
+                        return;
+                    }
+                    
+                    console.log("[EasyPlaytest] Loading recipe data for selected date:", easyPlaytestSelectedDate);
+                    
+                    // Clear any existing vessels first
+                    if (window.vessels) {
+                        console.log("[EasyPlaytest] Clearing", window.vessels.length, "existing vessels");
+                        window.vessels = [];
+                    }
+                    
+                    // Call the original function which will use our overridden getCurrentDateEST
+                    return originalLoadRecipeData();
+                };
+            }
+            
+            // Capture original functions if they haven't been captured yet
+            if (!originalFetchTodayRecipe && window.fetchTodayRecipe) {
+                // Get the real fetchTodayRecipe from supabase.js
+                const scripts = document.getElementsByTagName('script');
+                for (let script of scripts) {
+                    if (script.src && script.src.includes('supabase.js')) {
+                        // The function should be defined by now
+                        break;
+                    }
+                }
+                
+                // Store the original by re-defining from supabase
+                originalFetchTodayRecipe = async function() {
+                    try {
+                        const today = window.getCurrentDateEST();
+                        console.log(`[EasyPlaytest] Fetching recipe for selected date: ${today}`);
+                        
+                        // Fetch recipe for selected date
+                        const { data: recipes, error } = await supabase
+                            .from('recipes')
+                            .select('*')
+                            .eq('date', today)
+                            .single();
+                        
+                        if (error) throw error;
+                        if (!recipes) {
+                            console.log("No recipe found for selected date:", today);
+                            return null;
+                        }
+                        
+                        console.log("Found recipe for selected date:", recipes);
+                        
+                        // Call fetchRecipeDetails to get the full processed data
+                        if (window.fetchRecipeDetails) {
+                            return window.fetchRecipeDetails(recipes.rec_id);
+                        }
+                        
+                        // Fallback if fetchRecipeDetails is not available
+                        return recipes;
+                        
+                    } catch (error) {
+                        console.error("Error in fetchTodayRecipe:", error);
+                        return null;
+                    }
+                };
+            }
+            
+            if (!originalCheckTodayCompletion && window.checkTodayCompletion !== originalCheckTodayCompletion) {
+                // We'll handle this differently - just let it run with the selected date
+                originalCheckTodayCompletion = function() {
+                    // Skip completion check in playtest mode
+                    console.log("[EasyPlaytest] Skipping completion check in playtest mode");
+                    return Promise.resolve();
+                };
+            }
+            
+            // Override the setup function to prevent auto-start
+            if (window.setup) {
+                const originalSetup = window.setup;
+                window.setup = function() {
+                    if (easyPlaytestActive && !easyPlaytestSelectedDate) {
+                        console.log("[EasyPlaytest] Preventing setup until date is selected");
+                        return;
+                    }
+                    originalSetup();
+                };
+            }
+        });
+    </script>
 </body>
 </html>
