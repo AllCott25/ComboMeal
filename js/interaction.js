@@ -1387,7 +1387,7 @@ function emousePressed() {
     // Add playtest date selector logic only in playtest mode
     if (typeof isPlaytestMode !== 'undefined' && isPlaytestMode) {
       // Check if date button was pressed
-      if (dateButton && dateButton.isInside(mouseX, mouseY)) {
+      if (typeof dateButton !== 'undefined' && dateButton && dateButton.isInside && dateButton.isInside(mouseX, mouseY)) {
         showDatePicker();
         return;
       }
