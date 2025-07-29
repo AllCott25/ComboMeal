@@ -102,8 +102,18 @@
                     
                     if (ingredientsError) throw ingredientsError;
                     
+                    // Get easter eggs for this recipe (optional)
+                    const { data: easterEggs, error: easterEggsError } = await supabase
+                        .from('eastereggs')
+                        .select('*')
+                        .eq('rec_id', recipe.rec_id);
+                    
+                    if (easterEggsError) {
+                        console.warn('Error fetching easter eggs:', easterEggsError);
+                    }
+                    
                     // Process the recipe data (using the existing function)
-                    const processedData = processRecipeData(recipe, combinations, ingredients);
+                    const processedData = processRecipeData(recipe, combinations, ingredients, easterEggs || []);
                     
                     // Hide loading overlay once recipe is loaded
                     setTimeout(() => {
