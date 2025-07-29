@@ -567,6 +567,35 @@ function setupGameEnvironment(recipeData) {
         }
     };
     
+    // Store original startGame if it exists
+    if (window.startGame) {
+        window.SuperEasyPlaytest.originalFunctions.startGame = window.startGame;
+    }
+    
+    // Override startGame to work in playtest mode
+    window.startGame = function() {
+        console.log('🎮 StartGame called in playtest mode');
+        
+        // Check if we have vessels
+        if (!window.vessels || window.vessels.length === 0) {
+            console.warn('⚠️ No vessels available yet');
+            return;
+        }
+        
+        // Force game state to be ready
+        window.isLoadingRecipe = false;
+        window.wallpaperAnimation = null;
+        window.wallpaperAnimationActive = false;
+        
+        // Call actuallyStartGame directly
+        if (window.actuallyStartGame) {
+            console.log('🚀 Starting game directly via actuallyStartGame');
+            window.actuallyStartGame();
+        } else {
+            console.error('❌ actuallyStartGame function not found');
+        }
+    };
+    
     // Set the recipe data globally
     window.recipeData = recipeData;
     window.recipe_data = recipeData; // Some parts of the game use recipe_data instead
@@ -627,6 +656,8 @@ function setupGameEnvironment(recipeData) {
     
     // Disable wallpaper loading in playtest mode to avoid CORS issues
     window.wallpaperImageReady = false;
+    window.wallpaperAnimation = null; // Ensure no wallpaper animation is set
+    window.wallpaperAnimationActive = false;
     
     // Skip authentication
     window.isPlaytestMode = true;
@@ -639,6 +670,12 @@ function setupGameEnvironment(recipeData) {
             window.loadingComplete = true;
         };
     }
+    
+    // Initialize game state variables
+    window.gameStarted = false;
+    window.gameWon = false;
+    window.isLoadingRecipe = false;
+    window.vessels = window.vessels || [];
     
     console.log('✅ Game environment ready');
 }
@@ -812,6 +849,18 @@ function initializeP5Game() {
         
         // Run draw
         p.draw = function() {
+            // Always update global mouse/touch positions
+            window.mouseX = p.mouseX;
+            window.mouseY = p.mouseY;
+            window.pmouseX = p.pmouseX;
+            window.pmouseY = p.pmouseY;
+            window.mouseIsPressed = p.mouseIsPressed;
+            window.touches = p.touches;
+            
+            // Update other frequently used variables
+            window.frameCount = p.frameCount;
+            window.deltaTime = p.deltaTime;
+            
             if (window.draw) {
                 window.draw();
             }
@@ -819,24 +868,42 @@ function initializeP5Game() {
         
         // Handle mouse events
         p.mousePressed = function() {
+            // Update global mouse position first
+            window.mouseX = p.mouseX;
+            window.mouseY = p.mouseY;
+            window.pmouseX = p.pmouseX;
+            window.pmouseY = p.pmouseY;
+            
             if (window.mousePressed) {
                 return window.mousePressed();
             }
         };
         
         p.mouseReleased = function() {
+            // Update global mouse position first
+            window.mouseX = p.mouseX;
+            window.mouseY = p.mouseY;
+            window.pmouseX = p.pmouseX;
+            window.pmouseY = p.pmouseY;
+            
             if (window.mouseReleased) {
                 return window.mouseReleased();
             }
         };
         
         p.touchStarted = function() {
+            // Update touch positions
+            window.touches = p.touches;
+            
             if (window.touchStarted) {
                 return window.touchStarted();
             }
         };
         
         p.touchEnded = function() {
+            // Update touch positions
+            window.touches = p.touches;
+            
             if (window.touchEnded) {
                 return window.touchEnded();
             }
