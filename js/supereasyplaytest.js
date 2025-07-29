@@ -316,6 +316,13 @@ function loadScript(src) {
             return;
         }
         
+        // Special check for supabase.js
+        if (src.includes('supabase.js') && typeof window.SUPABASE_URL !== 'undefined') {
+            console.log(`✓ Supabase already initialized, skipping: ${src}`);
+            resolve();
+            return;
+        }
+        
         const script = document.createElement('script');
         script.src = src;
         script.onload = () => {
@@ -452,8 +459,20 @@ function setupGameEnvironment(recipeData) {
     window.skipWallpaperAnimation = true;
     window.loadingComplete = true;
     
+    // Disable wallpaper loading in playtest mode to avoid CORS issues
+    window.wallpaperImageReady = false;
+    
     // Skip authentication
     window.isPlaytestMode = true;
+    
+    // Override wallpaper loading to prevent CORS issues
+    if (window.loadWallpaperImage) {
+        window.loadWallpaperImage = function() {
+            console.log('🖼️ Skipping wallpaper loading in playtest mode');
+            window.wallpaperImageReady = false;
+            window.loadingComplete = true;
+        };
+    }
     
     console.log('✅ Game environment ready');
 }
@@ -481,6 +500,7 @@ function initializeP5Game() {
             'push', 'pop', 'translate', 'rotate', 'scale', 'loadImage',
             'image', 'tint', 'noTint', 'color', 'loadFont', 'textFont',
             'noStroke', 'noFill', 'smooth', 'noSmooth', 'cursor', 'noCursor',
+            'rectMode', 'ellipseMode', 'strokeCap', 'strokeJoin',
             'min', 'max', 'abs', 'constrain', 'dist', 'exp', 'floor', 'lerp',
             'log', 'mag', 'map', 'norm', 'pow', 'round', 'sq', 'sqrt',
             'random', 'randomSeed', 'noise', 'noiseSeed', 'noiseDetail',
@@ -594,6 +614,11 @@ function initializeP5Game() {
                     window[varName] = p[varName];
                 }
             });
+            
+            // Skip wallpaper loading in playtest mode
+            window.skipWallpaperAnimation = true;
+            window.wallpaperImageReady = false;
+            window.loadingComplete = true;
             
             // Run original setup if it exists
             if (window.setup) {
