@@ -258,26 +258,31 @@ async function loadGameWithRecipe(recipe) {
     console.log('🎮 Loading game with recipe data...');
     
     // First, we need to load all the game scripts
+    console.log('📦 Step 1: Loading game scripts...');
     await loadGameScripts();
     
     // Wait for scripts to initialize
+    console.log('⏳ Step 2: Waiting for scripts to initialize...');
     await new Promise(resolve => setTimeout(resolve, 500));
     
     // Fetch the full recipe data
+    console.log('📋 Step 3: Fetching full recipe data...');
     const recipeData = await fetchRecipeData(recipe.date, recipe.rec_id);
     
     // Set up the game environment
+    console.log('🔧 Step 4: Setting up game environment...');
     setupGameEnvironment(recipeData);
     
     // Store recipe data for later use
     window.playtestRecipeData = recipeData;
-    console.log('📦 Stored recipe data:', {
+    console.log('📦 Step 5: Stored recipe data:', {
         hasData: !!window.playtestRecipeData,
         recipeName: recipeData?.name,
         ingredientCount: recipeData?.baseIngredients?.length || 0
     });
     
     // Initialize p5 with our custom setup
+    console.log('🎨 Step 6: Initializing p5 game...');
     initializeP5Game();
 }
 
@@ -579,28 +584,60 @@ function setupGameEnvironment(recipeData) {
     window.startGame = function() {
         console.log('🎮 StartGame called in playtest mode');
         
+        // Check if we're actually in playtest mode
+        if (!window.SuperEasyPlaytest || !window.SuperEasyPlaytest.isActive) {
+            console.warn('❌ Not in active playtest mode! Did you select a recipe and click Start Playtest?');
+            return;
+        }
+        
+        // Check if we're still loading
+        if (!window.gameScriptsLoaded) {
+            console.warn('⏳ Game scripts still loading, please wait...');
+            return;
+        }
+        
+        // Check if p5 instance exists
+        if (!window.p) {
+            console.warn('⏳ P5 instance not ready yet, please wait...');
+            return;
+        }
+        
+        // First check if we need to initialize the game
+        if (!window.gameInitialized && window.proceedWithNormalFlow && window.playtestRecipeData) {
+            console.log('🔄 Game not initialized yet, initializing now...');
+            
+            // Set up recipe data
+            window.recipe_data = window.playtestRecipeData;
+            window.recipe = window.playtestRecipeData;
+            
+            // Set game state flags
+            window.gameStarted = false;
+            window.gameWon = false;
+            window.isLoadingRecipe = false;
+            window.loadingComplete = true;
+            
+            // Initialize the game
+            window.proceedWithNormalFlow(window.playtestRecipeData);
+            window.gameInitialized = true;
+            
+            // Give it a moment to create vessels
+            setTimeout(() => {
+                window.startGame();
+            }, 100);
+            return;
+        }
+        
         // Store vessels before any reset might happen
         const vesselBackup = window.vessels ? [...window.vessels] : [];
         
         // Check if we have vessels
         if (!window.vessels || window.vessels.length === 0) {
-            console.warn('⚠️ No vessels available yet');
-            
-            // Try to initialize the game if proceedWithNormalFlow hasn't been called yet
-            if (window.proceedWithNormalFlow && window.playtestRecipeData && !window.gameInitialized) {
-                console.log('🔄 Attempting to initialize game now...');
-                window.proceedWithNormalFlow(window.playtestRecipeData);
-                window.gameInitialized = true;
-                
-                // Try again after a short delay
-                setTimeout(() => {
-                    if (window.vessels && window.vessels.length > 0) {
-                        window.startGame();
-                    } else {
-                        console.error('❌ Still no vessels after initialization');
-                    }
-                }, 100);
-            }
+            console.error('⚠️ No vessels available yet', {
+                vessels: window.vessels,
+                gameInitialized: window.gameInitialized,
+                ingredients: window.ingredients,
+                recipe: window.recipe
+            });
             return;
         }
         
@@ -778,8 +815,25 @@ function initializeP5Game() {
         existingCanvas.remove();
     }
     
+    // Check if p5 is available
+    if (typeof p5 === 'undefined') {
+        console.error('❌ p5.js is not loaded!');
+        return;
+    }
+    
+    console.log('✅ p5.js is available, creating instance...');
+    
+    // Check if game container exists
+    const gameContainer = document.getElementById('game-container');
+    if (!gameContainer) {
+        console.error('❌ Game container not found!');
+        return;
+    }
+    
     // Create a new p5 instance in the game container
-    new p5((p) => {
+    const p5Instance = new p5((p) => {
+        console.log('🎨 P5 instance created');
+        
         // Store p5 instance
         window.p = p;
         
@@ -881,6 +935,8 @@ function initializeP5Game() {
         
         // Run setup
         p.setup = function() {
+            console.log('🎨 P5 Setup starting...');
+            
             // Ensure window dimensions are available
             window.windowWidth = p.windowWidth;
             window.windowHeight = p.windowHeight;
@@ -911,10 +967,33 @@ function initializeP5Game() {
             window.wallpaperImageReady = false;
             window.loadingComplete = true;
             
-            // Run original setup if it exists
-            if (window.setup) {
-                window.setup();
+            // Don't run original setup as it tries to create another canvas
+            // Instead, do minimal initialization
+            if (window.bodyFont) {
+                p.textFont(window.bodyFont);
             }
+            
+            // Initialize touch system if available
+            if (window.touchSystem && window.touchSystem.init) {
+                window.touchSystem.init();
+            }
+            
+            // Set frame rate
+            p.frameRate(30);
+            
+            // Calculate play area dimensions (from original setup)
+            const maxPlayWidth = 800;
+            const playAreaPadding = 20;
+            window.playAreaWidth = p.min(maxPlayWidth, p.windowWidth - 2 * playAreaPadding);
+            window.playAreaHeight = p.min(p.windowHeight - 2 * playAreaPadding, window.playAreaWidth * 1.8);
+            window.playAreaX = (p.windowWidth - window.playAreaWidth) / 2;
+            window.playAreaY = (p.windowHeight - window.playAreaHeight) / 2;
+            
+            console.log('🔍 Checking initialization conditions:', {
+                hasProceedWithNormalFlow: !!window.proceedWithNormalFlow,
+                hasPlaytestRecipeData: !!window.playtestRecipeData,
+                hasVessel: !!window.Vessel
+            });
             
             // Now that canvas is ready, initialize the game
             if (window.proceedWithNormalFlow && window.playtestRecipeData) {
