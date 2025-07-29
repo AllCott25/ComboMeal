@@ -257,8 +257,11 @@ async function loadGameWithRecipe(recipe) {
     // Set up the game environment
     setupGameEnvironment(recipeData);
     
+    // Store recipe data for later use
+    window.playtestRecipeData = recipeData;
+    
     // Initialize p5 with our custom setup
-    initializeGame();
+    initializeP5Game();
 }
 
 /**
@@ -456,10 +459,10 @@ function setupGameEnvironment(recipeData) {
 }
 
 /**
- * Initialize the game
+ * Initialize the p5 game instance
  */
-function initializeGame() {
-    console.log('🎮 Initializing game...');
+function initializeP5Game() {
+    console.log('🎮 Initializing p5 game...');
     
     // Remove any existing canvas
     const existingCanvas = document.querySelector('canvas');
@@ -526,9 +529,20 @@ function initializeGame() {
             // Store canvas globally (some game code expects this)
             window.canvas = canvas;
             
-            // Run original setup
+            // Make height and width available globally
+            window.width = p.width;
+            window.height = p.height;
+            
+            // Run original setup if it exists
             if (window.setup) {
                 window.setup();
+            }
+            
+            // Now that canvas is ready, initialize the game
+            if (window.initializeGame && window.playtestRecipeData) {
+                // Make sure we have the recipe data
+                window.recipeData = window.playtestRecipeData;
+                window.initializeGame();
             }
         };
         
