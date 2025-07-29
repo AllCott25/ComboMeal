@@ -26,8 +26,16 @@ if (typeof SUPABASE_ANON_KEY === 'undefined') {
     window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
 }
 
-// Initialize Supabase client if not already initialized
-const supabase = window.supabase || window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+// Initialize Supabase client
+// First check if a client already exists from the main app
+let supabase;
+if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+    // If the main app hasn't created a client yet, create one
+    supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+} else {
+    console.error('❌ Supabase library not loaded!');
+    throw new Error('Supabase library is required');
+}
 
 /**
  * Initialize the playtest system
@@ -827,4 +835,24 @@ function showError(message) {
 }
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', initializePlaytest);
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait a bit for Supabase to load
+    if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+        console.log('⏳ Waiting for Supabase to load...');
+        let attempts = 0;
+        const checkSupabase = setInterval(() => {
+            attempts++;
+            if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+                clearInterval(checkSupabase);
+                console.log('✅ Supabase loaded, initializing playtest...');
+                initializePlaytest();
+            } else if (attempts > 20) { // 2 seconds timeout
+                clearInterval(checkSupabase);
+                console.error('❌ Supabase failed to load after 2 seconds');
+                showError('Failed to load Supabase library');
+            }
+        }, 100);
+    } else {
+        initializePlaytest();
+    }
+});
