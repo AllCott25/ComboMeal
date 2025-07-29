@@ -71,7 +71,8 @@ async function loadRecipes() {
         
         // Log first recipe to see structure
         if (recipes.length > 0) {
-            console.log('Sample recipe structure:', recipes[0]);
+            console.log('Sample recipe structure:', JSON.stringify(recipes[0], null, 2));
+            console.log('Recipe keys:', Object.keys(recipes[0]));
         }
         
         // Display recipes
@@ -174,6 +175,7 @@ function selectRecipe(recipe) {
     document.getElementById('start-btn').disabled = false;
     
     console.log('📝 Selected recipe:', recipe.name, 'with ID:', recipe.rec_id);
+    console.log('Full recipe object:', JSON.stringify(recipe, null, 2));
 }
 
 /**
