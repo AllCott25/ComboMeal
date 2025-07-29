@@ -616,15 +616,41 @@ function setupGameEnvironment(recipeData) {
             window.isLoadingRecipe = false;
             window.loadingComplete = true;
             
-            // Initialize the game
+            // Ensure grid layout variables are set
+            window.gridCols = 3; // Default grid columns
+            window.gridSpacing = 10; // Default grid spacing
+            window.vesselRowSpacing = 50; // Space between rows
+            window.vesselColSpacing = 20; // Space between columns
+            
+            // Initialize layout type (will be properly set by initializeGame)
+            window.currentLayoutType = 'big';
+            
+            // Initialize other game variables
+            window.usedIngredients = new Set();
+            window.animations = [];
+            window.combine_animations = [];
+            window.displayedVessels = [];
+            
+            // Call proceedWithNormalFlow with the recipe data
+            // This will properly set up ingredients and create vessels
             window.proceedWithNormalFlow(window.playtestRecipeData);
             window.gameInitialized = true;
             
-            // Give it a moment to create vessels
-            setTimeout(() => {
-                window.startGame();
-            }, 100);
-            return;
+            // Log vessel status after initialization
+            console.log('🎮 After proceedWithNormalFlow:', {
+                vesselsCount: window.vessels ? window.vessels.length : 0,
+                ingredients: window.ingredients ? window.ingredients.length : 0,
+                gameStarted: window.gameStarted,
+                loadingComplete: window.loadingComplete
+            });
+        } else {
+            console.warn('⚠️ proceedWithNormalFlow not available yet or no recipe data');
+            if (!window.proceedWithNormalFlow) {
+                console.error('❌ proceedWithNormalFlow function is missing!');
+            }
+            if (!window.playtestRecipeData) {
+                console.error('❌ playtestRecipeData is missing!');
+            }
         }
         
         // Store vessels before any reset might happen
@@ -703,74 +729,8 @@ function setupGameEnvironment(recipeData) {
         console.log(`🎯 Loaded final combination: ${recipeData.finalCombination.name}`);
     }
     
-    // Set up global variables that menu system expects
-    if (typeof window.playAreaWidth === 'undefined') {
-        window.playAreaWidth = 800; // Default play area width
-    }
-    if (typeof window.playAreaX === 'undefined') {
-        window.playAreaX = 0; // Default play area X position
-    }
-    if (typeof window.COLORS === 'undefined') {
-        window.COLORS = {
-            background: '#F5F1E8',
-            primary: '#778F5D',
-            secondary: '#C9B5A0',
-            text: '#2D3A2E'
-        };
-    }
-    if (typeof window.Button === 'undefined') {
-        // Basic Button class for menu compatibility
-        window.Button = class Button {
-            constructor(x, y, width, height, text, callback) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.text = text;
-                this.callback = callback;
-                this.hovered = false;
-                this.color = '#778F5D';
-                this.textColor = 'white';
-            }
-            draw() {
-                // Basic button drawing for fallback
-                if (typeof rect !== 'undefined' && typeof fill !== 'undefined') {
-                    push();
-                    fill(this.hovered ? 200 : this.color);
-                    rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
-                    fill(this.textColor);
-                    textAlign(CENTER, CENTER);
-                    text(this.text, this.x, this.y);
-                    pop();
-                }
-            }
-            checkHover(mx, my) {
-                this.hovered = mx > this.x - this.width/2 && 
-                              mx < this.x + this.width/2 && 
-                              my > this.y - this.height/2 && 
-                              my < this.y + this.height/2;
-                return this.hovered;
-            }
-            checkClick() {
-                if (this.hovered && this.callback) {
-                    this.callback();
-                    return true;
-                }
-                return false;
-            }
-            isInside(mx, my) {
-                return mx > this.x - this.width/2 && 
-                       mx < this.x + this.width/2 && 
-                       my > this.y - this.height/2 && 
-                       my < this.y + this.height/2;
-            }
-            handleClick() {
-                if (this.callback) {
-                    this.callback();
-                }
-            }
-        };
-    }
+    // Initialize byline transition variables - APlasker
+    window.bylineTransitionState = "stable";
     
     // Disable animations for better performance
     window.skipWallpaperAnimation = true;
@@ -799,6 +759,111 @@ function setupGameEnvironment(recipeData) {
     window.isLoadingRecipe = false;
     window.vessels = window.vessels || [];
     window.displayedVessels = window.displayedVessels || [];
+    
+    // Initialize variables that hamburger menu needs to prevent infinite loop
+    window.playAreaWidth = window.playAreaWidth || 800;
+    window.playAreaX = window.playAreaX || 0;
+    
+    // Define COLORS if not already defined (needed by hamburger menu)
+    if (typeof window.COLORS === 'undefined') {
+        window.COLORS = {
+            button: '#AAAAAA',
+            buttonHover: '#888888',
+            background: '#F5F1E8',
+            primary: '#778F5D',
+            secondary: '#C9B5A0',
+            text: '#2D3A2E'
+        };
+    }
+    
+    // Define Button class if not already defined (needed by hamburger menu)
+    if (typeof window.Button === 'undefined') {
+        window.Button = class Button {
+            constructor(x, y, width, height, text, onClick) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.text = text;
+                this.onClick = onClick || (() => {});
+                this.callback = this.onClick; // Alias for compatibility
+                this.hovered = false;
+                this.color = '#778F5D';
+                this.textColor = 'white';
+            }
+            
+            update(mouseX, mouseY) {
+                this.hovered = this.checkHover(mouseX, mouseY);
+            }
+            
+            checkHover(mx, my) {
+                this.hovered = mx > this.x - this.width/2 && 
+                              mx < this.x + this.width/2 && 
+                              my > this.y - this.height/2 && 
+                              my < this.y + this.height/2;
+                return this.hovered;
+            }
+            
+            draw() {
+                // Basic button drawing for fallback
+                if (typeof rect !== 'undefined' && typeof fill !== 'undefined') {
+                    push();
+                    fill(this.hovered ? 200 : this.color);
+                    rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                    fill(this.textColor);
+                    textAlign(CENTER, CENTER);
+                    text(this.text, this.x, this.y);
+                    pop();
+                }
+            }
+            
+            handleClick() {
+                if (this.hovered && this.onClick) {
+                    this.onClick();
+                }
+            }
+            
+            checkClick() {
+                if (this.hovered && this.callback) {
+                    this.callback();
+                    return true;
+                }
+                return false;
+            }
+            
+            isInside(mx, my) {
+                return this.checkHover(mx, my);
+            }
+        };
+    }
+    
+    // Protect vessels array from being cleared
+    let originalVessels = window.vessels;
+    Object.defineProperty(window, 'vessels', {
+        get() {
+            return originalVessels;
+        },
+        set(value) {
+            if (window.SuperEasyPlaytest && window.SuperEasyPlaytest.isActive) {
+                // In playtest mode, only allow setting vessels if it's not an empty array
+                // or if we don't have vessels yet
+                if (!Array.isArray(value) || value.length > 0 || !originalVessels || originalVessels.length === 0) {
+                    console.log('🛡️ Vessels array updated:', value?.length || 0, 'vessels');
+                    originalVessels = value;
+                } else {
+                    console.warn('🚫 Blocked attempt to clear vessels array in playtest mode');
+                }
+            } else {
+                originalVessels = value;
+            }
+        },
+        configurable: true
+    });
+    
+    // Initialize game flags
+    window.isTransitioning = false;
+    window.nextByline = "";
+    window.bylineOpacity = 255;
     
     console.log('✅ Game environment ready');
 }
@@ -989,6 +1054,17 @@ function initializeP5Game() {
             window.playAreaX = (p.windowWidth - window.playAreaWidth) / 2;
             window.playAreaY = (p.windowHeight - window.playAreaHeight) / 2;
             
+            // Also set the global play area variables that GameLogic.js expects
+            window.maxPlayWidth = maxPlayWidth;
+            window.playAreaPadding = playAreaPadding;
+            
+            console.log('📐 Play area dimensions:', {
+                playAreaWidth: window.playAreaWidth,
+                playAreaHeight: window.playAreaHeight,
+                playAreaX: window.playAreaX,
+                playAreaY: window.playAreaY
+            });
+            
             console.log('🔍 Checking initialization conditions:', {
                 hasProceedWithNormalFlow: !!window.proceedWithNormalFlow,
                 hasPlaytestRecipeData: !!window.playtestRecipeData,
@@ -1014,6 +1090,21 @@ function initializeP5Game() {
                 window.gameWon = false;
                 window.isLoadingRecipe = false;
                 window.loadingComplete = true;
+                
+                // Ensure grid layout variables are set
+                window.gridCols = 3; // Default grid columns
+                window.gridSpacing = 10; // Default grid spacing
+                window.vesselRowSpacing = 50; // Space between rows
+                window.vesselColSpacing = 20; // Space between columns
+                
+                // Initialize layout type (will be properly set by initializeGame)
+                window.currentLayoutType = 'big';
+                
+                // Initialize other game variables
+                window.usedIngredients = new Set();
+                window.animations = [];
+                window.combine_animations = [];
+                window.displayedVessels = [];
                 
                 // Call proceedWithNormalFlow with the recipe data
                 // This will properly set up ingredients and create vessels
