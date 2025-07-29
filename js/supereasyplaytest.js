@@ -437,9 +437,9 @@ async function fetchRecipeData(date, recipeId) {
         
         // Fetch ingredients for all combinations
         const allCombinationIds = combinations.map(c => c.combo_id);
-        const { data: ingredientRelations, error: ingredientError } = await supabase
-            .from('ingredient_combo')
-            .select('*, ingredients(*)')
+        const { data: ingredients, error: ingredientError } = await supabase
+            .from('ingredients')
+            .select('*')
             .in('combo_id', allCombinationIds);
             
         if (ingredientError) throw ingredientError;
@@ -448,19 +448,45 @@ async function fetchRecipeData(date, recipeId) {
         const uniqueIngredients = new Map();
         const ingredientsByCombination = {};
         
-        ingredientRelations.forEach(rel => {
-            if (rel.ingredients) {
-                uniqueIngredients.set(rel.ingredients.ingredient_id, rel.ingredients.name);
-                
-                if (!ingredientsByCombination[rel.combo_id]) {
-                    ingredientsByCombination[rel.combo_id] = [];
-                }
-                ingredientsByCombination[rel.combo_id].push({
-                    ingredient_id: rel.ingredients.ingredient_id,
-                    name: rel.ingredients.name
-                });
+        ingredients.forEach(ing => {
+            uniqueIngredients.set(ing.ing_id, ing.name);
+            
+            if (!ingredientsByCombination[ing.combo_id]) {
+                ingredientsByCombination[ing.combo_id] = [];
             }
+            ingredientsByCombination[ing.combo_id].push({
+                ingredient_id: ing.ing_id,
+                name: ing.name
+            });
         });
+        
+        // Process combinations to match expected format
+        const finalCombo = combinations.find(c => c.is_final);
+        const intermediateCombos = combinations.filter(c => !c.is_final);
+        
+        // Get only base ingredients for the baseIngredients array
+        const baseIngredients = ingredients
+            .filter(ing => ing.is_base === true)
+            .map(ing => ing.name);
+        
+        // Format intermediate combinations with their required ingredients
+        const intermediateCombinations = intermediateCombos.map(combo => {
+            const comboIngredients = ingredientsByCombination[combo.combo_id] || [];
+            return {
+                name: combo.name,
+                required: comboIngredients.map(ing => ing.name),
+                verb: combo.verb || "mix",
+                combo_id: combo.combo_id
+            };
+        });
+        
+        // Format final combination
+        const finalCombination = finalCombo ? {
+            name: finalCombo.name,
+            required: intermediateCombinations.map(c => c.name), // Final requires intermediate combos
+            verb: finalCombo.verb || "prepare",
+            combo_id: finalCombo.combo_id
+        } : null;
         
         // Return in expected format
         return {
@@ -470,10 +496,13 @@ async function fetchRecipeData(date, recipeId) {
             imgUrl: recipe.img_url,
             day_number: recipe.day_number,
             date: recipe.date,
-            finalCombination: combinations.find(c => c.is_final),
-            intermediateCombinations: combinations.filter(c => !c.is_final),
-            ingredients: Array.from(uniqueIngredients.values()),
-            ingredientsByCombination: ingredientsByCombination
+            finalCombination: finalCombination,
+            intermediateCombinations: intermediateCombinations,
+            baseIngredients: [...new Set(baseIngredients)], // Deduplicated base ingredients
+            ingredients: Array.from(uniqueIngredients.values()), // All ingredients
+            ingredientsByCombination: ingredientsByCombination,
+            description: recipe.description,
+            author: recipe.author
         };
         
     } catch (error) {
@@ -540,11 +569,56 @@ function setupGameEnvironment(recipeData) {
     
     // Set the recipe data globally
     window.recipeData = recipeData;
+    window.recipe_data = recipeData; // Some parts of the game use recipe_data instead
     
     // Store ingredients globally (needed by some game systems)
-    if (recipeData && recipeData.ingredients) {
-        window.ingredients = recipeData.ingredients;
-        console.log(`📦 Loaded ${recipeData.ingredients.length} ingredients:`, recipeData.ingredients);
+    if (recipeData && recipeData.baseIngredients) {
+        window.ingredients = recipeData.baseIngredients;
+        window.base_ingredients = recipeData.baseIngredients;
+        console.log(`📦 Loaded ${recipeData.baseIngredients.length} base ingredients:`, recipeData.baseIngredients);
+    }
+    
+    // Store combinations globally
+    if (recipeData && recipeData.intermediateCombinations) {
+        window.intermediate_combinations = recipeData.intermediateCombinations;
+        console.log(`🔄 Loaded ${recipeData.intermediateCombinations.length} intermediate combinations`);
+    }
+    
+    if (recipeData && recipeData.finalCombination) {
+        window.final_combination = recipeData.finalCombination;
+        console.log(`🎯 Loaded final combination: ${recipeData.finalCombination.name}`);
+    }
+    
+    // Set up global variables that menu system expects
+    if (typeof window.playAreaWidth === 'undefined') {
+        window.playAreaWidth = 800; // Default play area width
+    }
+    if (typeof window.playAreaX === 'undefined') {
+        window.playAreaX = 0; // Default play area X position
+    }
+    if (typeof window.COLORS === 'undefined') {
+        window.COLORS = {
+            background: '#F5F1E8',
+            primary: '#778F5D',
+            secondary: '#C9B5A0',
+            text: '#2D3A2E'
+        };
+    }
+    if (typeof window.Button === 'undefined') {
+        // Basic Button class for menu compatibility
+        window.Button = class Button {
+            constructor(x, y, width, height, text, callback) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.text = text;
+                this.callback = callback;
+            }
+            draw() {}
+            checkHover() { return false; }
+            checkClick() { return false; }
+        };
     }
     
     // Disable animations for better performance
