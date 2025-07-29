@@ -329,7 +329,7 @@
             
             Object.defineProperty(img, 'src', {
                 set: function(value) {
-                    if (value && (value.includes('wallpaper') || value.includes('assets/wallpaper'))) {
+                    if (value && value.includes('wallpaper') && (value.endsWith('.svg') || value.endsWith('.png'))) {
                         console.log('🚫 Blocked wallpaper loading:', value);
                         // Immediately trigger error handler
                         setTimeout(() => {

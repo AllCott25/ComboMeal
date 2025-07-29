@@ -427,6 +427,33 @@ async function fetchRecipeData(date, recipeId) {
         
         if (comboError) throw comboError;
         
+        // Fetch ingredients for all combinations
+        const allCombinationIds = combinations.map(c => c.combo_id);
+        const { data: ingredientRelations, error: ingredientError } = await supabase
+            .from('ingredient_combo')
+            .select('*, ingredients(*)')
+            .in('combo_id', allCombinationIds);
+            
+        if (ingredientError) throw ingredientError;
+        
+        // Get unique ingredients
+        const uniqueIngredients = new Map();
+        const ingredientsByCombination = {};
+        
+        ingredientRelations.forEach(rel => {
+            if (rel.ingredients) {
+                uniqueIngredients.set(rel.ingredients.ingredient_id, rel.ingredients.name);
+                
+                if (!ingredientsByCombination[rel.combo_id]) {
+                    ingredientsByCombination[rel.combo_id] = [];
+                }
+                ingredientsByCombination[rel.combo_id].push({
+                    ingredient_id: rel.ingredients.ingredient_id,
+                    name: rel.ingredients.name
+                });
+            }
+        });
+        
         // Return in expected format
         return {
             rec_id: recipe.rec_id,
@@ -437,8 +464,8 @@ async function fetchRecipeData(date, recipeId) {
             date: recipe.date,
             finalCombination: combinations.find(c => c.is_final),
             intermediateCombinations: combinations.filter(c => !c.is_final),
-            ingredients: [], // Would need to fetch these too
-            ingredientsByCombination: {}
+            ingredients: Array.from(uniqueIngredients.values()),
+            ingredientsByCombination: ingredientsByCombination
         };
         
     } catch (error) {
@@ -505,6 +532,12 @@ function setupGameEnvironment(recipeData) {
     
     // Set the recipe data globally
     window.recipeData = recipeData;
+    
+    // Store ingredients globally (needed by some game systems)
+    if (recipeData && recipeData.ingredients) {
+        window.ingredients = recipeData.ingredients;
+        console.log(`📦 Loaded ${recipeData.ingredients.length} ingredients:`, recipeData.ingredients);
+    }
     
     // Disable animations for better performance
     window.skipWallpaperAnimation = true;
@@ -680,6 +713,17 @@ function initializeP5Game() {
             if (window.initializeGame && window.playtestRecipeData) {
                 // Make sure we have the recipe data
                 window.recipeData = window.playtestRecipeData;
+                
+                // Ensure ingredients are available globally
+                if (window.recipeData && window.recipeData.ingredients) {
+                    window.ingredients = window.recipeData.ingredients;
+                }
+                
+                // Set game state flags
+                window.gameStarted = false;
+                window.gameWon = false;
+                window.loadingComplete = true;
+                
                 window.initializeGame();
             }
         };
