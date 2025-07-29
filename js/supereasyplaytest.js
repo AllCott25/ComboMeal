@@ -481,10 +481,27 @@ function initializeP5Game() {
             'push', 'pop', 'translate', 'rotate', 'scale', 'loadImage',
             'image', 'tint', 'noTint', 'color', 'loadFont', 'textFont',
             'noStroke', 'noFill', 'smooth', 'noSmooth', 'cursor', 'noCursor',
+            'min', 'max', 'abs', 'constrain', 'dist', 'exp', 'floor', 'lerp',
+            'log', 'mag', 'map', 'norm', 'pow', 'round', 'sq', 'sqrt',
+            'random', 'randomSeed', 'noise', 'noiseSeed', 'noiseDetail',
             'frameRate', 'frameCount', 'millis', 'resizeCanvas',
             'pixelDensity', 'displayDensity', 'windowWidth', 'windowHeight',
             'width', 'height', 'mouseX', 'mouseY', 'pmouseX', 'pmouseY',
-            'mouseIsPressed', 'keyIsPressed', 'key', 'keyCode'
+            'mouseIsPressed', 'keyIsPressed', 'key', 'keyCode',
+            'touches', 'touchIsDown', 'touchStarted', 'touchMoved', 'touchEnded',
+            'CENTER', 'LEFT', 'RIGHT', 'TOP', 'BOTTOM', 'BASELINE',
+            'BOLD', 'ITALIC', 'NORMAL', 'PI', 'TWO_PI', 'HALF_PI', 'QUARTER_PI',
+            'degrees', 'radians', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
+            'angleMode', 'DEGREES', 'RADIANS', 'textWidth', 'textAscent', 'textDescent',
+            'textLeading', 'textStyle', 'textWrap', 'WORD', 'CHAR',
+            'blendMode', 'BLEND', 'ADD', 'DARKEST', 'LIGHTEST', 'DIFFERENCE',
+            'EXCLUSION', 'MULTIPLY', 'SCREEN', 'REPLACE', 'OVERLAY', 'HARD_LIGHT',
+            'SOFT_LIGHT', 'DODGE', 'BURN', 'SUBTRACT',
+            'vertex', 'beginShape', 'endShape', 'CLOSE', 'bezier', 'bezierVertex',
+            'quadraticVertex', 'curve', 'curveVertex', 'arc', 'triangle', 'quad',
+            'mousePressed', 'mouseReleased', 'mouseMoved', 'mouseDragged',
+            'mouseClicked', 'mouseWheel', 'keyPressed', 'keyReleased', 'keyTyped',
+            'windowResized', 'deviceMoved', 'deviceTurned', 'deviceShaken'
         ];
         
         // Expose functions to window
@@ -496,16 +513,51 @@ function initializeP5Game() {
             }
         });
         
-        // Expose p5 constants
-        const p5Constants = ['PI', 'TWO_PI', 'HALF_PI', 'QUARTER_PI',
-            'CENTER', 'LEFT', 'RIGHT', 'TOP', 'BOTTOM', 'BASELINE',
-            'RADIANS', 'DEGREES', 'CORNER', 'CORNERS', 'RADIUS',
-            'RGB', 'HSB', 'HSL', 'BLEND', 'ADD', 'MULTIPLY'
-        ];
-        
+        // Also expose p5 constants and properties that aren't functions
+        const p5Constants = ['PI', 'TWO_PI', 'HALF_PI', 'QUARTER_PI', 'TAU',
+            'DEGREES', 'RADIANS', 'DEG_TO_RAD', 'RAD_TO_DEG',
+            'CORNER', 'CORNERS', 'RADIUS', 'CENTER',
+            'LEFT', 'RIGHT', 'TOP', 'BOTTOM', 'BASELINE',
+            'POINTS', 'LINES', 'LINE_STRIP', 'LINE_LOOP', 'TRIANGLES',
+            'TRIANGLE_FAN', 'TRIANGLE_STRIP', 'QUADS', 'QUAD_STRIP',
+            'CLOSE', 'OPEN', 'CHORD', 'PIE', 'PROJECT', 'SQUARE', 'ROUND',
+            'BEVEL', 'MITER', 'RGB', 'HSB', 'HSL', 'AUTO',
+            'BLEND', 'ADD', 'DARKEST', 'LIGHTEST', 'DIFFERENCE',
+            'EXCLUSION', 'MULTIPLY', 'SCREEN', 'REPLACE', 'OVERLAY',
+            'HARD_LIGHT', 'SOFT_LIGHT', 'DODGE', 'BURN', 'SUBTRACT',
+            'NORMAL', 'ITALIC', 'BOLD', 'BOLDITALIC',
+            'WORD', 'CHAR', 'RGBA', 'HSBA', 'HSLA',
+            'ARROW', 'CROSS', 'HAND', 'MOVE', 'TEXT', 'WAIT'];
+            
         p5Constants.forEach(constant => {
             if (typeof p[constant] !== 'undefined') {
                 window[constant] = p[constant];
+            }
+        });
+        
+        // Create a getter on window for any missing p5 properties
+        // This is a dynamic fallback for any p5 properties we might have missed
+        const windowProps = Object.getOwnPropertyNames(window);
+        const p5Props = Object.getOwnPropertyNames(p);
+        
+        p5Props.forEach(prop => {
+            // Skip if already defined on window or if it's a private property
+            if (!windowProps.includes(prop) && !prop.startsWith('_')) {
+                try {
+                    Object.defineProperty(window, prop, {
+                        get: function() {
+                            return typeof p[prop] === 'function' 
+                                ? p[prop].bind(p) 
+                                : p[prop];
+                        },
+                        set: function(val) {
+                            p[prop] = val;
+                        },
+                        configurable: true
+                    });
+                } catch (e) {
+                    // Some properties might not be configurable
+                }
             }
         });
         
@@ -532,6 +584,16 @@ function initializeP5Game() {
             // Make height and width available globally
             window.width = p.width;
             window.height = p.height;
+            
+            // Update any p5 variables that might have changed after canvas creation
+            const p5Variables = ['width', 'height', 'windowWidth', 'windowHeight', 
+                'displayWidth', 'displayHeight', 'pixelDensity', 'displayDensity'];
+            
+            p5Variables.forEach(varName => {
+                if (typeof p[varName] !== 'undefined') {
+                    window[varName] = p[varName];
+                }
+            });
             
             // Run original setup if it exists
             if (window.setup) {
