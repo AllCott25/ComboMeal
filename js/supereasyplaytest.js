@@ -271,6 +271,11 @@ async function loadGameWithRecipe(recipe) {
     
     // Store recipe data for later use
     window.playtestRecipeData = recipeData;
+    console.log('📦 Stored recipe data:', {
+        hasData: !!window.playtestRecipeData,
+        recipeName: recipeData?.name,
+        ingredientCount: recipeData?.baseIngredients?.length || 0
+    });
     
     // Initialize p5 with our custom setup
     initializeP5Game();
@@ -324,6 +329,7 @@ async function loadGameScripts() {
         'js/streak.js',
         'js/user-migration.js',
         'js/modules/VesselSystem.js',
+        'js/vessel-designs.js',
         'js/animation.js',
         'js/interaction.js',
         'js/menu.js',
@@ -555,10 +561,7 @@ function setupGameEnvironment(recipeData) {
     window.checkTodayCompletion = async function() {
         if (window.SuperEasyPlaytest.isActive) {
             console.log('🎮 Skipping completion check in playtest mode');
-            // Just proceed with the game
-            if (window.proceedWithNormalFlow) {
-                window.proceedWithNormalFlow(recipeData);
-            }
+            // Don't do anything in playtest mode - game will be initialized in p5 setup
             return;
         }
         // Call original if not in playtest
@@ -582,6 +585,22 @@ function setupGameEnvironment(recipeData) {
         // Check if we have vessels
         if (!window.vessels || window.vessels.length === 0) {
             console.warn('⚠️ No vessels available yet');
+            
+            // Try to initialize the game if proceedWithNormalFlow hasn't been called yet
+            if (window.proceedWithNormalFlow && window.playtestRecipeData && !window.gameInitialized) {
+                console.log('🔄 Attempting to initialize game now...');
+                window.proceedWithNormalFlow(window.playtestRecipeData);
+                window.gameInitialized = true;
+                
+                // Try again after a short delay
+                setTimeout(() => {
+                    if (window.vessels && window.vessels.length > 0) {
+                        window.startGame();
+                    } else {
+                        console.error('❌ Still no vessels after initialization');
+                    }
+                }, 100);
+            }
             return;
         }
         
@@ -898,21 +917,45 @@ function initializeP5Game() {
             }
             
             // Now that canvas is ready, initialize the game
-            if (window.initializeGame && window.playtestRecipeData) {
-                // Make sure we have the recipe data
-                window.recipeData = window.playtestRecipeData;
+            if (window.proceedWithNormalFlow && window.playtestRecipeData) {
+                console.log('🎮 Initializing game with recipe data...');
                 
-                // Ensure ingredients are available globally
-                if (window.recipeData && window.recipeData.ingredients) {
-                    window.ingredients = window.recipeData.ingredients;
+                // Check if required constructors exist
+                if (!window.Vessel) {
+                    console.error('❌ Vessel constructor is missing! Loading VesselSystem.js may have failed.');
+                    return;
                 }
+                
+                // Make sure we have the recipe data
+                window.recipe_data = window.playtestRecipeData;
+                window.recipe = window.playtestRecipeData;
                 
                 // Set game state flags
                 window.gameStarted = false;
                 window.gameWon = false;
+                window.isLoadingRecipe = false;
                 window.loadingComplete = true;
                 
-                window.initializeGame();
+                // Call proceedWithNormalFlow with the recipe data
+                // This will properly set up ingredients and create vessels
+                window.proceedWithNormalFlow(window.playtestRecipeData);
+                window.gameInitialized = true;
+                
+                // Log vessel status after initialization
+                console.log('🎮 After proceedWithNormalFlow:', {
+                    vesselsCount: window.vessels ? window.vessels.length : 0,
+                    ingredients: window.ingredients ? window.ingredients.length : 0,
+                    gameStarted: window.gameStarted,
+                    loadingComplete: window.loadingComplete
+                });
+            } else {
+                console.warn('⚠️ proceedWithNormalFlow not available yet or no recipe data');
+                if (!window.proceedWithNormalFlow) {
+                    console.error('❌ proceedWithNormalFlow function is missing!');
+                }
+                if (!window.playtestRecipeData) {
+                    console.error('❌ playtestRecipeData is missing!');
+                }
             }
         };
         
