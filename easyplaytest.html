@@ -151,10 +151,12 @@
         let originalFetchTodayRecipe = null;
         let originalCheckTodayCompletion = null;
         let originalLoadRecipeData = null;
-        let loadRecipeDataOverrideApplied = false;
+        let originalProceedWithNormalFlow = null;
+        let originalInitializeGame = null;
+        let gameInitialized = false;
         
-        // Prevent the game from starting automatically
-        window.easyPlaytestPreventAutoStart = true;
+        // Prevent any early initialization
+        window.easyPlaytestPreventInit = true;
         
         // Override getCurrentDateEST immediately
         window.getCurrentDateEST = function() {
@@ -167,10 +169,25 @@
             return '2024-01-01';
         };
         
-        // Store original functions and override them to prevent early fetches
+        // Override critical functions to prevent early initialization
+        window.checkTodayCompletion = async function() {
+            if (!easyPlaytestSelectedDate) {
+                console.log("[EasyPlaytest] Preventing checkTodayCompletion - no date selected");
+                return;
+            }
+            if (originalCheckTodayCompletion) {
+                // In playtest mode, we always proceed with normal flow
+                console.log("[EasyPlaytest] Skipping completion check, proceeding with normal flow");
+                if (window.proceedWithNormalFlow) {
+                    window.proceedWithNormalFlow();
+                }
+                return;
+            }
+        };
+        
         window.fetchTodayRecipe = async function() {
             if (!easyPlaytestSelectedDate) {
-                console.log("[EasyPlaytest] Preventing early fetchTodayRecipe call");
+                console.log("[EasyPlaytest] Preventing fetchTodayRecipe - no date selected");
                 return null;
             }
             if (originalFetchTodayRecipe) {
@@ -179,13 +196,47 @@
             return null;
         };
         
-        window.checkTodayCompletion = async function() {
+        window.loadRecipeData = async function() {
             if (!easyPlaytestSelectedDate) {
-                console.log("[EasyPlaytest] Preventing early checkTodayCompletion call");
+                console.log("[EasyPlaytest] Preventing loadRecipeData - no date selected");
                 return;
             }
-            if (originalCheckTodayCompletion) {
-                return originalCheckTodayCompletion();
+            if (originalLoadRecipeData) {
+                return originalLoadRecipeData();
+            }
+        };
+        
+        window.proceedWithNormalFlow = function() {
+            if (!easyPlaytestSelectedDate) {
+                console.log("[EasyPlaytest] Preventing proceedWithNormalFlow - no date selected");
+                return;
+            }
+            if (originalProceedWithNormalFlow) {
+                originalProceedWithNormalFlow();
+            }
+        };
+        
+        window.initializeGame = function() {
+            if (!easyPlaytestSelectedDate) {
+                console.log("[EasyPlaytest] Preventing initializeGame - no date selected");
+                return;
+            }
+            
+            // Prevent duplicate initialization
+            if (gameInitialized) {
+                console.log("[EasyPlaytest] Game already initialized, skipping");
+                return;
+            }
+            
+            if (originalInitializeGame) {
+                // Clear vessels before initializing to prevent duplicates
+                if (window.vessels && window.vessels.length > 0) {
+                    console.log("[EasyPlaytest] Clearing existing vessels before initialization");
+                    window.vessels = [];
+                }
+                
+                gameInitialized = true;
+                originalInitializeGame();
             }
         };
         
@@ -266,7 +317,8 @@
                 // Store the selected date
                 easyPlaytestSelectedDate = selectedDate;
                 
-                // Clear any existing game state
+                // Reset game state
+                gameInitialized = false;
                 if (window.vessels) {
                     console.log("[EasyPlaytest] Clearing existing vessels");
                     window.vessels = [];
@@ -275,29 +327,27 @@
                     console.log("[EasyPlaytest] Clearing existing recipe data");
                     window.recipeData = null;
                 }
-                if (window.gameStarted) {
-                    window.gameStarted = false;
+                if (window.ingredients) {
+                    window.ingredients = [];
                 }
-                if (window.gameWon) {
-                    window.gameWon = false;
+                if (window.base_ingredient_instances) {
+                    window.base_ingredient_instances = [];
                 }
+                window.gameStarted = false;
+                window.gameWon = false;
+                window.isLoadingRecipe = false;
                 
                 // Hide the selector
                 document.getElementById('playtestSelector').classList.add('playtest-hidden');
                 
-                // Now restore original functions if they exist and start the game
+                // Now start the game properly
                 console.log("[EasyPlaytest] Starting game with selected date:", selectedDate);
                 
-                // If the game hasn't initialized yet, wait for it
-                if (typeof window.setup === 'function') {
+                // Call the original setup if it exists
+                if (window.originalSetup) {
+                    window.originalSetup();
+                } else if (typeof window.setup === 'function') {
                     window.setup();
-                } else {
-                    // Wait for p5.js to load
-                    setTimeout(() => {
-                        if (typeof window.setup === 'function') {
-                            window.setup();
-                        }
-                    }, 500);
                 }
                 
             } catch (error) {
@@ -326,16 +376,6 @@
             // Start loading recipes after a short delay to ensure scripts are loaded
             setTimeout(loadRecipeList, 1000);
         });
-        
-        // Override the setup function to prevent auto-start
-        if (window.setup) {
-            const originalSetup = window.setup;
-            window.setup = function() {
-                if (!window.easyPlaytestPreventAutoStart || !easyPlaytestActive) {
-                    originalSetup();
-                }
-            };
-        }
     </script>
     
     <!-- Configuration - loads environment-specific settings -->
@@ -371,49 +411,17 @@
     <!-- Help Modal Script -->
     <script src="js/help.js"></script>
     
-    <!-- Capture original functions and override setup after all scripts load -->
+    <!-- Capture original functions after all scripts load -->
     <script>
+        // Override setup immediately to prevent auto-start
+        window.originalSetup = null;
+        
         // Wait for all scripts to load
         window.addEventListener('load', function() {
             console.log("[EasyPlaytest] All scripts loaded, capturing original functions");
             
-            // Capture original loadRecipeData if it hasn't been captured yet
-            if (!originalLoadRecipeData && window.loadRecipeData && !loadRecipeDataOverrideApplied) {
-                originalLoadRecipeData = window.loadRecipeData;
-                loadRecipeDataOverrideApplied = true;
-                
-                // Override loadRecipeData
-                window.loadRecipeData = async function() {
-                    if (!easyPlaytestSelectedDate) {
-                        console.log("[EasyPlaytest] No date selected for loadRecipeData");
-                        return;
-                    }
-                    
-                    console.log("[EasyPlaytest] Loading recipe data for selected date:", easyPlaytestSelectedDate);
-                    
-                    // Clear any existing vessels first
-                    if (window.vessels) {
-                        console.log("[EasyPlaytest] Clearing", window.vessels.length, "existing vessels");
-                        window.vessels = [];
-                    }
-                    
-                    // Call the original function which will use our overridden getCurrentDateEST
-                    return originalLoadRecipeData();
-                };
-            }
-            
-            // Capture original functions if they haven't been captured yet
-            if (!originalFetchTodayRecipe && window.fetchTodayRecipe) {
-                // Get the real fetchTodayRecipe from supabase.js
-                const scripts = document.getElementsByTagName('script');
-                for (let script of scripts) {
-                    if (script.src && script.src.includes('supabase.js')) {
-                        // The function should be defined by now
-                        break;
-                    }
-                }
-                
-                // Store the original by re-defining from supabase
+            // Capture original functions
+            if (window.fetchTodayRecipe && !originalFetchTodayRecipe) {
                 originalFetchTodayRecipe = async function() {
                     try {
                         const today = window.getCurrentDateEST();
@@ -449,25 +457,37 @@
                 };
             }
             
-            if (!originalCheckTodayCompletion && window.checkTodayCompletion !== originalCheckTodayCompletion) {
-                // We'll handle this differently - just let it run with the selected date
-                originalCheckTodayCompletion = function() {
-                    // Skip completion check in playtest mode
-                    console.log("[EasyPlaytest] Skipping completion check in playtest mode");
-                    return Promise.resolve();
-                };
+            if (window.checkTodayCompletion && !originalCheckTodayCompletion) {
+                originalCheckTodayCompletion = window.checkTodayCompletion;
+            }
+            
+            if (window.loadRecipeData && !originalLoadRecipeData) {
+                originalLoadRecipeData = window.loadRecipeData;
+            }
+            
+            if (window.proceedWithNormalFlow && !originalProceedWithNormalFlow) {
+                originalProceedWithNormalFlow = window.proceedWithNormalFlow;
+            }
+            
+            if (window.initializeGame && !originalInitializeGame) {
+                originalInitializeGame = window.initializeGame;
             }
             
             // Override the setup function to prevent auto-start
-            if (window.setup) {
-                const originalSetup = window.setup;
+            if (window.setup && !window.originalSetup) {
+                window.originalSetup = window.setup;
                 window.setup = function() {
                     if (easyPlaytestActive && !easyPlaytestSelectedDate) {
                         console.log("[EasyPlaytest] Preventing setup until date is selected");
                         return;
                     }
-                    originalSetup();
+                    window.originalSetup();
                 };
+            }
+            
+            // Ensure p5.js doesn't auto-start
+            if (window.p5 && window.p5.instance) {
+                window.p5.instance.remove();
             }
         });
     </script>
