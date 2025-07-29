@@ -245,7 +245,7 @@ async function loadGameWithRecipe(recipe) {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     // Fetch the full recipe data
-    const recipeData = await fetchRecipeData(recipe.date);
+    const recipeData = await fetchRecipeData(recipe.date, recipe.id);
     
     // Set up the game environment
     setupGameEnvironment(recipeData);
@@ -324,8 +324,8 @@ function loadScript(src) {
 /**
  * Fetch full recipe data including combinations
  */
-async function fetchRecipeData(date) {
-    console.log('📊 Fetching recipe data for date:', date);
+async function fetchRecipeData(date, recipeId) {
+    console.log('📊 Fetching recipe data for date:', date, 'with ID:', recipeId);
     
     // Use the existing fetchRecipeByDate function if available
     if (window.fetchRecipeByDate) {
@@ -334,13 +334,29 @@ async function fetchRecipeData(date) {
     
     // Otherwise, fetch directly
     try {
-        const { data: recipe, error: recipeError } = await supabase
-            .from('recipes')
-            .select('*')
-            .eq('date', date)
-            .single();
+        let recipe;
         
-        if (recipeError) throw recipeError;
+        // If we have the recipe ID, use it directly
+        if (recipeId) {
+            const { data: recipeData, error: recipeError } = await supabase
+                .from('recipes')
+                .select('*')
+                .eq('id', recipeId)
+                .single();
+            
+            if (recipeError) throw recipeError;
+            recipe = recipeData;
+        } else {
+            // Fallback to fetching by date
+            const { data: recipeData, error: recipeError } = await supabase
+                .from('recipes')
+                .select('*')
+                .eq('date', date)
+                .single();
+            
+            if (recipeError) throw recipeError;
+            recipe = recipeData;
+        }
         
         // Fetch combinations
         const { data: combinations, error: comboError } = await supabase
