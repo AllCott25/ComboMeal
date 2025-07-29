@@ -298,8 +298,8 @@
                     
                     // Create new p5 instance with proper initialization
                     window.p5Instance = new p5(function(p) {
-                        // Store p5 reference globally for other scripts
-                        window.p5 = p;
+                        // DO NOT reassign window.p5 to avoid duplicate import warning
+                        // window.p5 = p;
                         
                         // Get canvas reference
                         let canvas = null;
@@ -366,9 +366,19 @@
                         // Expose p5 functions globally
                         p5Functions.forEach(fn => {
                             if (typeof p[fn] !== 'undefined') {
-                                window[fn] = function() {
-                                    return p[fn].apply(p, arguments);
-                                };
+                                if (fn === 'textFont') {
+                                    // Special handling for textFont to avoid null font error
+                                    window[fn] = function(font) {
+                                        if (font) {
+                                            return p[fn].apply(p, arguments);
+                                        }
+                                        // If font is null/undefined, don't call p5's textFont
+                                    };
+                                } else {
+                                    window[fn] = function() {
+                                        return p[fn].apply(p, arguments);
+                                    };
+                                }
                             }
                         });
                         
@@ -478,7 +488,8 @@
                         
                         // Set up p5 callbacks
                         p.preload = function() {
-                            // Initialize fonts
+                            console.log("[EasyPlaytest] Running preload");
+                            // Initialize fonts first as string values
                             window.titleFont = 'Courier, "Courier New", monospace';
                             window.bodyFont = 'Helvetica, Arial, sans-serif';
                             window.buttonFont = 'Helvetica, Arial, sans-serif';
@@ -508,12 +519,16 @@
                                 '#dd9866'  // Peach/orange
                             ];
                             
-                            if (window.preload) {
+                            if (window.originalPreload) {
+                                window.originalPreload();
+                            } else if (window.preload) {
                                 window.preload();
                             }
                         };
                         
                         p.setup = function() {
+                            console.log("[EasyPlaytest] Running setup");
+                            
                             // Initialize game state variables if needed
                             if (typeof window.gameStarted === 'undefined') {
                                 window.gameStarted = false;
@@ -534,7 +549,7 @@
                                 window.skipWallpaperAnimation = true;
                             }
                             
-                            // Override createCanvas to capture canvas reference
+                            // Override createCanvas to capture the canvas reference
                             const originalCreateCanvas = p.createCanvas;
                             p.createCanvas = function() {
                                 canvas = originalCreateCanvas.apply(p, arguments);
