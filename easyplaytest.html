@@ -159,25 +159,6 @@
         let originalInitializeGame = null;
         let gameInitialized = false;
         
-        // Mock p5.js globals that might be accessed before p5.js is ready
-        if (typeof window.width === 'undefined') {
-            Object.defineProperty(window, 'width', {
-                get: function() {
-                    return window.innerWidth || 561;
-                },
-                configurable: true
-            });
-        }
-        
-        if (typeof window.height === 'undefined') {
-            Object.defineProperty(window, 'height', {
-                get: function() {
-                    return window.innerHeight || 808;
-                },
-                configurable: true
-            });
-        }
-        
         // Override wallpaper loading to avoid CORS issues
         window.skipWallpaperAnimation = true;
         
@@ -262,41 +243,41 @@
             }
         }
         
-        // Function to start the game with selected recipe
+        // Start game with selected recipe
         async function startWithSelectedRecipe() {
             const selectedDate = document.getElementById('recipeSelect').value;
             if (!selectedDate) {
-                document.getElementById('playtestError').textContent = 'Please select a recipe date';
-                document.getElementById('playtestError').style.display = 'block';
+                alert('Please select a recipe first');
                 return;
             }
             
+            console.log("[EasyPlaytest] Starting with date:", selectedDate);
+            
+            // Disable the button to prevent multiple clicks
+            document.getElementById('loadRecipeBtn').disabled = true;
+            
+            // Show loading message
+            document.getElementById('playtestMessage').textContent = 'Loading recipe...';
+            document.getElementById('playtestMessage').style.display = 'block';
+            document.getElementById('playtestError').style.display = 'none';
+            
             try {
-                // Show loading message
-                document.getElementById('playtestMessage').textContent = 'Loading recipe...';
-                document.getElementById('playtestMessage').style.display = 'block';
-                document.getElementById('playtestError').style.display = 'none';
-                document.getElementById('loadRecipeBtn').disabled = true;
-                
-                // Store the selected date
+                // Set the selected date
                 window.easyPlaytestSelectedDate = selectedDate;
                 
+                // Ensure recipe data is loaded
+                const recipe = await window.fetchRecipeByDate(selectedDate);
+                if (!recipe) {
+                    throw new Error('Could not load recipe for selected date');
+                }
+                
+                // Set the recipe data globally
+                window.recipeData = recipe;
+                
+                // Update message
+                document.getElementById('playtestMessage').textContent = 'Starting game...';
+                
                 // Reset game state
-                gameInitialized = false;
-                if (window.vessels) {
-                    console.log("[EasyPlaytest] Clearing existing vessels");
-                    window.vessels = [];
-                }
-                if (window.recipeData) {
-                    console.log("[EasyPlaytest] Clearing existing recipe data");
-                    window.recipeData = null;
-                }
-                if (window.ingredients) {
-                    window.ingredients = [];
-                }
-                if (window.base_ingredient_instances) {
-                    window.base_ingredient_instances = [];
-                }
                 window.gameStarted = false;
                 window.gameWon = false;
                 window.isLoadingRecipe = false;
@@ -307,11 +288,300 @@
                 // Now start the game properly
                 console.log("[EasyPlaytest] Starting game with selected date:", selectedDate);
                 
-                // Call the original setup if it exists
-                if (window.originalSetup) {
-                    window.originalSetup();
-                } else if (typeof window.setup === 'function') {
-                    window.setup();
+                // Wait for p5.js to be ready before calling setup
+                if (window.p5) {
+                    // Remove any existing p5 instance
+                    if (window.p5Instance) {
+                        window.p5Instance.remove();
+                        window.p5Instance = null;
+                    }
+                    
+                    // Create new p5 instance with proper initialization
+                    window.p5Instance = new p5(function(p) {
+                        // Store p5 reference globally for other scripts
+                        window.p5 = p;
+                        
+                        // Get canvas reference
+                        let canvas = null;
+                        
+                        // Define p5 functions globally
+                        const p5Functions = [
+                            'createCanvas', 'background', 'fill', 'stroke', 'strokeWeight',
+                            'rect', 'ellipse', 'line', 'text', 'textSize', 'textAlign',
+                            'push', 'pop', 'translate', 'rotate', 'scale', 'loadImage',
+                            'image', 'tint', 'noTint', 'mouseX', 'mouseY', 'width', 'height',
+                            'windowWidth', 'windowHeight', 'frameRate', 'frameCount',
+                            'loadFont', 'textFont', 'color', 'red', 'green', 'blue',
+                            'alpha', 'lerpColor', 'map', 'constrain', 'dist', 'atan2',
+                            'cos', 'sin', 'PI', 'TWO_PI', 'HALF_PI', 'radians', 'degrees',
+                            'random', 'noise', 'noiseSeed', 'randomSeed', 'floor', 'ceil',
+                            'round', 'abs', 'sqrt', 'pow', 'exp', 'log', 'sq',
+                            'CENTER', 'LEFT', 'RIGHT', 'TOP', 'BOTTOM', 'BASELINE',
+                            'mousePressed', 'mouseReleased', 'keyPressed', 'keyReleased',
+                            'noStroke', 'noFill', 'smooth', 'noSmooth', 'cursor', 'noCursor',
+                            'beginShape', 'endShape', 'vertex', 'curveVertex', 'bezierVertex',
+                            'CLOSE', 'BLEND', 'ADD', 'DARKEST', 'LIGHTEST', 'DIFFERENCE',
+                            'EXCLUSION', 'MULTIPLY', 'SCREEN', 'REPLACE', 'OVERLAY',
+                            'HARD_LIGHT', 'SOFT_LIGHT', 'DODGE', 'BURN', 'blendMode',
+                            'angleMode', 'RADIANS', 'DEGREES', 'textWidth', 'textAscent',
+                            'textDescent', 'loadSound', 'soundFormats', 'millis', 'resizeCanvas',
+                            'filter', 'BLUR', 'GRAY', 'THRESHOLD', 'INVERT', 'POSTERIZE',
+                            'DILATE', 'ERODE', 'pixelDensity', 'displayDensity', 'getURL',
+                            'getURLPath', 'getURLParams', 'preload', 'setup', 'draw',
+                            'remove', 'createGraphics', 'createVector', 'createStringDict',
+                            'createNumberDict', 'select', 'selectAll', 'removeElements',
+                            'createDiv', 'createP', 'createSpan', 'createImg', 'createA',
+                            'createSlider', 'createButton', 'createCheckbox', 'createSelect',
+                            'createRadio', 'createInput', 'createFileInput', 'createVideo',
+                            'createAudio', 'createCapture', 'createElement', 'quad',
+                            'triangle', 'arc', 'point', 'bezier', 'curve', 'clear',
+                            'colorMode', 'RGB', 'HSB', 'HSL', 'hue', 'saturation', 'brightness',
+                            'lightness', 'min', 'max', 'norm', 'lerp', 'mag', 'heading',
+                            'createWriter', 'save', 'saveCanvas', 'saveFrames', 'httpGet',
+                            'httpPost', 'httpDo', 'loadJSON', 'loadStrings', 'loadXML',
+                            'loadBytes', 'loadTable', 'parseXML', 'parseJSONObject', 'parseJSONArray',
+                            'day', 'hour', 'minute', 'second', 'year', 'month', 'pmouseX',
+                            'pmouseY', 'winMouseX', 'winMouseY', 'pwinMouseX', 'pwinMouseY',
+                            'touches', 'touchStarted', 'touchMoved', 'touchEnded', 'deviceMoved',
+                            'deviceTurned', 'deviceShaken', 'keyIsPressed', 'key', 'keyCode',
+                            'keyIsDown', 'keyTyped', 'mouseButton', 'mouseIsPressed',
+                            'mouseMoved', 'mouseDragged', 'mouseClicked', 'mouseWheel',
+                            'requestPointerLock', 'exitPointerLock', 'textStyle', 'NORMAL',
+                            'ITALIC', 'BOLD', 'BOLDITALIC', 'textLeading', 'textWrap',
+                            'WORD', 'CHAR', 'redraw', 'loop', 'noLoop', 'isLooping',
+                            'popMatrix', 'pushMatrix', 'applyMatrix', 'resetMatrix',
+                            'rotateX', 'rotateY', 'rotateZ', 'shearX', 'shearY', 'bezierPoint',
+                            'bezierTangent', 'curvePoint', 'curveTangent', 'curveTightness',
+                            'rectMode', 'CORNER', 'CORNERS', 'RADIUS', 'ellipseMode',
+                            'imageMode', 'loadShader', 'resetShader', 'shader', 'normalMaterial',
+                            'texture', 'ambientMaterial', 'specularMaterial', 'shininess',
+                            'camera', 'perspective', 'ortho', 'frustum', 'createCamera',
+                            'setCamera', 'ambientLight', 'directionalLight', 'pointLight',
+                            'spotLight', 'lights', 'lightFalloff', 'loadModel', 'model',
+                            'plane', 'box', 'sphere', 'cylinder', 'cone', 'torus', 'orbitControl',
+                            'debugMode', 'noDebugMode', 'setAttributes', 'createShader',
+                            'createFilterShader', 'setUniform'
+                        ];
+                        
+                        // Expose p5 functions globally
+                        p5Functions.forEach(fn => {
+                            if (typeof p[fn] !== 'undefined') {
+                                window[fn] = function() {
+                                    return p[fn].apply(p, arguments);
+                                };
+                            }
+                        });
+                        
+                        // Expose p5 constants globally
+                        const p5Constants = [
+                            'PI', 'TWO_PI', 'HALF_PI', 'QUARTER_PI', 'TAU',
+                            'DEGREES', 'RADIANS',
+                            'CORNER', 'CORNERS', 'RADIUS', 'RIGHT', 'LEFT', 'CENTER', 'TOP', 'BOTTOM',
+                            'BASELINE', 'POINTS', 'LINES', 'LINE_STRIP', 'LINE_LOOP', 'TRIANGLES',
+                            'TRIANGLE_FAN', 'TRIANGLE_STRIP', 'QUADS', 'QUAD_STRIP', 'CLOSE',
+                            'OPEN', 'CHORD', 'PIE', 'PROJECT', 'SQUARE', 'ROUND', 'BEVEL', 'MITER',
+                            'RGB', 'HSB', 'HSL', 'AUTO', 'ALT', 'BACKSPACE', 'CONTROL', 'DELETE',
+                            'DOWN_ARROW', 'ENTER', 'ESCAPE', 'LEFT_ARROW', 'OPTION', 'RETURN',
+                            'RIGHT_ARROW', 'SHIFT', 'TAB', 'UP_ARROW', 'BLEND', 'REMOVE', 'ADD',
+                            'DARKEST', 'LIGHTEST', 'DIFFERENCE', 'EXCLUSION', 'MULTIPLY', 'SCREEN',
+                            'REPLACE', 'OVERLAY', 'HARD_LIGHT', 'SOFT_LIGHT', 'DODGE', 'BURN',
+                            'THRESHOLD', 'GRAY', 'OPAQUE', 'INVERT', 'POSTERIZE', 'DILATE', 'ERODE',
+                            'BLUR', 'NORMAL', 'ITALIC', 'BOLD', 'BOLDITALIC',
+                            'LANDSCAPE', 'PORTRAIT', 'GRID', 'AXES', 'ARROW', 'CROSS', 'HAND',
+                            'MOVE', 'TEXT', 'WAIT', 'HALF_FLOAT', 'RGBA', 'FLOAT', 'DOUBLE',
+                            'INT', 'LONG', 'TESS', 'WORD', 'CHAR'
+                        ];
+                        
+                        p5Constants.forEach(constant => {
+                            if (typeof p[constant] !== 'undefined') {
+                                window[constant] = p[constant];
+                            }
+                        });
+                        
+                        // Also expose p5 properties
+                        Object.defineProperty(window, 'width', {
+                            get: () => p.width,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'height', {
+                            get: () => p.height,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'mouseX', {
+                            get: () => p.mouseX,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'mouseY', {
+                            get: () => p.mouseY,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'pmouseX', {
+                            get: () => p.pmouseX,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'pmouseY', {
+                            get: () => p.pmouseY,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'windowWidth', {
+                            get: () => p.windowWidth,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'windowHeight', {
+                            get: () => p.windowHeight,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'frameCount', {
+                            get: () => p.frameCount,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'deltaTime', {
+                            get: () => p.deltaTime,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'focused', {
+                            get: () => p.focused,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'displayWidth', {
+                            get: () => p.displayWidth,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'displayHeight', {
+                            get: () => p.displayHeight,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'key', {
+                            get: () => p.key,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'keyCode', {
+                            get: () => p.keyCode,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'keyIsPressed', {
+                            get: () => p.keyIsPressed,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'mouseIsPressed', {
+                            get: () => p.mouseIsPressed,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'mouseButton', {
+                            get: () => p.mouseButton,
+                            configurable: true
+                        });
+                        Object.defineProperty(window, 'touches', {
+                            get: () => p.touches,
+                            configurable: true
+                        });
+                        
+                        // Set up p5 callbacks
+                        p.preload = function() {
+                            // Initialize fonts
+                            window.titleFont = 'Courier, "Courier New", monospace';
+                            window.bodyFont = 'Helvetica, Arial, sans-serif';
+                            window.buttonFont = 'Helvetica, Arial, sans-serif';
+                            
+                            // Initialize color palette
+                            window.COLORS = {
+                                background: '#f8f5f2',    
+                                primary: '#9a9832',       
+                                secondary: '#cf6d88',     
+                                tertiary: '#FFFFFF',      
+                                accent: '#7A9BB5',        
+                                text: '#333333',          
+                                vesselBase: '#F9F5EB',    
+                                vesselYellow: '#FFFFFF',  
+                                vesselGreen: '#9a9832',   
+                                vesselHint: '#f7dc30',    
+                                green: '#9a9832',         
+                                peach: '#da9356',          
+                                HintPink: '#cf6d88' 
+                            };
+                            
+                            window.COMPLETED_VESSEL_COLORS = [
+                                '#f3a9b2', // Light pink
+                                '#cfc23f', // Mustard yellow
+                                '#f7dc30', // Bright yellow
+                                '#cf6d88', // Pink
+                                '#dd9866'  // Peach/orange
+                            ];
+                            
+                            if (window.preload) {
+                                window.preload();
+                            }
+                        };
+                        
+                        p.setup = function() {
+                            // Initialize game state variables if needed
+                            if (typeof window.gameStarted === 'undefined') {
+                                window.gameStarted = false;
+                            }
+                            if (typeof window.gameWon === 'undefined') {
+                                window.gameWon = false;
+                            }
+                            if (typeof window.isLoadingRecipe === 'undefined') {
+                                window.isLoadingRecipe = false;
+                            }
+                            if (typeof window.loadingComplete === 'undefined') {
+                                window.loadingComplete = true;
+                            }
+                            if (typeof window.wallpaperImageReady === 'undefined') {
+                                window.wallpaperImageReady = false;
+                            }
+                            if (typeof window.skipWallpaperAnimation === 'undefined') {
+                                window.skipWallpaperAnimation = true;
+                            }
+                            
+                            // Override createCanvas to capture canvas reference
+                            const originalCreateCanvas = p.createCanvas;
+                            p.createCanvas = function() {
+                                canvas = originalCreateCanvas.apply(p, arguments);
+                                window.canvas = canvas;
+                                return canvas;
+                            };
+                            window.createCanvas = p.createCanvas;
+                            
+                            if (window.originalSetup) {
+                                window.originalSetup();
+                            } else if (window.setup) {
+                                window.setup();
+                            }
+                        };
+                        
+                        p.draw = function() {
+                            if (window.draw) {
+                                window.draw();
+                            }
+                        };
+                        
+                        p.mousePressed = function() {
+                            if (window.mousePressed) {
+                                return window.mousePressed();
+                            }
+                        };
+                        
+                        p.mouseReleased = function() {
+                            if (window.mouseReleased) {
+                                return window.mouseReleased();
+                            }
+                        };
+                        
+                        p.keyPressed = function() {
+                            if (window.keyPressed) {
+                                return window.keyPressed();
+                            }
+                        };
+                        
+                        p.windowResized = function() {
+                            if (window.windowResized) {
+                                return window.windowResized();
+                            }
+                        };
+                    });
+                } else {
+                    throw new Error('p5.js library not loaded');
                 }
                 
             } catch (error) {
@@ -377,6 +647,10 @@
     
     <!-- Capture original functions after all scripts load -->
     <script>
+        // Prevent p5.js from auto-starting
+        window._setupDone = true;
+        window._preloadDone = true;
+        
         // Override setup immediately to prevent auto-start
         window.originalSetup = null;
         
@@ -400,97 +674,23 @@
                 };
             }
             
-            // Capture original functions
-            if (window.fetchTodayRecipe && !originalFetchTodayRecipe) {
-                originalFetchTodayRecipe = async function() {
-                    try {
-                        const today = window.getCurrentDateEST();
-                        console.log(`[EasyPlaytest] Fetching recipe for selected date: ${today}`);
-                        
-                        // Fetch recipe for selected date
-                        const { data: recipes, error } = await supabase
-                            .from('recipes')
-                            .select('*')
-                            .eq('date', today)
-                            .single();
-                        
-                        if (error) throw error;
-                        if (!recipes) {
-                            console.log("No recipe found for selected date:", today);
-                            return null;
-                        }
-                        
-                        console.log("Found recipe for selected date:", recipes);
-                        
-                        // Call fetchRecipeDetails to get the full processed data
-                        if (window.fetchRecipeDetails) {
-                            return window.fetchRecipeDetails(recipes.rec_id);
-                        }
-                        
-                        // Fallback if fetchRecipeDetails is not available
-                        return recipes;
-                        
-                    } catch (error) {
-                        console.error("Error in fetchTodayRecipe:", error);
-                        return null;
-                    }
-                };
-            }
-            
-            if (window.checkTodayCompletion && !originalCheckTodayCompletion) {
-                originalCheckTodayCompletion = window.checkTodayCompletion;
-                // Override to skip completion check in playtest mode
-                window.checkTodayCompletion = async function() {
-                    console.log("[EasyPlaytest] Skipping completion check, proceeding with normal flow");
-                    if (window.proceedWithNormalFlow) {
-                        window.proceedWithNormalFlow();
-                    }
-                };
-            }
-            
-            if (window.loadRecipeData && !originalLoadRecipeData) {
-                originalLoadRecipeData = window.loadRecipeData;
-            }
-            
-            if (window.proceedWithNormalFlow && !originalProceedWithNormalFlow) {
-                originalProceedWithNormalFlow = window.proceedWithNormalFlow;
-            }
-            
-            if (window.initializeGame && !originalInitializeGame) {
-                originalInitializeGame = window.initializeGame;
-                // Override to prevent duplicate initialization
-                window.initializeGame = function() {
-                    if (gameInitialized) {
-                        console.log("[EasyPlaytest] Game already initialized, skipping");
-                        return;
-                    }
-                    
-                    // Clear vessels before initializing
-                    if (window.vessels && window.vessels.length > 0) {
-                        console.log("[EasyPlaytest] Clearing existing vessels");
-                        window.vessels = [];
-                    }
-                    
-                    gameInitialized = true;
-                    originalInitializeGame();
-                };
-            }
-            
-            // Override the setup function to prevent auto-start
+            // Capture setup before p5.js overwrites it
             if (window.setup && !window.originalSetup) {
                 window.originalSetup = window.setup;
                 window.setup = function() {
-                    if (easyPlaytestActive && !easyPlaytestSelectedDate) {
+                    if (window.easyPlaytestActive && !window.easyPlaytestSelectedDate) {
                         console.log("[EasyPlaytest] Preventing setup until date is selected");
                         return;
                     }
-                    window.originalSetup();
+                    if (window.originalSetup) {
+                        window.originalSetup();
+                    }
                 };
             }
             
-            // Ensure p5.js doesn't auto-start
+            // Prevent any existing p5 instance from running
             if (window.p5 && window.p5.instance) {
-                window.p5.instance.remove();
+                window.p5.instance = null;
             }
         });
     </script>
