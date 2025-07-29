@@ -18,12 +18,16 @@ window.SuperEasyPlaytest = {
     originalFunctions: {}
 };
 
-// Supabase configuration (read from config.js if available)
-const SUPABASE_URL = window.SUPABASE_URL || 'https://ovrvtfjejmhrflybslwi.supabase.co';
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
+// Use existing Supabase configuration if available, otherwise use defaults
+if (typeof SUPABASE_URL === 'undefined') {
+    window.SUPABASE_URL = 'https://ovrvtfjejmhrflybslwi.supabase.co';
+}
+if (typeof SUPABASE_ANON_KEY === 'undefined') {
+    window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
+}
 
-// Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Initialize Supabase client if not already initialized
+const supabase = window.supabase || window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
 
 /**
  * Initialize the playtest system
