@@ -19,8 +19,8 @@ window.SuperEasyPlaytest = {
 };
 
 // Supabase configuration (read from config.js if available)
-const SUPABASE_URL = window.SUPABASE_URL || 'https://nabbkyctwjxiaugjvwso.supabase.co';
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5hYmJreWN0d2p4aWF1Z2p2d3NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDQ2NDQ1MzEsImV4cCI6MjAyMDIyMDUzMX0.ssoZsBa-6qJX3m7fGMKNNDKr4UaZTxuJM6mJd2w-sfQ';
+const SUPABASE_URL = window.SUPABASE_URL || 'https://ovrvtfjejmhrflybslwi.supabase.co';
+const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
 
 // Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
