@@ -69,6 +69,11 @@ async function loadRecipes() {
         window.SuperEasyPlaytest.recipes = recipes;
         console.log(`✅ Loaded ${recipes.length} recipes`);
         
+        // Log first recipe to see structure
+        if (recipes.length > 0) {
+            console.log('Sample recipe structure:', recipes[0]);
+        }
+        
         // Display recipes
         displayRecipes(recipes);
         
@@ -94,7 +99,7 @@ function displayRecipes(recipes) {
     recipes.forEach(recipe => {
         const item = document.createElement('div');
         item.className = 'recipe-item';
-        item.dataset.recipeId = recipe.id;
+        item.dataset.recipeId = recipe.rec_id;
         item.dataset.date = recipe.date;
         
         item.innerHTML = `
@@ -157,7 +162,7 @@ function selectRecipe(recipe) {
     });
     
     // Add selection to clicked item
-    const selectedItem = document.querySelector(`[data-recipe-id="${recipe.id}"]`);
+    const selectedItem = document.querySelector(`[data-recipe-id="${recipe.rec_id}"]`);
     if (selectedItem) {
         selectedItem.classList.add('selected');
     }
@@ -168,7 +173,7 @@ function selectRecipe(recipe) {
     // Enable start button
     document.getElementById('start-btn').disabled = false;
     
-    console.log('📝 Selected recipe:', recipe.name);
+    console.log('📝 Selected recipe:', recipe.name, 'with ID:', recipe.rec_id);
 }
 
 /**
@@ -200,7 +205,7 @@ async function startPlaytest() {
         return;
     }
     
-    console.log('🎮 Starting playtest with recipe:', recipe.name);
+    console.log('🎮 Starting playtest with recipe:', recipe.name, 'ID:', recipe.rec_id, 'Full recipe object:', recipe);
     
     try {
         // Hide selector panel
@@ -245,7 +250,7 @@ async function loadGameWithRecipe(recipe) {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     // Fetch the full recipe data
-    const recipeData = await fetchRecipeData(recipe.date, recipe.id);
+    const recipeData = await fetchRecipeData(recipe.date, recipe.rec_id);
     
     // Set up the game environment
     setupGameEnvironment(recipeData);
@@ -341,7 +346,7 @@ async function fetchRecipeData(date, recipeId) {
             const { data: recipeData, error: recipeError } = await supabase
                 .from('recipes')
                 .select('*')
-                .eq('id', recipeId)
+                .eq('rec_id', recipeId)
                 .single();
             
             if (recipeError) throw recipeError;
@@ -362,13 +367,13 @@ async function fetchRecipeData(date, recipeId) {
         const { data: combinations, error: comboError } = await supabase
             .from('combinations')
             .select('*')
-            .eq('rec_id', recipe.id);
+            .eq('rec_id', recipe.rec_id);
         
         if (comboError) throw comboError;
         
         // Return in expected format
         return {
-            rec_id: recipe.id,
+            rec_id: recipe.rec_id,
             recipeName: recipe.name,
             recipeUrl: recipe.recipe_url,
             imgUrl: recipe.img_url,
