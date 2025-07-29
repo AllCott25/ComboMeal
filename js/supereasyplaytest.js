@@ -18,12 +18,24 @@ window.SuperEasyPlaytest = {
     originalFunctions: {}
 };
 
-// Supabase configuration (read from config.js if available)
-const SUPABASE_URL = window.SUPABASE_URL || 'https://ovrvtfjejmhrflybslwi.supabase.co';
-const SUPABASE_ANON_KEY = window.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
+// Use existing Supabase configuration if available, otherwise use defaults
+if (typeof SUPABASE_URL === 'undefined') {
+    window.SUPABASE_URL = 'https://ovrvtfjejmhrflybslwi.supabase.co';
+}
+if (typeof SUPABASE_ANON_KEY === 'undefined') {
+    window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
+}
 
 // Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// First check if a client already exists from the main app
+let supabase;
+if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+    // If the main app hasn't created a client yet, create one
+    supabase = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+} else {
+    console.error('❌ Supabase library not loaded!');
+    throw new Error('Supabase library is required');
+}
 
 /**
  * Initialize the playtest system
@@ -69,6 +81,12 @@ async function loadRecipes() {
         window.SuperEasyPlaytest.recipes = recipes;
         console.log(`✅ Loaded ${recipes.length} recipes`);
         
+        // Log first recipe to see structure
+        if (recipes.length > 0) {
+            console.log('Sample recipe structure:', JSON.stringify(recipes[0], null, 2));
+            console.log('Recipe keys:', Object.keys(recipes[0]));
+        }
+        
         // Display recipes
         displayRecipes(recipes);
         
@@ -94,7 +112,7 @@ function displayRecipes(recipes) {
     recipes.forEach(recipe => {
         const item = document.createElement('div');
         item.className = 'recipe-item';
-        item.dataset.recipeId = recipe.id;
+        item.dataset.recipeId = recipe.rec_id;
         item.dataset.date = recipe.date;
         
         item.innerHTML = `
@@ -157,7 +175,7 @@ function selectRecipe(recipe) {
     });
     
     // Add selection to clicked item
-    const selectedItem = document.querySelector(`[data-recipe-id="${recipe.id}"]`);
+    const selectedItem = document.querySelector(`[data-recipe-id="${recipe.rec_id}"]`);
     if (selectedItem) {
         selectedItem.classList.add('selected');
     }
@@ -168,7 +186,8 @@ function selectRecipe(recipe) {
     // Enable start button
     document.getElementById('start-btn').disabled = false;
     
-    console.log('📝 Selected recipe:', recipe.name);
+    console.log('📝 Selected recipe:', recipe.name, 'with ID:', recipe.rec_id);
+    console.log('Full recipe object:', JSON.stringify(recipe, null, 2));
 }
 
 /**
@@ -200,7 +219,7 @@ async function startPlaytest() {
         return;
     }
     
-    console.log('🎮 Starting playtest with recipe:', recipe.name);
+    console.log('🎮 Starting playtest with recipe:', recipe.name, 'ID:', recipe.rec_id, 'Full recipe object:', recipe);
     
     try {
         // Hide selector panel
@@ -245,13 +264,16 @@ async function loadGameWithRecipe(recipe) {
     await new Promise(resolve => setTimeout(resolve, 500));
     
     // Fetch the full recipe data
-    const recipeData = await fetchRecipeData(recipe.date);
+    const recipeData = await fetchRecipeData(recipe.date, recipe.rec_id);
     
     // Set up the game environment
     setupGameEnvironment(recipeData);
     
+    // Store recipe data for later use
+    window.playtestRecipeData = recipeData;
+    
     // Initialize p5 with our custom setup
-    initializeGame();
+    initializeP5Game();
 }
 
 /**
@@ -259,6 +281,41 @@ async function loadGameWithRecipe(recipe) {
  */
 async function loadGameScripts() {
     console.log('📦 Loading game scripts...');
+    
+    // Set flags BEFORE loading any scripts to prevent wallpaper loading
+    window.skipWallpaperAnimation = true;
+    window.wallpaperImageReady = false;
+    window.loadingComplete = true;
+    
+    // Store the original Image constructor
+    window.OriginalImage = window.Image;
+    
+    // Override Image constructor to prevent wallpaper loading
+    window.Image = function() {
+        const img = new window.OriginalImage();
+        const originalSrcSetter = Object.getOwnPropertyDescriptor(window.OriginalImage.prototype, 'src').set;
+        
+        Object.defineProperty(img, 'src', {
+            set: function(value) {
+                // Block wallpaper image loading
+                if (value && (value.includes('wallpaper') || value.includes('assets/wallpaper'))) {
+                    console.log('🚫 Blocked wallpaper loading:', value);
+                    // Trigger error to skip wallpaper
+                    setTimeout(() => {
+                        if (img.onerror) img.onerror();
+                    }, 0);
+                    return;
+                }
+                // Allow other images
+                originalSrcSetter.call(this, value);
+            },
+            get: function() {
+                return this._src;
+            }
+        });
+        
+        return img;
+    };
     
     const scripts = [
         'js/config.js',
@@ -292,6 +349,11 @@ async function loadGameScripts() {
     
     window.gameScriptsLoaded = true;
     console.log('✅ All game scripts loaded');
+    
+    // Restore original Image constructor after scripts are loaded
+    if (window.OriginalImage) {
+        window.Image = window.OriginalImage;
+    }
 }
 
 /**
@@ -302,6 +364,13 @@ function loadScript(src) {
         // Check if script already exists
         if (document.querySelector(`script[src="${src}"]`)) {
             console.log(`✓ Script already loaded: ${src}`);
+            resolve();
+            return;
+        }
+        
+        // Special check for supabase.js
+        if (src.includes('supabase.js') && typeof window.SUPABASE_URL !== 'undefined') {
+            console.log(`✓ Supabase already initialized, skipping: ${src}`);
             resolve();
             return;
         }
@@ -324,8 +393,8 @@ function loadScript(src) {
 /**
  * Fetch full recipe data including combinations
  */
-async function fetchRecipeData(date) {
-    console.log('📊 Fetching recipe data for date:', date);
+async function fetchRecipeData(date, recipeId) {
+    console.log('📊 Fetching recipe data for date:', date, 'with ID:', recipeId);
     
     // Use the existing fetchRecipeByDate function if available
     if (window.fetchRecipeByDate) {
@@ -334,25 +403,68 @@ async function fetchRecipeData(date) {
     
     // Otherwise, fetch directly
     try {
-        const { data: recipe, error: recipeError } = await supabase
-            .from('recipes')
-            .select('*')
-            .eq('date', date)
-            .single();
+        let recipe;
         
-        if (recipeError) throw recipeError;
+        // If we have the recipe ID, use it directly
+        if (recipeId) {
+            const { data: recipeData, error: recipeError } = await supabase
+                .from('recipes')
+                .select('*')
+                .eq('rec_id', recipeId)
+                .single();
+            
+            if (recipeError) throw recipeError;
+            recipe = recipeData;
+        } else {
+            // Fallback to fetching by date
+            const { data: recipeData, error: recipeError } = await supabase
+                .from('recipes')
+                .select('*')
+                .eq('date', date)
+                .single();
+            
+            if (recipeError) throw recipeError;
+            recipe = recipeData;
+        }
         
         // Fetch combinations
         const { data: combinations, error: comboError } = await supabase
             .from('combinations')
             .select('*')
-            .eq('rec_id', recipe.id);
+            .eq('rec_id', recipe.rec_id);
         
         if (comboError) throw comboError;
         
+        // Fetch ingredients for all combinations
+        const allCombinationIds = combinations.map(c => c.combo_id);
+        const { data: ingredientRelations, error: ingredientError } = await supabase
+            .from('ingredient_combo')
+            .select('*, ingredients(*)')
+            .in('combo_id', allCombinationIds);
+            
+        if (ingredientError) throw ingredientError;
+        
+        // Get unique ingredients
+        const uniqueIngredients = new Map();
+        const ingredientsByCombination = {};
+        
+        ingredientRelations.forEach(rel => {
+            if (rel.ingredients) {
+                uniqueIngredients.set(rel.ingredients.ingredient_id, rel.ingredients.name);
+                
+                if (!ingredientsByCombination[rel.combo_id]) {
+                    ingredientsByCombination[rel.combo_id] = [];
+                }
+                ingredientsByCombination[rel.combo_id].push({
+                    ingredient_id: rel.ingredients.ingredient_id,
+                    name: rel.ingredients.name
+                });
+            }
+        });
+        
         // Return in expected format
         return {
-            rec_id: recipe.id,
+            rec_id: recipe.rec_id,
             recipeName: recipe.name,
             recipeUrl: recipe.recipe_url,
             imgUrl: recipe.img_url,
@@ -360,8 +472,8 @@ async function fetchRecipeData(date) {
             date: recipe.date,
             finalCombination: combinations.find(c => c.is_final),
             intermediateCombinations: combinations.filter(c => !c.is_final),
-            ingredients: [], // Would need to fetch these too
-            ingredientsByCombination: {}
+            ingredients: Array.from(uniqueIngredients.values()),
+            ingredientsByCombination: ingredientsByCombination
         };
         
     } catch (error) {
@@ -386,6 +498,13 @@ function setupGameEnvironment(recipeData) {
     if (window.checkTodayCompletion) {
         window.SuperEasyPlaytest.originalFunctions.checkTodayCompletion = window.checkTodayCompletion;
     }
+    
+    // Override loadWallpaperImage BEFORE scripts load to prevent CORS issues
+    window.loadWallpaperImage = function() {
+        console.log('🖼️ Skipping wallpaper loading in playtest mode');
+        window.wallpaperImageReady = false;
+        window.loadingComplete = true;
+    };
     
     // Override date function to return our recipe's date
     window.getCurrentDateEST = function() {
@@ -422,21 +541,39 @@ function setupGameEnvironment(recipeData) {
     // Set the recipe data globally
     window.recipeData = recipeData;
     
+    // Store ingredients globally (needed by some game systems)
+    if (recipeData && recipeData.ingredients) {
+        window.ingredients = recipeData.ingredients;
+        console.log(`📦 Loaded ${recipeData.ingredients.length} ingredients:`, recipeData.ingredients);
+    }
+    
     // Disable animations for better performance
     window.skipWallpaperAnimation = true;
     window.loadingComplete = true;
     
+    // Disable wallpaper loading in playtest mode to avoid CORS issues
+    window.wallpaperImageReady = false;
+    
     // Skip authentication
     window.isPlaytestMode = true;
+    
+    // Override wallpaper loading to prevent CORS issues
+    if (window.loadWallpaperImage) {
+        window.loadWallpaperImage = function() {
+            console.log('🖼️ Skipping wallpaper loading in playtest mode');
+            window.wallpaperImageReady = false;
+            window.loadingComplete = true;
+        };
+    }
     
     console.log('✅ Game environment ready');
 }
 
 /**
- * Initialize the game
+ * Initialize the p5 game instance
  */
-function initializeGame() {
-    console.log('🎮 Initializing game...');
+function initializeP5Game() {
+    console.log('🎮 Initializing p5 game...');
     
     // Remove any existing canvas
     const existingCanvas = document.querySelector('canvas');
@@ -451,14 +588,32 @@ function initializeGame() {
         
         // Expose p5 functions globally (needed by the game code)
         const p5Functions = ['createCanvas', 'background', 'fill', 'stroke', 'strokeWeight',
-            'rect', 'ellipse', 'line', 'text', 'textSize', 'textAlign',
+            'rect', 'ellipse', 'circle', 'line', 'text', 'textSize', 'textAlign',
             'push', 'pop', 'translate', 'rotate', 'scale', 'loadImage',
             'image', 'tint', 'noTint', 'color', 'loadFont', 'textFont',
             'noStroke', 'noFill', 'smooth', 'noSmooth', 'cursor', 'noCursor',
+            'rectMode', 'ellipseMode', 'strokeCap', 'strokeJoin',
+            'min', 'max', 'abs', 'constrain', 'dist', 'exp', 'floor', 'lerp',
+            'log', 'mag', 'map', 'norm', 'pow', 'round', 'sq', 'sqrt',
+            'random', 'randomSeed', 'noise', 'noiseSeed', 'noiseDetail',
             'frameRate', 'frameCount', 'millis', 'resizeCanvas',
             'pixelDensity', 'displayDensity', 'windowWidth', 'windowHeight',
             'width', 'height', 'mouseX', 'mouseY', 'pmouseX', 'pmouseY',
-            'mouseIsPressed', 'keyIsPressed', 'key', 'keyCode'
+            'mouseIsPressed', 'keyIsPressed', 'key', 'keyCode',
+            'touches', 'touchIsDown', 'touchStarted', 'touchMoved', 'touchEnded',
+            'CENTER', 'LEFT', 'RIGHT', 'TOP', 'BOTTOM', 'BASELINE',
+            'BOLD', 'ITALIC', 'NORMAL', 'PI', 'TWO_PI', 'HALF_PI', 'QUARTER_PI',
+            'degrees', 'radians', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
+            'angleMode', 'DEGREES', 'RADIANS', 'textWidth', 'textAscent', 'textDescent',
+            'textLeading', 'textStyle', 'textWrap', 'WORD', 'CHAR',
+            'blendMode', 'BLEND', 'ADD', 'DARKEST', 'LIGHTEST', 'DIFFERENCE',
+            'EXCLUSION', 'MULTIPLY', 'SCREEN', 'REPLACE', 'OVERLAY', 'HARD_LIGHT',
+            'SOFT_LIGHT', 'DODGE', 'BURN', 'SUBTRACT',
+            'vertex', 'beginShape', 'endShape', 'CLOSE', 'bezier', 'bezierVertex',
+            'quadraticVertex', 'curve', 'curveVertex', 'arc', 'triangle', 'quad',
+            'mousePressed', 'mouseReleased', 'mouseMoved', 'mouseDragged',
+            'mouseClicked', 'mouseWheel', 'keyPressed', 'keyReleased', 'keyTyped',
+            'windowResized', 'deviceMoved', 'deviceTurned', 'deviceShaken'
         ];
         
         // Expose functions to window
@@ -470,16 +625,51 @@ function initializeGame() {
             }
         });
         
-        // Expose p5 constants
-        const p5Constants = ['PI', 'TWO_PI', 'HALF_PI', 'QUARTER_PI',
-            'CENTER', 'LEFT', 'RIGHT', 'TOP', 'BOTTOM', 'BASELINE',
-            'RADIANS', 'DEGREES', 'CORNER', 'CORNERS', 'RADIUS',
-            'RGB', 'HSB', 'HSL', 'BLEND', 'ADD', 'MULTIPLY'
-        ];
-        
+        // Also expose p5 constants and properties that aren't functions
+        const p5Constants = ['PI', 'TWO_PI', 'HALF_PI', 'QUARTER_PI', 'TAU',
+            'DEGREES', 'RADIANS', 'DEG_TO_RAD', 'RAD_TO_DEG',
+            'CORNER', 'CORNERS', 'RADIUS', 'CENTER',
+            'LEFT', 'RIGHT', 'TOP', 'BOTTOM', 'BASELINE',
+            'POINTS', 'LINES', 'LINE_STRIP', 'LINE_LOOP', 'TRIANGLES',
+            'TRIANGLE_FAN', 'TRIANGLE_STRIP', 'QUADS', 'QUAD_STRIP',
+            'CLOSE', 'OPEN', 'CHORD', 'PIE', 'PROJECT', 'SQUARE', 'ROUND',
+            'BEVEL', 'MITER', 'RGB', 'HSB', 'HSL', 'AUTO',
+            'BLEND', 'ADD', 'DARKEST', 'LIGHTEST', 'DIFFERENCE',
+            'EXCLUSION', 'MULTIPLY', 'SCREEN', 'REPLACE', 'OVERLAY',
+            'HARD_LIGHT', 'SOFT_LIGHT', 'DODGE', 'BURN', 'SUBTRACT',
+            'NORMAL', 'ITALIC', 'BOLD', 'BOLDITALIC',
+            'WORD', 'CHAR', 'RGBA', 'HSBA', 'HSLA',
+            'ARROW', 'CROSS', 'HAND', 'MOVE', 'TEXT', 'WAIT'];
+            
         p5Constants.forEach(constant => {
             if (typeof p[constant] !== 'undefined') {
                 window[constant] = p[constant];
+            }
+        });
+        
+        // Create a getter on window for any missing p5 properties
+        // This is a dynamic fallback for any p5 properties we might have missed
+        const windowProps = Object.getOwnPropertyNames(window);
+        const p5Props = Object.getOwnPropertyNames(p);
+        
+        p5Props.forEach(prop => {
+            // Skip if already defined on window or if it's a private property
+            if (!windowProps.includes(prop) && !prop.startsWith('_')) {
+                try {
+                    Object.defineProperty(window, prop, {
+                        get: function() {
+                            return typeof p[prop] === 'function' 
+                                ? p[prop].bind(p) 
+                                : p[prop];
+                        },
+                        set: function(val) {
+                            p[prop] = val;
+                        },
+                        configurable: true
+                    });
+                } catch (e) {
+                    // Some properties might not be configurable
+                }
             }
         });
         
@@ -503,9 +693,46 @@ function initializeGame() {
             // Store canvas globally (some game code expects this)
             window.canvas = canvas;
             
-            // Run original setup
+            // Make height and width available globally
+            window.width = p.width;
+            window.height = p.height;
+            
+            // Update any p5 variables that might have changed after canvas creation
+            const p5Variables = ['width', 'height', 'windowWidth', 'windowHeight', 
+                'displayWidth', 'displayHeight', 'pixelDensity', 'displayDensity'];
+            
+            p5Variables.forEach(varName => {
+                if (typeof p[varName] !== 'undefined') {
+                    window[varName] = p[varName];
+                }
+            });
+            
+            // Skip wallpaper loading in playtest mode
+            window.skipWallpaperAnimation = true;
+            window.wallpaperImageReady = false;
+            window.loadingComplete = true;
+            
+            // Run original setup if it exists
             if (window.setup) {
                 window.setup();
+            }
+            
+            // Now that canvas is ready, initialize the game
+            if (window.initializeGame && window.playtestRecipeData) {
+                // Make sure we have the recipe data
+                window.recipeData = window.playtestRecipeData;
+                
+                // Ensure ingredients are available globally
+                if (window.recipeData && window.recipeData.ingredients) {
+                    window.ingredients = window.recipeData.ingredients;
+                }
+                
+                // Set game state flags
+                window.gameStarted = false;
+                window.gameWon = false;
+                window.loadingComplete = true;
+                
+                window.initializeGame();
             }
         };
         
@@ -608,4 +835,24 @@ function showError(message) {
 }
 
 // Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', initializePlaytest);
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait a bit for Supabase to load
+    if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+        console.log('⏳ Waiting for Supabase to load...');
+        let attempts = 0;
+        const checkSupabase = setInterval(() => {
+            attempts++;
+            if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+                clearInterval(checkSupabase);
+                console.log('✅ Supabase loaded, initializing playtest...');
+                initializePlaytest();
+            } else if (attempts > 20) { // 2 seconds timeout
+                clearInterval(checkSupabase);
+                console.error('❌ Supabase failed to load after 2 seconds');
+                showError('Failed to load Supabase library');
+            }
+        }, 100);
+    } else {
+        initializePlaytest();
+    }
+});
