@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Playtest Link Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #F5F1E8;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .date-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .date-input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .date-input:focus {
+            outline: none;
+            border-color: #778F5D;
+        }
+        
+        .generate-btn {
+            padding: 10px 20px;
+            background-color: #778F5D;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .generate-btn:hover {
+            background-color: #66804f;
+        }
+        
+        .link-display {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            word-break: break-all;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .link-display:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .copy-hint {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .recipe-list {
+            background-color: #f8f8f8;
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .recipe-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            background: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+        
+        .recipe-item:hover {
+            transform: translateX(5px);
+        }
+        
+        .recipe-date {
+            font-weight: 600;
+            color: #778F5D;
+        }
+        
+        .recipe-name {
+            color: #666;
+        }
+        
+        .view-link {
+            text-decoration: none;
+            color: #4285F4;
+            font-size: 14px;
+        }
+        
+        .view-link:hover {
+            text-decoration: underline;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
+        
+        .error {
+            color: #d32f2f;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .success-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .success-message.show {
+            opacity: 1;
+        }
+    </style>
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Our Supabase Integration -->
+    <script src="js/supabase.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Playtest Link Generator</h1>
+        <p class="subtitle">Generate direct links to test specific recipe dates</p>
+        
+        <div class="section">
+            <h2>Generate Custom Link</h2>
+            <div class="date-input-group">
+                <input type="date" id="dateInput" class="date-input" value="">
+                <button onclick="generateLink()" class="generate-btn">Generate Link</button>
+            </div>
+            <div id="linkDisplay" style="display: none;">
+                <div id="generatedLink" class="link-display" onclick="copyLink()"></div>
+                <p class="copy-hint">Click to copy link</p>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>Available Recipes</h2>
+            <div id="recipeList" class="recipe-list">
+                <div class="loading">Loading recipes...</div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="successMessage" class="success-message">Link copied to clipboard!</div>
+    
+    <script>
+        // Set today's date as default
+        document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+        
+        // Load available recipes
+        async function loadRecipes() {
+            try {
+                const { data: recipes, error } = await supabase
+                    .from('recipes')
+                    .select('date, name, rec_id')
+                    .order('date', { ascending: false })
+                    .limit(50);
+                
+                if (error) throw error;
+                
+                const listElement = document.getElementById('recipeList');
+                
+                if (!recipes || recipes.length === 0) {
+                    listElement.innerHTML = '<div class="error">No recipes found</div>';
+                    return;
+                }
+                
+                listElement.innerHTML = recipes.map(recipe => `
+                    <div class="recipe-item">
+                        <div>
+                            <span class="recipe-date">${recipe.date}</span>
+                            <span class="recipe-name">${recipe.name}</span>
+                        </div>
+                        <a href="/simple-playtest.html?date=${recipe.date}&admin=true" 
+                           target="_blank" 
+                           class="view-link">Test →</a>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                document.getElementById('recipeList').innerHTML = 
+                    `<div class="error">Error loading recipes: ${error.message}</div>`;
+            }
+        }
+        
+        // Generate link for custom date
+        function generateLink() {
+            const date = document.getElementById('dateInput').value;
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            
+            const link = `${window.location.origin}/simple-playtest.html?date=${date}`;
+            
+            document.getElementById('generatedLink').textContent = link;
+            document.getElementById('linkDisplay').style.display = 'block';
+        }
+        
+        // Copy link to clipboard
+        async function copyLink() {
+            const link = document.getElementById('generatedLink').textContent;
+            try {
+                await navigator.clipboard.writeText(link);
+                showSuccess();
+            } catch (err) {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = link;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                showSuccess();
+            }
+        }
+        
+        // Show success message
+        function showSuccess() {
+            const message = document.getElementById('successMessage');
+            message.classList.add('show');
+            setTimeout(() => {
+                message.classList.remove('show');
+            }, 2000);
+        }
+        
+        // Load recipes on page load
+        loadRecipes();
+    </script>
+</body>
+</html>
