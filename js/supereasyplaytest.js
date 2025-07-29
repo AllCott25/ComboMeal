@@ -9,6 +9,85 @@
  * 4. Fail gracefully with helpful error messages
  */
 
+// Super Easy Playtest System
+// This file allows playing any recipe without waiting for the daily schedule
+
+// Initialize critical dependencies early to prevent hamburger menu loop
+(function() {
+    // Set default values for hamburger menu dependencies
+    window.playAreaWidth = window.playAreaWidth || 800;
+    window.playAreaX = window.playAreaX || 0;
+    
+    // Define COLORS if not already defined (needed by hamburger menu)
+    if (typeof window.COLORS === 'undefined') {
+        window.COLORS = {
+            button: '#AAAAAA',
+            buttonHover: '#888888',
+            background: '#F5F1E8',
+            primary: '#778F5D',
+            secondary: '#C9B5A0',
+            text: '#2D3A2E'
+        };
+    }
+    
+    // Define Button class if not already defined (needed by hamburger menu)
+    if (typeof window.Button === 'undefined') {
+        window.Button = class Button {
+            constructor(x, y, width, height, text, onClick) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.text = text;
+                this.onClick = onClick || (() => {});
+                this.callback = this.onClick; // Alias for compatibility
+                this.hovered = false;
+                this.color = '#778F5D';
+                this.textColor = 'white';
+            }
+            
+            update(mouseX, mouseY) {
+                this.hovered = this.checkHover(mouseX, mouseY);
+            }
+            
+            checkHover(mx, my) {
+                this.hovered = mx > this.x - this.width/2 && 
+                              mx < this.x + this.width/2 && 
+                              my > this.y - this.height/2 && 
+                              my < this.y + this.height/2;
+                return this.hovered;
+            }
+            
+            draw() {
+                // Basic button drawing for fallback
+                if (typeof rect !== 'undefined' && typeof fill !== 'undefined') {
+                    push();
+                    fill(this.hovered ? 200 : this.color);
+                    rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                    fill(this.textColor);
+                    textAlign(CENTER, CENTER);
+                    text(this.text, this.x, this.y);
+                    pop();
+                }
+            }
+            
+            handleClick() {
+                if (this.hovered && this.onClick) {
+                    this.onClick();
+                }
+            }
+            
+            checkClick() {
+                if (this.hovered && this.callback) {
+                    this.callback();
+                    return true;
+                }
+                return false;
+            }
+        };
+    }
+})();
+
 // Global state for the playtest system
 window.SuperEasyPlaytest = {
     recipes: [],
@@ -256,6 +335,39 @@ async function startPlaytest() {
  */
 async function loadGameWithRecipe(recipe) {
     console.log('🎮 Loading game with recipe data...');
+    
+    // Initialize hamburger menu globals early to prevent infinite loop
+    window.playAreaWidth = window.playAreaWidth || 800;
+    window.playAreaX = window.playAreaX || 0;
+    
+    // Store original hamburger menu initializer if it exists
+    if (window.initializeHamburgerMenu && !window.SuperEasyPlaytest.originalFunctions.initializeHamburgerMenu) {
+        window.SuperEasyPlaytest.originalFunctions.initializeHamburgerMenu = window.initializeHamburgerMenu;
+    }
+    
+    // Override hamburger menu initialization to prevent infinite loop
+    window.hamburgerMenuInitAttempts = 0;
+    window.initializeHamburgerMenu = function() {
+        window.hamburgerMenuInitAttempts = (window.hamburgerMenuInitAttempts || 0) + 1;
+        
+        if (window.hamburgerMenuInitAttempts > 5) {
+            console.warn('⚠️ Hamburger menu initialization limit reached, stopping attempts');
+            return;
+        }
+        
+        // Check dependencies
+        if (typeof playAreaWidth !== 'undefined' && typeof playAreaX !== 'undefined' && 
+            typeof COLORS !== 'undefined' && typeof Button !== 'undefined') {
+            // Call original function
+            if (window.SuperEasyPlaytest.originalFunctions.initializeHamburgerMenu) {
+                window.SuperEasyPlaytest.originalFunctions.initializeHamburgerMenu();
+            }
+        } else {
+            console.log(`Hamburger menu init attempt ${window.hamburgerMenuInitAttempts}/5 - waiting for dependencies`);
+            // Try again after a short delay
+            setTimeout(window.initializeHamburgerMenu, 100);
+        }
+    };
     
     // First, we need to load all the game scripts
     console.log('📦 Step 1: Loading game scripts...');
@@ -602,6 +714,12 @@ function setupGameEnvironment(recipeData) {
             return;
         }
         
+        // Check if game is already started
+        if (window.gameStarted) {
+            console.log('✅ Game already started, nothing to do');
+            return;
+        }
+        
         // First check if we need to initialize the game
         if (!window.gameInitialized && window.proceedWithNormalFlow && window.playtestRecipeData) {
             console.log('🔄 Game not initialized yet, initializing now...');
@@ -672,20 +790,15 @@ function setupGameEnvironment(recipeData) {
         window.wallpaperAnimation = null;
         window.wallpaperAnimationActive = false;
         
-        // Store original actuallyStartGame if it exists
-        const originalActuallyStartGame = window.actuallyStartGame;
-        
-        // Override actuallyStartGame to preserve vessels
-        window.actuallyStartGame = function() {
-            console.log('🚀 Starting game with vessel preservation');
+        // Call actuallyStartGame directly without overriding
+        if (window.actuallyStartGame) {
+            console.log('🚀 Calling actuallyStartGame directly');
             
-            // Store vessels again in case they were modified
+            // Save current vessels
             const currentVessels = window.vessels ? [...window.vessels] : vesselBackup;
             
-            // Call original function
-            if (originalActuallyStartGame) {
-                originalActuallyStartGame.call(this);
-            }
+            // Call the function
+            window.actuallyStartGame();
             
             // Restore vessels if they were cleared
             if (window.vessels.length === 0 && currentVessels.length > 0) {
@@ -694,14 +807,20 @@ function setupGameEnvironment(recipeData) {
                 window.displayedVessels = currentVessels;
             }
             
+            // For playtest mode, we need to keep loadingComplete true since we're not loading anything
+            // actuallyStartGame sets it to false, but that's for normal gameplay
+            window.loadingComplete = true;
+            
             // Ensure game state is set
             window.gameStarted = true;
             window.isLoadingRecipe = false;
-        };
-        
-        // Call actuallyStartGame
-        if (window.actuallyStartGame) {
-            window.actuallyStartGame();
+            
+            console.log('✅ Game started successfully:', {
+                gameStarted: window.gameStarted,
+                vesselsCount: window.vessels ? window.vessels.length : 0,
+                gameWon: window.gameWon,
+                loadingComplete: window.loadingComplete
+            });
         } else {
             console.error('❌ actuallyStartGame function not found');
         }
@@ -1256,6 +1375,8 @@ function showError(message) {
         errorDiv.remove();
     }, 5000);
 }
+
+
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
