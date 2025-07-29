@@ -576,6 +576,9 @@ function setupGameEnvironment(recipeData) {
     window.startGame = function() {
         console.log('🎮 StartGame called in playtest mode');
         
+        // Store vessels before any reset might happen
+        const vesselBackup = window.vessels ? [...window.vessels] : [];
+        
         // Check if we have vessels
         if (!window.vessels || window.vessels.length === 0) {
             console.warn('⚠️ No vessels available yet');
@@ -587,9 +590,35 @@ function setupGameEnvironment(recipeData) {
         window.wallpaperAnimation = null;
         window.wallpaperAnimationActive = false;
         
-        // Call actuallyStartGame directly
+        // Store original actuallyStartGame if it exists
+        const originalActuallyStartGame = window.actuallyStartGame;
+        
+        // Override actuallyStartGame to preserve vessels
+        window.actuallyStartGame = function() {
+            console.log('🚀 Starting game with vessel preservation');
+            
+            // Store vessels again in case they were modified
+            const currentVessels = window.vessels ? [...window.vessels] : vesselBackup;
+            
+            // Call original function
+            if (originalActuallyStartGame) {
+                originalActuallyStartGame.call(this);
+            }
+            
+            // Restore vessels if they were cleared
+            if (window.vessels.length === 0 && currentVessels.length > 0) {
+                console.log('🔧 Restoring vessels that were cleared during start');
+                window.vessels = currentVessels;
+                window.displayedVessels = currentVessels;
+            }
+            
+            // Ensure game state is set
+            window.gameStarted = true;
+            window.isLoadingRecipe = false;
+        };
+        
+        // Call actuallyStartGame
         if (window.actuallyStartGame) {
-            console.log('🚀 Starting game directly via actuallyStartGame');
             window.actuallyStartGame();
         } else {
             console.error('❌ actuallyStartGame function not found');
@@ -643,10 +672,47 @@ function setupGameEnvironment(recipeData) {
                 this.height = height;
                 this.text = text;
                 this.callback = callback;
+                this.hovered = false;
+                this.color = '#778F5D';
+                this.textColor = 'white';
             }
-            draw() {}
-            checkHover() { return false; }
-            checkClick() { return false; }
+            draw() {
+                // Basic button drawing for fallback
+                if (typeof rect !== 'undefined' && typeof fill !== 'undefined') {
+                    push();
+                    fill(this.hovered ? 200 : this.color);
+                    rect(this.x - this.width/2, this.y - this.height/2, this.width, this.height);
+                    fill(this.textColor);
+                    textAlign(CENTER, CENTER);
+                    text(this.text, this.x, this.y);
+                    pop();
+                }
+            }
+            checkHover(mx, my) {
+                this.hovered = mx > this.x - this.width/2 && 
+                              mx < this.x + this.width/2 && 
+                              my > this.y - this.height/2 && 
+                              my < this.y + this.height/2;
+                return this.hovered;
+            }
+            checkClick() {
+                if (this.hovered && this.callback) {
+                    this.callback();
+                    return true;
+                }
+                return false;
+            }
+            isInside(mx, my) {
+                return mx > this.x - this.width/2 && 
+                       mx < this.x + this.width/2 && 
+                       my > this.y - this.height/2 && 
+                       my < this.y + this.height/2;
+            }
+            handleClick() {
+                if (this.callback) {
+                    this.callback();
+                }
+            }
         };
     }
     
@@ -676,6 +742,7 @@ function setupGameEnvironment(recipeData) {
     window.gameWon = false;
     window.isLoadingRecipe = false;
     window.vessels = window.vessels || [];
+    window.displayedVessels = window.displayedVessels || [];
     
     console.log('✅ Game environment ready');
 }
@@ -724,7 +791,9 @@ function initializeP5Game() {
             'quadraticVertex', 'curve', 'curveVertex', 'arc', 'triangle', 'quad',
             'mousePressed', 'mouseReleased', 'mouseMoved', 'mouseDragged',
             'mouseClicked', 'mouseWheel', 'keyPressed', 'keyReleased', 'keyTyped',
-            'windowResized', 'deviceMoved', 'deviceTurned', 'deviceShaken'
+            'windowResized', 'deviceMoved', 'deviceTurned', 'deviceShaken',
+            'lerpColor', 'red', 'green', 'blue', 'alpha', 'hue', 'saturation', 'brightness',
+            'colorMode', 'RGB', 'HSB', 'HSL'
         ];
         
         // Expose functions to window
