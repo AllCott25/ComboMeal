@@ -3,7 +3,7 @@ const GREEN = '#2d5a2d';
 const WHITE = '#ffffff';
 const STROKE_WIDTH = 4;
 
-// 1. Filled-in Flower Generator with variations
+// 1. Filled-in Flower Generator with more organic petal shapes
 function createFilledFlower(size, variation) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', size);
@@ -13,51 +13,74 @@ function createFilledFlower(size, variation) {
     const centerX = 50;
     const centerY = 50;
     
-    // Different variations of petal arrangements
+    // Different variations with more organic petal arrangements
     const variations = [
-        { petalLength: 28, petalWidth: 20, rotation: 0, centerOffset: { x: -3, y: -2 }, centerSize: 8 },
-        { petalLength: 32, petalWidth: 18, rotation: 36, centerOffset: { x: 2, y: -3 }, centerSize: 10 },
-        { petalLength: 26, petalWidth: 22, rotation: 18, centerOffset: { x: -2, y: 3 }, centerSize: 7 },
-        { petalLength: 30, petalWidth: 19, rotation: -18, centerOffset: { x: 3, y: 2 }, centerSize: 9 },
-        { petalLength: 34, petalWidth: 16, rotation: 45, centerOffset: { x: -4, y: 0 }, centerSize: 11 },
-        { petalLength: 27, petalWidth: 21, rotation: -36, centerOffset: { x: 0, y: -4 }, centerSize: 8 },
-        { petalLength: 31, petalWidth: 17, rotation: 12, centerOffset: { x: 2, y: 2 }, centerSize: 10 },
-        { petalLength: 29, petalWidth: 20, rotation: -12, centerOffset: { x: -3, y: 1 }, centerSize: 6 },
-        { petalLength: 33, petalWidth: 15, rotation: 24, centerOffset: { x: 1, y: -2 }, centerSize: 12 },
-        { petalLength: 28, petalWidth: 19, rotation: -24, centerOffset: { x: -1, y: 3 }, centerSize: 9 }
+        { rotation: 0, centerOffset: { x: -2, y: -1 }, centerSize: 7, petalScale: 1 },
+        { rotation: 25, centerOffset: { x: 1, y: -2 }, centerSize: 9, petalScale: 0.95 },
+        { rotation: -15, centerOffset: { x: -3, y: 2 }, centerSize: 6, petalScale: 1.05 },
+        { rotation: 40, centerOffset: { x: 2, y: 1 }, centerSize: 8, petalScale: 0.9 },
+        { rotation: -30, centerOffset: { x: 0, y: -3 }, centerSize: 10, petalScale: 1.1 },
+        { rotation: 10, centerOffset: { x: -1, y: 0 }, centerSize: 7, petalScale: 0.98 },
+        { rotation: -45, centerOffset: { x: 3, y: -2 }, centerSize: 11, petalScale: 0.92 },
+        { rotation: 35, centerOffset: { x: -2, y: 3 }, centerSize: 5, petalScale: 1.02 },
+        { rotation: -5, centerOffset: { x: 1, y: 2 }, centerSize: 9, petalScale: 0.96 },
+        { rotation: 20, centerOffset: { x: -3, y: -1 }, centerSize: 8, petalScale: 1.08 }
     ];
     
     const config = variations[variation % variations.length];
     
-    // Create petals with non-uniform angles
-    const petalAngles = [0, 68, 144, 216, 292]; // Non-uniform angles
+    // Create more organic petals using paths
+    const petalCount = 5;
+    const baseAngles = [0, 68, 143, 215, 290]; // Irregular spacing
     
-    petalAngles.forEach((baseAngle, i) => {
+    baseAngles.forEach((baseAngle, i) => {
         const angle = (baseAngle + config.rotation) * Math.PI / 180;
-        const petal = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        const petal = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         
-        const petalDistance = config.petalLength * 0.55;
-        const px = centerX + Math.cos(angle) * petalDistance;
-        const py = centerY + Math.sin(angle) * petalDistance;
+        // Create organic petal shape using cubic bezier curves
+        const petalLength = 25 * config.petalScale * (i % 2 === 0 ? 1 : 0.9);
+        const petalWidth = 15 * config.petalScale * (i % 2 === 0 ? 0.95 : 1.05);
         
-        // Vary petal sizes slightly
-        const sizeMultiplier = i % 2 === 0 ? 1 : 0.95;
+        const tipX = centerX + Math.cos(angle) * petalLength;
+        const tipY = centerY + Math.sin(angle) * petalLength;
         
-        petal.setAttribute('cx', px);
-        petal.setAttribute('cy', py);
-        petal.setAttribute('rx', config.petalWidth * sizeMultiplier);
-        petal.setAttribute('ry', config.petalLength * sizeMultiplier);
-        petal.setAttribute('transform', `rotate(${angle * 180 / Math.PI} ${px} ${py})`);
+        // Control points for organic petal shape
+        const cp1x = centerX + Math.cos(angle - 0.4) * petalWidth;
+        const cp1y = centerY + Math.sin(angle - 0.4) * petalWidth;
+        
+        const cp2x = tipX + Math.cos(angle - 0.3) * petalWidth * 0.8;
+        const cp2y = tipY + Math.sin(angle - 0.3) * petalWidth * 0.8;
+        
+        const cp3x = tipX + Math.cos(angle + 0.3) * petalWidth * 0.8;
+        const cp3y = tipY + Math.sin(angle + 0.3) * petalWidth * 0.8;
+        
+        const cp4x = centerX + Math.cos(angle + 0.4) * petalWidth;
+        const cp4y = centerY + Math.sin(angle + 0.4) * petalWidth;
+        
+        const path = `M ${centerX} ${centerY}
+                      C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${tipX} ${tipY}
+                      C ${cp3x} ${cp3y}, ${cp4x} ${cp4y}, ${centerX} ${centerY}`;
+        
+        petal.setAttribute('d', path);
         petal.setAttribute('fill', GREEN);
         
         svg.appendChild(petal);
     });
     
-    // Create off-center white circle
-    const centerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    centerCircle.setAttribute('cx', centerX + config.centerOffset.x);
-    centerCircle.setAttribute('cy', centerY + config.centerOffset.y);
-    centerCircle.setAttribute('r', config.centerSize);
+    // Create slightly irregular center circle
+    const centerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const cx = centerX + config.centerOffset.x;
+    const cy = centerY + config.centerOffset.y;
+    const r = config.centerSize;
+    
+    // Create slightly irregular circle
+    const circlePath = `M ${cx + r} ${cy}
+                        A ${r} ${r * 0.95} 0 0 1 ${cx} ${cy + r}
+                        A ${r * 0.98} ${r} 0 0 1 ${cx - r} ${cy}
+                        A ${r} ${r * 0.97} 0 0 1 ${cx} ${cy - r}
+                        A ${r * 0.96} ${r} 0 0 1 ${cx + r} ${cy}`;
+    
+    centerCircle.setAttribute('d', circlePath);
     centerCircle.setAttribute('fill', WHITE);
     
     svg.appendChild(centerCircle);
@@ -65,7 +88,7 @@ function createFilledFlower(size, variation) {
     return svg;
 }
 
-// 2. Outline Flower Generator with variations
+// 2. Outline Flower Generator with more organic shapes
 function createOutlineFlower(size, variation) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', size);
@@ -77,49 +100,77 @@ function createOutlineFlower(size, variation) {
     
     // Different variations
     const variations = [
-        { petalLength: 26, petalWidth: 18, rotation: 0, centerSize: 12, angles: [0, 72, 144, 216, 288] },
-        { petalLength: 30, petalWidth: 16, rotation: 20, centerSize: 10, angles: [0, 70, 140, 215, 290] },
-        { petalLength: 24, petalWidth: 20, rotation: -15, centerSize: 14, angles: [0, 75, 145, 210, 285] },
-        { petalLength: 28, petalWidth: 17, rotation: 35, centerSize: 11, angles: [0, 68, 142, 218, 292] },
-        { petalLength: 32, petalWidth: 15, rotation: -25, centerSize: 9, angles: [0, 73, 146, 212, 287] },
-        { petalLength: 25, petalWidth: 19, rotation: 10, centerSize: 13, angles: [0, 71, 143, 214, 286] },
-        { petalLength: 29, petalWidth: 16, rotation: -30, centerSize: 12, angles: [0, 74, 141, 217, 289] },
-        { petalLength: 27, petalWidth: 18, rotation: 40, centerSize: 10, angles: [0, 69, 145, 213, 291] },
-        { petalLength: 31, petalWidth: 14, rotation: 15, centerSize: 11, angles: [0, 72, 140, 220, 288] },
-        { petalLength: 26, petalWidth: 17, rotation: -20, centerSize: 15, angles: [0, 76, 144, 211, 290] }
+        { rotation: 0, centerSize: 11, petalScale: 1, angles: [0, 72, 144, 216, 288] },
+        { rotation: 18, centerSize: 9, petalScale: 0.95, angles: [0, 68, 140, 215, 290] },
+        { rotation: -25, centerSize: 13, petalScale: 1.05, angles: [0, 75, 145, 210, 285] },
+        { rotation: 36, centerSize: 10, petalScale: 0.9, angles: [0, 70, 142, 218, 288] },
+        { rotation: -12, centerSize: 8, petalScale: 1.1, angles: [0, 73, 146, 212, 290] },
+        { rotation: 8, centerSize: 12, petalScale: 0.98, angles: [0, 71, 143, 214, 287] },
+        { rotation: -40, centerSize: 11, petalScale: 0.92, angles: [0, 69, 141, 217, 291] },
+        { rotation: 30, centerSize: 9, petalScale: 1.02, angles: [0, 74, 145, 213, 289] },
+        { rotation: -18, centerSize: 14, petalScale: 0.96, angles: [0, 72, 140, 216, 285] },
+        { rotation: 22, centerSize: 10, petalScale: 1.08, angles: [0, 76, 144, 211, 290] }
     ];
     
     const config = variations[variation % variations.length];
     
-    // Create petal outlines with white fill to hide overlaps
+    // Create organic petal outlines
     config.angles.forEach((baseAngle, i) => {
         const angle = (baseAngle + config.rotation) * Math.PI / 180;
-        const petal = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+        const petal = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         
-        const petalDistance = config.petalLength * 0.55;
-        const px = centerX + Math.cos(angle) * petalDistance;
-        const py = centerY + Math.sin(angle) * petalDistance;
+        // Create more organic oval shape
+        const petalLength = 24 * config.petalScale * (i % 2 === 0 ? 1 : 0.88);
+        const petalWidth = 13 * config.petalScale * (i % 2 === 0 ? 0.92 : 1.08);
+        const petalDistance = petalLength * 0.5;
         
-        // Vary petal sizes
-        const sizeMultiplier = i % 2 === 0 ? 1 : 0.9;
+        const cx = centerX + Math.cos(angle) * petalDistance;
+        const cy = centerY + Math.sin(angle) * petalDistance;
         
-        petal.setAttribute('cx', px);
-        petal.setAttribute('cy', py);
-        petal.setAttribute('rx', config.petalWidth * sizeMultiplier);
-        petal.setAttribute('ry', config.petalLength * sizeMultiplier);
-        petal.setAttribute('transform', `rotate(${angle * 180 / Math.PI} ${px} ${py})`);
+        // Create organic oval using bezier curves
+        const startX = cx + Math.cos(angle) * petalLength * 0.5;
+        const startY = cy + Math.sin(angle) * petalLength * 0.5;
+        
+        const endX = cx - Math.cos(angle) * petalLength * 0.5;
+        const endY = cy - Math.sin(angle) * petalLength * 0.5;
+        
+        const cp1x = startX + Math.cos(angle + Math.PI/2) * petalWidth;
+        const cp1y = startY + Math.sin(angle + Math.PI/2) * petalWidth;
+        
+        const cp2x = endX + Math.cos(angle + Math.PI/2) * petalWidth;
+        const cp2y = endY + Math.sin(angle + Math.PI/2) * petalWidth;
+        
+        const cp3x = endX - Math.cos(angle + Math.PI/2) * petalWidth;
+        const cp3y = endY - Math.sin(angle + Math.PI/2) * petalWidth;
+        
+        const cp4x = startX - Math.cos(angle + Math.PI/2) * petalWidth;
+        const cp4y = startY - Math.sin(angle + Math.PI/2) * petalWidth;
+        
+        const path = `M ${startX} ${startY}
+                      C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}
+                      C ${cp3x} ${cp3y}, ${cp4x} ${cp4y}, ${startX} ${startY}`;
+        
+        petal.setAttribute('d', path);
         petal.setAttribute('fill', WHITE);
         petal.setAttribute('stroke', GREEN);
         petal.setAttribute('stroke-width', STROKE_WIDTH);
+        petal.setAttribute('stroke-linejoin', 'round');
         
         svg.appendChild(petal);
     });
     
-    // Create filled center
-    const centerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    centerCircle.setAttribute('cx', centerX);
-    centerCircle.setAttribute('cy', centerY);
-    centerCircle.setAttribute('r', config.centerSize);
+    // Create organic filled center
+    const centerCircle = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const r = config.centerSize;
+    
+    // Create slightly irregular circle for center
+    const circlePath = `M ${centerX + r} ${centerY}
+                        A ${r * 0.98} ${r} 0 0 1 ${centerX} ${centerY + r}
+                        A ${r} ${r * 0.96} 0 0 1 ${centerX - r} ${centerY}
+                        A ${r * 0.97} ${r} 0 0 1 ${centerX} ${centerY - r}
+                        A ${r} ${r * 0.99} 0 0 1 ${centerX + r} ${centerY}`;
+    
+    centerCircle.setAttribute('d', circlePath);
     centerCircle.setAttribute('fill', GREEN);
     
     svg.appendChild(centerCircle);
@@ -127,7 +178,7 @@ function createOutlineFlower(size, variation) {
     return svg;
 }
 
-// 3. Sprig Generator with rounded ends and shared branch
+// 3. Sprig Generator with very soft, rounded organic shapes
 function createSprig(size, variation) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', size);
@@ -135,25 +186,28 @@ function createSprig(size, variation) {
     svg.setAttribute('viewBox', '0 0 100 100');
     
     const variations = [
-        { angles: [-40, -15, 15, 40], leafLength: 28, leafWidth: 10, stemLength: 15 },
-        { angles: [-45, -20, 10, 35], leafLength: 30, leafWidth: 9, stemLength: 18 },
-        { angles: [-35, -10, 20, 45], leafLength: 26, leafWidth: 11, stemLength: 12 },
-        { angles: [-50, -25, 5, 30], leafLength: 32, leafWidth: 8, stemLength: 20 },
-        { angles: [-30, -5, 25, 50], leafLength: 27, leafWidth: 10, stemLength: 14 },
-        { angles: [-42, -18, 12, 38], leafLength: 29, leafWidth: 9, stemLength: 16 },
-        { angles: [-38, -12, 18, 42], leafLength: 31, leafWidth: 11, stemLength: 17 },
-        { angles: [-48, -22, 8, 32], leafLength: 25, leafWidth: 10, stemLength: 13 },
-        { angles: [-33, -8, 22, 47], leafLength: 28, leafWidth: 12, stemLength: 15 },
-        { angles: [-43, -17, 13, 37], leafLength: 30, leafWidth: 9, stemLength: 19 }
+        { angles: [-35, -12, 12, 35], leafScale: 1, stemCurve: 0 },
+        { angles: [-40, -15, 10, 33], leafScale: 0.95, stemCurve: -3 },
+        { angles: [-30, -8, 15, 38], leafScale: 1.05, stemCurve: 3 },
+        { angles: [-42, -18, 8, 30], leafScale: 0.9, stemCurve: -2 },
+        { angles: [-28, -5, 18, 40], leafScale: 1.1, stemCurve: 2 },
+        { angles: [-38, -14, 11, 34], leafScale: 0.98, stemCurve: -4 },
+        { angles: [-33, -10, 14, 36], leafScale: 1.02, stemCurve: 1 },
+        { angles: [-45, -20, 5, 28], leafScale: 0.92, stemCurve: -1 },
+        { angles: [-32, -7, 16, 39], leafScale: 1.08, stemCurve: 4 },
+        { angles: [-37, -13, 13, 37], leafScale: 0.96, stemCurve: -3 }
     ];
     
     const config = variations[variation % variations.length];
-    const centerX = 50;
-    const centerY = 70;
+    const centerX = 50 + config.stemCurve;
+    const centerY = 72;
+    const stemTop = 45;
     
-    // Create shared stem/branch
+    // Create very soft curved stem
     const stem = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const stemPath = `M ${centerX} ${centerY} L ${centerX} ${centerY - config.stemLength}`;
+    const stemPath = `M ${centerX} ${centerY} 
+                      Q ${centerX + config.stemCurve/2} ${(centerY + stemTop)/2} 
+                        ${centerX + config.stemCurve} ${stemTop}`;
     stem.setAttribute('d', stemPath);
     stem.setAttribute('stroke', GREEN);
     stem.setAttribute('stroke-width', STROKE_WIDTH);
@@ -161,39 +215,44 @@ function createSprig(size, variation) {
     stem.setAttribute('fill', 'none');
     svg.appendChild(stem);
     
-    // Create teardrop leaves with rounded ends
+    // Create very soft, rounded teardrop leaves
     config.angles.forEach((angleDeg, i) => {
         const angle = angleDeg * Math.PI / 180 - Math.PI / 2;
         const leaf = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         
-        const startX = centerX;
-        const startY = centerY - config.stemLength;
+        const startX = centerX + config.stemCurve;
+        const startY = stemTop;
         
-        // Vary leaf sizes
-        const lengthMultiplier = i % 2 === 0 ? 1 : 0.85;
-        const widthMultiplier = i % 2 === 0 ? 1 : 1.1;
+        // Vary leaf sizes for organic look
+        const leafLength = 22 * config.leafScale * (i % 2 === 0 ? 1 : 0.85);
+        const leafWidth = 8 * config.leafScale * (i === 1 || i === 2 ? 1.2 : 1);
         
-        const leafLen = config.leafLength * lengthMultiplier;
-        const leafWid = config.leafWidth * widthMultiplier;
+        const tipX = startX + Math.cos(angle) * leafLength;
+        const tipY = startY + Math.sin(angle) * leafLength;
         
-        const endX = startX + Math.cos(angle) * leafLen;
-        const endY = startY + Math.sin(angle) * leafLen;
+        // Very soft, rounded control points
+        const cp1x = startX + Math.cos(angle) * leafLength * 0.25 - Math.sin(angle) * leafWidth * 0.8;
+        const cp1y = startY + Math.sin(angle) * leafLength * 0.25 + Math.cos(angle) * leafWidth * 0.8;
         
-        // Control points for rounded teardrop shape
-        const cp1x = startX + Math.cos(angle) * leafLen * 0.4 - Math.sin(angle) * leafWid;
-        const cp1y = startY + Math.sin(angle) * leafLen * 0.4 + Math.cos(angle) * leafWid;
+        const cp2x = startX + Math.cos(angle) * leafLength * 0.75 - Math.sin(angle) * leafWidth;
+        const cp2y = startY + Math.sin(angle) * leafLength * 0.75 + Math.cos(angle) * leafWidth;
         
-        const cp2x = startX + Math.cos(angle) * leafLen * 0.8 - Math.sin(angle) * leafWid * 0.6;
-        const cp2y = startY + Math.sin(angle) * leafLen * 0.8 + Math.cos(angle) * leafWid * 0.6;
+        const cp3x = startX + Math.cos(angle) * leafLength * 0.75 + Math.sin(angle) * leafWidth;
+        const cp3y = startY + Math.sin(angle) * leafLength * 0.75 - Math.cos(angle) * leafWidth;
         
-        const cp3x = startX + Math.cos(angle) * leafLen * 0.8 + Math.sin(angle) * leafWid * 0.6;
-        const cp3y = startY + Math.sin(angle) * leafLen * 0.8 - Math.cos(angle) * leafWid * 0.6;
+        const cp4x = startX + Math.cos(angle) * leafLength * 0.25 + Math.sin(angle) * leafWidth * 0.8;
+        const cp4y = startY + Math.sin(angle) * leafLength * 0.25 - Math.cos(angle) * leafWidth * 0.8;
         
-        const cp4x = startX + Math.cos(angle) * leafLen * 0.4 + Math.sin(angle) * leafWid;
-        const cp4y = startY + Math.sin(angle) * leafLen * 0.4 - Math.cos(angle) * leafWid;
+        // Extra control points for very rounded tip
+        const tipcp1x = tipX - Math.cos(angle) * leafLength * 0.1 - Math.sin(angle) * leafWidth * 0.3;
+        const tipcp1y = tipY - Math.sin(angle) * leafLength * 0.1 + Math.cos(angle) * leafWidth * 0.3;
+        
+        const tipcp2x = tipX - Math.cos(angle) * leafLength * 0.1 + Math.sin(angle) * leafWidth * 0.3;
+        const tipcp2y = tipY - Math.sin(angle) * leafLength * 0.1 - Math.cos(angle) * leafWidth * 0.3;
         
         const path = `M ${startX} ${startY}
-                      C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}
+                      C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${tipcp1x} ${tipcp1y}
+                      Q ${tipX} ${tipY}, ${tipcp2x} ${tipcp2y}
                       C ${cp3x} ${cp3y}, ${cp4x} ${cp4y}, ${startX} ${startY}`;
         
         leaf.setAttribute('d', path);
@@ -201,6 +260,7 @@ function createSprig(size, variation) {
         leaf.setAttribute('stroke', GREEN);
         leaf.setAttribute('stroke-width', STROKE_WIDTH);
         leaf.setAttribute('stroke-linejoin', 'round');
+        leaf.setAttribute('stroke-linecap', 'round');
         
         svg.appendChild(leaf);
     });
@@ -215,76 +275,76 @@ function createThreeCircles(size, variation) {
     svg.setAttribute('height', size);
     svg.setAttribute('viewBox', '0 0 100 100');
     
-    // Different arrangements and sizes
+    // Different arrangements and sizes - more organic placements
     const variations = [
         { 
             circles: [
-                { x: 35, y: 40, r: 12, filled: true },
-                { x: 65, y: 40, r: 12, filled: true },
-                { x: 50, y: 65, r: 12, filled: false }
+                { x: 36, y: 42, r: 11, filled: true },
+                { x: 64, y: 41, r: 11, filled: true },
+                { x: 50, y: 64, r: 11, filled: false }
             ]
         },
         { 
             circles: [
-                { x: 30, y: 50, r: 14, filled: true },
-                { x: 50, y: 35, r: 10, filled: false },
-                { x: 70, y: 50, r: 14, filled: true }
+                { x: 31, y: 48, r: 13, filled: true },
+                { x: 51, y: 36, r: 9, filled: false },
+                { x: 69, y: 49, r: 13, filled: true }
             ]
         },
         { 
             circles: [
-                { x: 40, y: 35, r: 11, filled: false },
-                { x: 60, y: 35, r: 11, filled: true },
-                { x: 50, y: 60, r: 15, filled: true }
+                { x: 41, y: 37, r: 10, filled: false },
+                { x: 59, y: 36, r: 10, filled: true },
+                { x: 50, y: 58, r: 14, filled: true }
             ]
         },
         { 
             circles: [
-                { x: 35, y: 45, r: 13, filled: true },
-                { x: 55, y: 30, r: 9, filled: true },
-                { x: 60, y: 55, r: 16, filled: false }
+                { x: 37, y: 46, r: 12, filled: true },
+                { x: 56, y: 32, r: 8, filled: true },
+                { x: 61, y: 56, r: 15, filled: false }
             ]
         },
         { 
             circles: [
-                { x: 45, y: 35, r: 8, filled: true },
-                { x: 45, y: 65, r: 8, filled: true },
-                { x: 65, y: 50, r: 18, filled: false }
+                { x: 46, y: 37, r: 7, filled: true },
+                { x: 45, y: 63, r: 7, filled: true },
+                { x: 64, y: 50, r: 16, filled: false }
             ]
         },
         { 
             circles: [
-                { x: 30, y: 40, r: 10, filled: false },
-                { x: 50, y: 50, r: 14, filled: true },
-                { x: 70, y: 40, r: 10, filled: true }
+                { x: 32, y: 41, r: 9, filled: false },
+                { x: 50, y: 49, r: 13, filled: true },
+                { x: 68, y: 40, r: 9, filled: true }
             ]
         },
         { 
             circles: [
-                { x: 38, y: 38, r: 15, filled: true },
-                { x: 62, y: 38, r: 15, filled: true },
-                { x: 50, y: 62, r: 10, filled: false }
+                { x: 39, y: 39, r: 14, filled: true },
+                { x: 61, y: 38, r: 14, filled: true },
+                { x: 50, y: 61, r: 9, filled: false }
             ]
         },
         { 
             circles: [
-                { x: 35, y: 55, r: 12, filled: true },
-                { x: 55, y: 40, r: 17, filled: false },
-                { x: 65, y: 60, r: 9, filled: true }
+                { x: 36, y: 54, r: 11, filled: true },
+                { x: 55, y: 41, r: 16, filled: false },
+                { x: 64, y: 59, r: 8, filled: true }
             ]
         },
         { 
             circles: [
-                { x: 40, y: 45, r: 11, filled: true },
-                { x: 60, y: 45, r: 11, filled: true },
-                { x: 50, y: 30, r: 7, filled: false }
+                { x: 41, y: 44, r: 10, filled: true },
+                { x: 59, y: 45, r: 10, filled: true },
+                { x: 50, y: 31, r: 6, filled: false }
             ]
         },
         { 
             circles: [
-                { x: 25, y: 50, r: 13, filled: false },
-                { x: 50, y: 45, r: 16, filled: true },
-                { x: 75, y: 50, r: 13, filled: true }
+                { x: 27, y: 50, r: 12, filled: false },
+                { x: 50, y: 46, r: 15, filled: true },
+                { x: 73, y: 49, r: 12, filled: true }
             ]
         }
     ];
@@ -295,11 +355,20 @@ function createThreeCircles(size, variation) {
     const sortedCircles = [...config.circles].sort((a, b) => b.r - a.r);
     
     sortedCircles.forEach(circleConfig => {
-        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         
-        circle.setAttribute('cx', circleConfig.x);
-        circle.setAttribute('cy', circleConfig.y);
-        circle.setAttribute('r', circleConfig.r);
+        // Create slightly organic circles
+        const cx = circleConfig.x;
+        const cy = circleConfig.y;
+        const r = circleConfig.r;
+        
+        const circlePath = `M ${cx + r} ${cy}
+                            A ${r * 0.98} ${r} 0 0 1 ${cx} ${cy + r}
+                            A ${r} ${r * 0.97} 0 0 1 ${cx - r} ${cy}
+                            A ${r * 0.99} ${r} 0 0 1 ${cx} ${cy - r}
+                            A ${r} ${r * 0.98} 0 0 1 ${cx + r} ${cy}`;
+        
+        circle.setAttribute('d', circlePath);
         
         if (circleConfig.filled) {
             circle.setAttribute('fill', GREEN);
