@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Standalone Playtest</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-frame {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        .info {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        code {
+            background: #e0e0e0;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Standalone Playtest Test Page</h1>
+    
+    <div class="info">
+        <h2>Testing Instructions:</h2>
+        <ol>
+            <li>The standalone playtest should load below</li>
+            <li>Check the browser console for any errors</li>
+            <li>Try selecting a recipe and playing it</li>
+            <li>Verify that:
+                <ul>
+                    <li>Recipes load in the list</li>
+                    <li>Search functionality works</li>
+                    <li>Vessels appear properly spaced when game starts</li>
+                    <li>Drag and drop works</li>
+                    <li>Combinations create new vessels</li>
+                    <li>Win condition triggers properly</li>
+                </ul>
+            </li>
+        </ol>
+        
+        <h3>Common Issues:</h3>
+        <ul>
+            <li><strong>Vessels stacked:</strong> Check console for CSS/positioning errors</li>
+            <li><strong>Can't combine:</strong> Check console logs for combination attempts</li>
+            <li><strong>No recipes:</strong> Check Supabase connection and credentials</li>
+        </ul>
+    </div>
+    
+    <h2>Standalone Playtest:</h2>
+    <iframe src="standalone-playtest.html" class="test-frame"></iframe>
+    
+    <div class="info" style="margin-top: 20px;">
+        <h3>Debug Tips:</h3>
+        <p>Open the browser console and look for:</p>
+        <ul>
+            <li><code>🚀 Initializing Standalone Playtest System</code> - System started</li>
+            <li><code>✅ Supabase initialized</code> - Database connected</li>
+            <li><code>✅ Loaded X recipes</code> - Recipes loaded successfully</li>
+            <li><code>🎮 Game started: Recipe Name</code> - Game initialized</li>
+            <li><code>Recipe structure:</code> - Shows the recipe data structure</li>
+            <li><code>Attempting combination:</code> - Shows combination attempts</li>
+        </ul>
+    </div>
+</body>
+</html>

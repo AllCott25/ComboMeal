@@ -132,7 +132,7 @@ function processRecipeData(recipe, combinations, ingredients) {
         const finalCombo = combinations.find(combo => combo.is_final === true);
         
         if (!finalCombo) {
-            console.error(`No final combination found for recipe ${recipe.rec_id}`);
+            console.warn(`No final combination found for recipe ${recipe.rec_id}, skipping...`);
             return null;
         }
         
@@ -257,6 +257,9 @@ function startGame() {
     document.getElementById('recipe-date').textContent = `Day ${gameState.currentRecipe.dayNumber}`;
     document.getElementById('moves').textContent = '0';
     
+    // Clear previous combinations list
+    document.getElementById('combinations-list').innerHTML = '';
+    
     // Create initial vessels
     createInitialVessels();
     
@@ -267,6 +270,11 @@ function startGame() {
     startTimer();
     
     console.log('🎮 Game started:', gameState.currentRecipe.recipe_name);
+    console.log('Recipe structure:', {
+        baseIngredients: gameState.currentRecipe.baseIngredients,
+        intermediateCombinations: gameState.currentRecipe.intermediateCombinations,
+        finalCombination: gameState.currentRecipe.finalCombination
+    });
 }
 
 function createInitialVessels() {
@@ -306,6 +314,9 @@ function createVessel(data) {
         </div>
     `;
     
+    // Set initial position style
+    vessel.element.style.position = 'absolute';
+    
     // Make vessel draggable
     vessel.element.draggable = true;
     vessel.element.addEventListener('dragstart', (e) => handleDragStart(e, vessel));
@@ -322,22 +333,32 @@ function createVessel(data) {
 }
 
 function arrangeVessels() {
-    const container = document.getElementById('ingredient-area');
-    const vessels = container.querySelectorAll('.vessel');
-    const containerWidth = container.offsetWidth;
-    const vesselWidth = 120;
-    const vesselHeight = 80;
-    const padding = 20;
-    const vesselsPerRow = Math.floor(containerWidth / (vesselWidth + padding));
-    
-    vessels.forEach((vessel, index) => {
-        const row = Math.floor(index / vesselsPerRow);
-        const col = index % vesselsPerRow;
+    // Small delay to ensure DOM is ready
+    setTimeout(() => {
+        const container = document.getElementById('ingredient-area');
+        const vessels = container.querySelectorAll('.vessel');
+        const containerWidth = container.offsetWidth;
+        const vesselWidth = 120;
+        const vesselHeight = 80;
+        const padding = 20;
+        const vesselsPerRow = Math.max(1, Math.floor((containerWidth - padding) / (vesselWidth + padding)));
         
-        vessel.style.position = 'absolute';
-        vessel.style.left = `${col * (vesselWidth + padding) + padding}px`;
-        vessel.style.top = `${row * (vesselHeight + padding) + padding}px`;
-    });
+        vessels.forEach((vessel, index) => {
+            const row = Math.floor(index / vesselsPerRow);
+            const col = index % vesselsPerRow;
+            
+            vessel.style.position = 'absolute';
+            vessel.style.left = `${col * (vesselWidth + padding) + padding}px`;
+            vessel.style.top = `${row * (vesselHeight + padding) + padding}px`;
+            vessel.style.width = `${vesselWidth}px`;
+            vessel.style.height = `${vesselHeight}px`;
+        });
+        
+        // Update container height to fit all vessels
+        const rows = Math.ceil(vessels.length / vesselsPerRow);
+        const minHeight = rows * (vesselHeight + padding) + padding;
+        container.style.minHeight = `${minHeight}px`;
+    }, 100);
 }
 
 // ===== Drag and Drop =====
@@ -431,14 +452,17 @@ function attemptCombination(vessel1, vessel2) {
     
     // Combine all contents
     const allContents = [...vessel1.contents, ...vessel2.contents].sort();
+    console.log('Combined contents:', allContents);
     
     // Check for valid combinations
     const result = checkCombination(allContents);
     
     if (result) {
+        console.log('Valid combination found:', result);
         // Valid combination found
         performCombination(vessel1, vessel2, result);
     } else {
+        console.log('Invalid combination');
         // Invalid combination - shake vessels
         shakeVessel(vessel1.element);
         shakeVessel(vessel2.element);
@@ -448,7 +472,19 @@ function attemptCombination(vessel1, vessel2) {
 function checkCombination(contents) {
     const recipe = gameState.currentRecipe;
     
-    // Check intermediate combinations
+    // First check if this matches the final combination
+    if (recipe.finalCombination) {
+        // Final combination uses intermediate combination names
+        if (arraysEqual(contents, recipe.finalCombination.required.sort())) {
+            return {
+                type: 'final',
+                name: recipe.finalCombination.name,
+                isComplete: true
+            };
+        }
+    }
+    
+    // Then check intermediate combinations
     for (const combo of recipe.intermediateCombinations) {
         if (arraysEqual(contents, combo.required.sort())) {
             return {
@@ -465,17 +501,6 @@ function checkCombination(contents) {
                 name: `Partial ${combo.name}`,
                 isComplete: false,
                 targetCombo: combo
-            };
-        }
-    }
-    
-    // Check final combination
-    if (recipe.finalCombination) {
-        if (arraysEqual(contents, recipe.finalCombination.required.sort())) {
-            return {
-                type: 'final',
-                name: recipe.finalCombination.name,
-                isComplete: true
             };
         }
     }
@@ -498,11 +523,24 @@ function isPartialMatch(contents, required) {
 }
 
 function performCombination(vessel1, vessel2, result) {
+    // Determine the contents for the new vessel
+    let newContents;
+    if (result.type === 'final') {
+        // Final combination doesn't need contents
+        newContents = [result.name];
+    } else if (result.isComplete) {
+        // Complete intermediate combination - the name becomes the content
+        newContents = [result.name];
+    } else {
+        // Partial combination - keep individual ingredients
+        newContents = [...vessel1.contents, ...vessel2.contents];
+    }
+    
     // Create new vessel
     const newVessel = createVessel({
         id: `vessel-${Date.now()}`,
         type: result.isComplete ? 'complete' : 'partial',
-        contents: result.type === 'final' ? [] : [...vessel1.contents, ...vessel2.contents],
+        contents: newContents,
         name: result.name,
         x: vessel1.x,
         y: vessel1.y
