@@ -102,8 +102,11 @@ async function loadRecipes() {
                     continue;
                 }
                 
+                // Fetch easter eggs for this recipe
+                const easterEggs = await fetchEasterEggs(recipe.rec_id);
+                
                 // Process the recipe data
-                const processedRecipe = processRecipeData(recipe, combinations, ingredients);
+                const processedRecipe = processRecipeData(recipe, combinations, ingredients, easterEggs);
                 if (processedRecipe) {
                     processedRecipes.push(processedRecipe);
                 }
@@ -125,8 +128,73 @@ async function loadRecipes() {
     }
 }
 
+// Fetch easter eggs for a recipe
+async function fetchEasterEggs(recipeId) {
+    try {
+        // Query the eastereggs table
+        const { data: easterEggs, error } = await supabase
+            .from('eastereggs')
+            .select('*')
+            .eq('rec_id', recipeId);
+        
+        if (error) {
+            console.error("Easter eggs error:", error);
+            return [];
+        }
+        
+        if (!easterEggs || easterEggs.length === 0) {
+            return [];
+        }
+        
+        // Get ingredient IDs
+        const ingredientIds = [];
+        easterEggs.forEach(egg => {
+            if (egg.ing_id_1) ingredientIds.push(egg.ing_id_1);
+            if (egg.ing_id_2) ingredientIds.push(egg.ing_id_2);
+        });
+        
+        // Fetch ingredient names
+        if (ingredientIds.length > 0) {
+            const { data: ingredientData, error: ingredientError } = await supabase
+                .from('ingredients')
+                .select('ing_id, name')
+                .in('ing_id', ingredientIds);
+            
+            if (!ingredientError && ingredientData) {
+                // Create map of ing_id to name
+                const ingredientMap = {};
+                ingredientData.forEach(ing => {
+                    ingredientMap[ing.ing_id] = ing.name;
+                });
+                
+                // Format easter eggs with ingredient names
+                return easterEggs.map(egg => {
+                    const required = [];
+                    if (egg.ing_id_1 && ingredientMap[egg.ing_id_1]) {
+                        required.push(ingredientMap[egg.ing_id_1]);
+                    }
+                    if (egg.ing_id_2 && ingredientMap[egg.ing_id_2]) {
+                        required.push(ingredientMap[egg.ing_id_2]);
+                    }
+                    
+                    return {
+                        id: egg.egg_id,
+                        name: egg.name || "Secret Combination",
+                        required: required
+                    };
+                });
+            }
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error fetching easter eggs:', error);
+        return [];
+    }
+}
+
 // Process recipe data into a consistent format
-function processRecipeData(recipe, combinations, ingredients) {
+function processRecipeData(recipe, combinations, ingredients, easterEggs = []) {
     try {
         // Find the final combination
         const finalCombo = combinations.find(combo => combo.is_final === true);
