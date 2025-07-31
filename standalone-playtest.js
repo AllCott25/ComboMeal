@@ -66,7 +66,7 @@ async function loadRecipes() {
     showLoading(true);
     
     try {
-        // First fetch all recipes
+        // First fetch all recipes (lightweight - just the recipe data)
         const { data: recipes, error: recipesError } = await supabase
             .from('recipes')
             .select('*')
@@ -74,57 +74,84 @@ async function loadRecipes() {
 
         if (recipesError) throw recipesError;
 
-        // Process each recipe to get its details
-        const processedRecipes = [];
+        // Show recipes immediately with basic info
+        const basicRecipes = recipes.map(recipe => ({
+            ...recipe,
+            baseIngredients: [],
+            intermediateCombinations: [],
+            finalCombination: null,
+            easterEggs: [],
+            dayNumber: calculateDayNumber(recipe.date),
+            isLoading: true
+        }));
         
-        for (const recipe of recipes) {
-            try {
-                // Fetch combinations for this recipe
-                const { data: combinations, error: combosError } = await supabase
-                    .from('combinations')
-                    .select('*')
-                    .eq('rec_id', recipe.rec_id);
-                
-                if (combosError) {
-                    console.error(`Error loading combinations for recipe ${recipe.rec_id}:`, combosError);
-                    continue;
+        gameState.recipes = basicRecipes;
+        displayRecipes(gameState.recipes);
+        showLoading(false);
+        
+        // Then load details in batches
+        const batchSize = 5;
+        for (let i = 0; i < recipes.length; i += batchSize) {
+            const batch = recipes.slice(i, i + batchSize);
+            
+            // Process batch in parallel
+            const batchPromises = batch.map(async (recipe) => {
+                try {
+                    // Fetch combinations
+                    const { data: combinations, error: combosError } = await supabase
+                        .from('combinations')
+                        .select('*')
+                        .eq('rec_id', recipe.rec_id);
+                    
+                    if (combosError) {
+                        console.error(`Error loading combinations for recipe ${recipe.rec_id}:`, combosError);
+                        return null;
+                    }
+                    
+                    // Fetch ingredients
+                    const comboIds = combinations.map(c => c.combo_id);
+                    const { data: ingredients, error: ingredientsError } = await supabase
+                        .from('ingredients')
+                        .select('*')
+                        .in('combo_id', comboIds);
+                    
+                    if (ingredientsError) {
+                        console.error(`Error loading ingredients for recipe ${recipe.rec_id}:`, ingredientsError);
+                        return null;
+                    }
+                    
+                    // Fetch easter eggs
+                    const easterEggs = await fetchEasterEggs(recipe.rec_id);
+                    
+                    // Process the recipe data
+                    return processRecipeData(recipe, combinations, ingredients, easterEggs);
+                } catch (error) {
+                    console.error(`Error processing recipe ${recipe.rec_id}:`, error);
+                    return null;
                 }
-                
-                // Fetch ingredients for all combinations
-                const comboIds = combinations.map(c => c.combo_id);
-                const { data: ingredients, error: ingredientsError } = await supabase
-                    .from('ingredients')
-                    .select('*')
-                    .in('combo_id', comboIds);
-                
-                if (ingredientsError) {
-                    console.error(`Error loading ingredients for recipe ${recipe.rec_id}:`, ingredientsError);
-                    continue;
-                }
-                
-                // Fetch easter eggs for this recipe
-                const easterEggs = await fetchEasterEggs(recipe.rec_id);
-                
-                // Process the recipe data
-                const processedRecipe = processRecipeData(recipe, combinations, ingredients, easterEggs);
+            });
+            
+            // Wait for batch to complete
+            const processedBatch = await Promise.all(batchPromises);
+            
+            // Update recipes with processed data
+            processedBatch.forEach((processedRecipe, index) => {
                 if (processedRecipe) {
-                    processedRecipes.push(processedRecipe);
+                    const recipeIndex = gameState.recipes.findIndex(r => r.rec_id === batch[index].rec_id);
+                    if (recipeIndex !== -1) {
+                        gameState.recipes[recipeIndex] = processedRecipe;
+                    }
                 }
-            } catch (error) {
-                console.error(`Error processing recipe ${recipe.rec_id}:`, error);
-            }
+            });
+            
+            // Update display for this batch
+            displayRecipes(gameState.recipes);
         }
         
-        // Store and display recipes
-        gameState.recipes = processedRecipes;
-        displayRecipes(gameState.recipes);
-        
-        console.log(`✅ Loaded ${gameState.recipes.length} recipes`);
+        console.log(`✅ Loaded ${gameState.recipes.filter(r => !r.isLoading).length} complete recipes`);
     } catch (error) {
         console.error('❌ Failed to load recipes:', error);
         showError('Failed to load recipes. Please try again.');
-    } finally {
-        showLoading(false);
     }
 }
 
@@ -276,19 +303,38 @@ function displayRecipes(recipes) {
 function createRecipeElement(recipe) {
     const div = document.createElement('div');
     div.className = 'recipe-item';
-    div.innerHTML = `
-        <div class="recipe-header">
-            <h3>${recipe.recipe_name || 'Unnamed Recipe'}</h3>
-            <span class="recipe-date">Day ${recipe.dayNumber} - ${formatDate(recipe.date)}</span>
-        </div>
-        <div class="recipe-preview">
-            ${recipe.baseIngredients.length} ingredients → 
-            ${recipe.intermediateCombinations.length} combinations → 
-            ${recipe.finalCombination?.name || '???'}
-        </div>
-    `;
     
-    div.addEventListener('click', () => selectRecipe(recipe));
+    if (recipe.isLoading) {
+        div.innerHTML = `
+            <div class="recipe-header">
+                <h3>${recipe.name || recipe.recipe_name || 'Loading...'}</h3>
+                <span class="recipe-date">Day ${recipe.dayNumber} - ${formatDate(recipe.date)}</span>
+            </div>
+            <div class="recipe-preview">
+                <span style="color: #999;">Loading recipe details...</span>
+            </div>
+        `;
+        div.style.opacity = '0.7';
+    } else {
+        div.innerHTML = `
+            <div class="recipe-header">
+                <h3>${recipe.name || recipe.recipe_name || 'Unnamed Recipe'}</h3>
+                <span class="recipe-date">Day ${recipe.dayNumber} - ${formatDate(recipe.date)}</span>
+            </div>
+            <div class="recipe-preview">
+                ${recipe.baseIngredients.length} ingredients → 
+                ${recipe.intermediateCombinations.length} combinations → 
+                ${recipe.finalCombination?.name || '???'}
+            </div>
+        `;
+    }
+    
+    div.addEventListener('click', () => {
+        if (!recipe.isLoading) {
+            selectRecipe(recipe);
+        }
+    });
+    
     return div;
 }
 
@@ -320,7 +366,7 @@ function startGame() {
     gameState.completedSteps = [];
     
     // Update UI
-    document.getElementById('recipe-name').textContent = gameState.currentRecipe.recipe_name;
+    document.getElementById('recipe-name').textContent = gameState.currentRecipe.name || gameState.currentRecipe.recipe_name || 'Recipe';
     document.getElementById('recipe-date').textContent = `Day ${gameState.currentRecipe.dayNumber}`;
     document.getElementById('moves').textContent = '0';
     
@@ -336,7 +382,7 @@ function startGame() {
     // Start timer
     startTimer();
     
-    console.log('🎮 Game started:', gameState.currentRecipe.recipe_name);
+    console.log('🎮 Game started:', gameState.currentRecipe.name || gameState.currentRecipe.recipe_name || 'Recipe');
     console.log('Recipe structure:', {
         baseIngredients: gameState.currentRecipe.baseIngredients,
         intermediateCombinations: gameState.currentRecipe.intermediateCombinations,
@@ -417,9 +463,9 @@ function createVessel(data) {
     vessel.element.addEventListener('drop', (e) => handleDrop(e, vessel));
     
     // Touch support
-    vessel.element.addEventListener('touchstart', (e) => handleTouchStart(e, vessel));
-    vessel.element.addEventListener('touchmove', handleTouchMove);
-    vessel.element.addEventListener('touchend', handleTouchEnd);
+    vessel.element.addEventListener('touchstart', (e) => handleTouchStart(e, vessel), { passive: false });
+    vessel.element.addEventListener('touchmove', handleTouchMove, { passive: false });
+    vessel.element.addEventListener('touchend', handleTouchEnd, { passive: false });
     
     return vessel;
 }
@@ -682,12 +728,62 @@ function performCombination(vessel1, vessel2, result) {
         if (result.type !== 'easter') {
             checkForAutocomplete();
         }
+        
+        // If it's an easter egg, split it back after a delay
+        if (result.type === 'easter') {
+            setTimeout(() => {
+                splitEasterEgg(newVessel, vessel1.contents, vessel2.contents);
+            }, 2000); // Show easter egg for 2 seconds
+        }
     }
     
     // Animate
     newVessel.element.classList.add('vessel-appear');
     setTimeout(() => {
         newVessel.element.classList.remove('vessel-appear');
+    }, 500);
+}
+
+function splitEasterEgg(easterVessel, contents1, contents2) {
+    // Remove the easter egg vessel
+    removeVessel(easterVessel);
+    
+    // Recreate the original vessels
+    const vessel1 = createVessel({
+        id: `vessel-${Date.now()}-1`,
+        type: 'base',
+        contents: contents1,
+        name: contents1[0],
+        x: 0,
+        y: 0
+    });
+    
+    const vessel2 = createVessel({
+        id: `vessel-${Date.now()}-2`,
+        type: 'base',
+        contents: contents2,
+        name: contents2[0],
+        x: 0,
+        y: 0
+    });
+    
+    // Add them back to the game
+    gameState.vessels.push(vessel1);
+    gameState.vessels.push(vessel2);
+    
+    const ingredientArea = document.getElementById('ingredient-area');
+    ingredientArea.appendChild(vessel1.element);
+    ingredientArea.appendChild(vessel2.element);
+    
+    // Rearrange vessels
+    arrangeVessels();
+    
+    // Add animation
+    vessel1.element.classList.add('vessel-appear');
+    vessel2.element.classList.add('vessel-appear');
+    setTimeout(() => {
+        vessel1.element.classList.remove('vessel-appear');
+        vessel2.element.classList.remove('vessel-appear');
     }, 500);
 }
 
@@ -830,7 +926,8 @@ function setupSearch() {
         }
         
         const filtered = gameState.recipes.filter(recipe => {
-            return recipe.recipe_name?.toLowerCase().includes(query) ||
+            const recipeName = (recipe.name || recipe.recipe_name || '').toLowerCase();
+            return recipeName.includes(query) ||
                    recipe.date?.includes(query) ||
                    recipe.dayNumber?.toString().includes(query) ||
                    recipe.finalCombination?.name?.toLowerCase().includes(query);
