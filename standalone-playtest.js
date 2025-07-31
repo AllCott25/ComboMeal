@@ -207,12 +207,10 @@ function processRecipeData(recipe, combinations, ingredients, easterEggs = []) {
         // Find intermediate combinations
         const intermediateCombos = combinations.filter(combo => combo.is_final === false);
         
-        // Get all base ingredients
-        const baseIngredients = [...new Set(
-            ingredients
-                .filter(ing => ing.is_base === true)
-                .map(ing => ing.name)
-        )];
+        // Get all base ingredients - preserve duplicates!
+        const baseIngredients = ingredients
+            .filter(ing => ing.is_base === true)
+            .map(ing => ing.name);
         
         // Group ingredients by combination
         const ingredientsByCombo = {};
@@ -246,6 +244,7 @@ function processRecipeData(recipe, combinations, ingredients, easterEggs = []) {
             baseIngredients,
             intermediateCombinations,
             finalCombination,
+            easterEggs: easterEggs || [],
             dayNumber: calculateDayNumber(recipe.date)
         };
     } catch (error) {
@@ -341,8 +340,33 @@ function startGame() {
     console.log('Recipe structure:', {
         baseIngredients: gameState.currentRecipe.baseIngredients,
         intermediateCombinations: gameState.currentRecipe.intermediateCombinations,
-        finalCombination: gameState.currentRecipe.finalCombination
+        finalCombination: gameState.currentRecipe.finalCombination,
+        easterEggs: gameState.currentRecipe.easterEggs
     });
+    
+    // Display easter eggs if any
+    displayEasterEggs();
+}
+
+function displayEasterEggs() {
+    const recipe = gameState.currentRecipe;
+    const easterEggSection = document.getElementById('easter-egg-section');
+    const easterEggHint = document.getElementById('easter-egg-hint');
+    
+    if (recipe.easterEggs && recipe.easterEggs.length > 0) {
+        easterEggSection.classList.remove('hidden');
+        
+        const hints = recipe.easterEggs.map(egg => {
+            if (egg.required && egg.required.length === 2) {
+                return `<span class="easter-egg-recipe">${egg.required[0]} + ${egg.required[1]} = ${egg.name}</span>`;
+            }
+            return '';
+        }).filter(h => h).join('');
+        
+        easterEggHint.innerHTML = hints || 'Secret combinations available!';
+    } else {
+        easterEggSection.classList.add('hidden');
+    }
 }
 
 function createInitialVessels() {
@@ -540,7 +564,20 @@ function attemptCombination(vessel1, vessel2) {
 function checkCombination(contents) {
     const recipe = gameState.currentRecipe;
     
-    // First check if this matches the final combination
+    // First check easter eggs (they take priority)
+    if (recipe.easterEggs) {
+        for (const egg of recipe.easterEggs) {
+            if (egg.required && arraysEqual(contents, egg.required.sort())) {
+                return {
+                    type: 'easter',
+                    name: egg.name,
+                    isComplete: true
+                };
+            }
+        }
+    }
+    
+    // Then check if this matches the final combination
     if (recipe.finalCombination) {
         // Final combination uses intermediate combination names
         if (arraysEqual(contents, recipe.finalCombination.required.sort())) {
@@ -593,21 +630,30 @@ function isPartialMatch(contents, required) {
 function performCombination(vessel1, vessel2, result) {
     // Determine the contents for the new vessel
     let newContents;
-    if (result.type === 'final') {
+    let vesselType;
+    
+    if (result.type === 'easter') {
+        // Easter egg - special handling
+        newContents = [result.name];
+        vesselType = 'easter';
+    } else if (result.type === 'final') {
         // Final combination doesn't need contents
         newContents = [result.name];
+        vesselType = 'complete';
     } else if (result.isComplete) {
         // Complete intermediate combination - the name becomes the content
         newContents = [result.name];
+        vesselType = 'complete';
     } else {
         // Partial combination - keep individual ingredients
         newContents = [...vessel1.contents, ...vessel2.contents];
+        vesselType = 'partial';
     }
     
     // Create new vessel
     const newVessel = createVessel({
         id: `vessel-${Date.now()}`,
-        type: result.isComplete ? 'complete' : 'partial',
+        type: vesselType,
         contents: newContents,
         name: result.name,
         x: vessel1.x,
@@ -631,6 +677,11 @@ function performCombination(vessel1, vessel2, result) {
         
         // Update combination list
         updateCombinationsList(result);
+        
+        // Check for autocomplete condition (but not for easter eggs)
+        if (result.type !== 'easter') {
+            checkForAutocomplete();
+        }
     }
     
     // Animate
@@ -638,6 +689,78 @@ function performCombination(vessel1, vessel2, result) {
     setTimeout(() => {
         newVessel.element.classList.remove('vessel-appear');
     }, 500);
+}
+
+function checkForAutocomplete() {
+    const recipe = gameState.currentRecipe;
+    const currentVesselContents = gameState.vessels.map(v => v.contents).flat();
+    
+    // Check if we have exactly the components needed for the final combination
+    const requiredForFinal = recipe.finalCombination.required.sort();
+    const availableIntermediates = currentVesselContents.filter(c => 
+        recipe.intermediateCombinations.some(ic => ic.name === c)
+    ).sort();
+    
+    if (arraysEqual(requiredForFinal, availableIntermediates)) {
+        console.log('🎉 Autocomplete condition met!');
+        showAutocompleteNotification(requiredForFinal);
+        
+        // Auto-combine after a delay
+        setTimeout(() => {
+            performAutocomplete();
+        }, 3000);
+    }
+}
+
+function showAutocompleteNotification(vessels) {
+    const notification = document.getElementById('autocomplete-notification');
+    const vesselsList = document.getElementById('autocomplete-vessels');
+    
+    vesselsList.innerHTML = vessels.map(v => 
+        `<div class="autocomplete-vessel">${v}</div>`
+    ).join('');
+    
+    notification.classList.remove('hidden');
+    
+    // Hide after 2.5 seconds
+    setTimeout(() => {
+        notification.classList.add('hidden');
+    }, 2500);
+}
+
+function performAutocomplete() {
+    const recipe = gameState.currentRecipe;
+    const finalVessels = gameState.vessels.filter(v => 
+        recipe.finalCombination.required.includes(v.name)
+    );
+    
+    if (finalVessels.length === recipe.finalCombination.required.length) {
+        // Simulate combining all final vessels
+        const result = {
+            type: 'final',
+            name: recipe.finalCombination.name,
+            isComplete: true
+        };
+        
+        // Create final vessel at center
+        const centerX = document.getElementById('ingredient-area').offsetWidth / 2;
+        const centerY = document.getElementById('ingredient-area').offsetHeight / 2;
+        
+        const finalVessel = createVessel({
+            id: `vessel-${Date.now()}`,
+            type: 'complete',
+            contents: [result.name],
+            name: result.name,
+            x: centerX,
+            y: centerY
+        });
+        
+        // Remove all component vessels
+        finalVessels.forEach(v => removeVessel(v));
+        
+        // Trigger win
+        handleWin(result);
+    }
 }
 
 function removeVessel(vessel) {
@@ -753,6 +876,9 @@ function setupEventHandlers() {
     // Back button
     document.getElementById('back-button').addEventListener('click', () => {
         clearInterval(gameState.timerInterval);
+        // Hide any notifications
+        document.getElementById('autocomplete-notification').classList.add('hidden');
+        document.getElementById('easter-egg-section').classList.add('hidden');
         showScreen('selector');
     });
     

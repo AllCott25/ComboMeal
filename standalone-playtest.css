@@ -265,6 +265,24 @@ h1 {
     color: white;
 }
 
+.vessel-easter {
+    background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1, #F7B731);
+    background-size: 300% 300%;
+    border: 2px solid #333;
+    animation: easterGradient 3s ease infinite;
+}
+
+@keyframes easterGradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.vessel-easter .vessel-name {
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+}
+
 .vessel:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 8px var(--color-shadow);
@@ -361,6 +379,7 @@ h1 {
     background-color: var(--color-white);
     border-radius: var(--radius-md);
     box-shadow: 0 2px 4px var(--color-shadow);
+    margin-bottom: var(--spacing-md);
 }
 
 #status-bar > div {
@@ -369,6 +388,92 @@ h1 {
 
 #status-bar span {
     color: var(--color-primary);
+}
+
+/* ===== Easter Egg Section ===== */
+.easter-egg-section {
+    background-color: var(--color-white);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    box-shadow: 0 2px 4px var(--color-shadow);
+    margin-bottom: var(--spacing-md);
+}
+
+.easter-egg-section.hidden {
+    display: none;
+}
+
+.easter-egg-section h3 {
+    font-size: 1rem;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-primary);
+}
+
+#easter-egg-hint {
+    font-size: 0.875rem;
+    color: var(--color-text-light);
+}
+
+.easter-egg-recipe {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background-color: var(--color-background);
+    border-radius: var(--radius-sm);
+    margin-right: var(--spacing-sm);
+    margin-bottom: var(--spacing-xs);
+}
+
+/* ===== Autocomplete Notification ===== */
+.autocomplete-notification {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--color-white);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-xl);
+    box-shadow: 0 10px 30px var(--color-shadow);
+    z-index: 100;
+    text-align: center;
+    max-width: 400px;
+    animation: autocompleteAppear 0.5s ease;
+}
+
+.autocomplete-notification.hidden {
+    display: none;
+}
+
+@keyframes autocompleteAppear {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.autocomplete-content h3 {
+    color: var(--color-success);
+    margin-bottom: var(--spacing-md);
+}
+
+#autocomplete-vessels {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+    flex-wrap: wrap;
+}
+
+.autocomplete-vessel {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background-color: var(--color-primary);
+    color: white;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 0.875rem;
 }
 
 /* ===== Overlays ===== */
