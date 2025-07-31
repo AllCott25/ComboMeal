@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Tile Cutter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .controls {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: inline-block;
+            width: 150px;
+        }
+        input[type="number"] {
+            width: 80px;
+        }
+        button {
+            background: #4A90E2;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #357ABD;
+        }
+        #preview {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            min-height: 200px;
+            margin-bottom: 20px;
+        }
+        .tile-preview {
+            display: inline-block;
+            margin: 5px;
+            border: 1px solid #ddd;
+            background: white;
+        }
+        #output {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>SVG Tile Cutter</h1>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>SVG File:</label>
+            <input type="file" id="fileInput" accept=".svg">
+        </div>
+        
+        <div class="control-group">
+            <label>Tile Width (px):</label>
+            <input type="number" id="tileWidth" value="64" min="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Tile Height (px):</label>
+            <input type="number" id="tileHeight" value="64" min="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Grid Columns:</label>
+            <input type="number" id="gridCols" value="10" min="1">
+        </div>
+        
+        <div class="control-group">
+            <label>Grid Rows:</label>
+            <input type="number" id="gridRows" value="10" min="1">
+        </div>
+        
+        <button onclick="cutTiles()">Cut Tiles</button>
+        <button onclick="downloadAll()">Download All Tiles</button>
+    </div>
+    
+    <div id="preview">
+        <p>Load an SVG file and click "Cut Tiles" to preview</p>
+    </div>
+    
+    <div id="output"></div>
+
+    <script>
+        let tiles = [];
+        let originalSVG = null;
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    originalSVG = e.target.result;
+                    document.getElementById('preview').innerHTML = 
+                        '<h3>Original SVG loaded</h3>' + originalSVG;
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        function cutTiles() {
+            if (!originalSVG) {
+                alert('Please load an SVG file first');
+                return;
+            }
+
+            tiles = [];
+            const tileWidth = parseInt(document.getElementById('tileWidth').value);
+            const tileHeight = parseInt(document.getElementById('tileHeight').value);
+            const gridCols = parseInt(document.getElementById('gridCols').value);
+            const gridRows = parseInt(document.getElementById('gridRows').value);
+
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(originalSVG, 'image/svg+xml');
+            const svgElement = svgDoc.documentElement;
+            
+            // Get original viewBox or dimensions
+            let viewBox = svgElement.getAttribute('viewBox');
+            let originalWidth, originalHeight;
+            
+            if (viewBox) {
+                const vb = viewBox.split(' ');
+                originalWidth = parseFloat(vb[2]);
+                originalHeight = parseFloat(vb[3]);
+            } else {
+                originalWidth = parseFloat(svgElement.getAttribute('width') || 1000);
+                originalHeight = parseFloat(svgElement.getAttribute('height') || 1000);
+            }
+
+            const previewDiv = document.getElementById('preview');
+            previewDiv.innerHTML = '<h3>Tile Preview</h3>';
+
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    const x = col * tileWidth;
+                    const y = row * tileHeight;
+                    
+                    // Create new SVG for this tile
+                    const tileSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                    tileSVG.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                    tileSVG.setAttribute('width', tileWidth);
+                    tileSVG.setAttribute('height', tileHeight);
+                    tileSVG.setAttribute('viewBox', `0 0 ${tileWidth} ${tileHeight}`);
+                    
+                    // Create a group with transform to show the right portion
+                    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    g.setAttribute('transform', `translate(-${x}, -${y})`);
+                    
+                    // Clone all children from original SVG
+                    const children = svgElement.cloneNode(true).children;
+                    while (children.length > 0) {
+                        g.appendChild(children[0]);
+                    }
+                    
+                    tileSVG.appendChild(g);
+                    
+                    // Add clipPath to ensure nothing outside the tile is visible
+                    const clipPath = document.createElementNS('http://www.w3.org/2000/svg', 'clipPath');
+                    clipPath.setAttribute('id', `clip-${row}-${col}`);
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('width', tileWidth);
+                    rect.setAttribute('height', tileHeight);
+                    clipPath.appendChild(rect);
+                    tileSVG.insertBefore(clipPath, tileSVG.firstChild);
+                    g.setAttribute('clip-path', `url(#clip-${row}-${col})`);
+                    
+                    // Store tile data
+                    const tileData = {
+                        row: row,
+                        col: col,
+                        svg: new XMLSerializer().serializeToString(tileSVG),
+                        filename: `tile-${String(row * gridCols + col).padStart(3, '0')}.svg`
+                    };
+                    tiles.push(tileData);
+                    
+                    // Add to preview
+                    const tilePreview = document.createElement('div');
+                    tilePreview.className = 'tile-preview';
+                    tilePreview.innerHTML = tileData.svg;
+                    tilePreview.title = tileData.filename;
+                    previewDiv.appendChild(tilePreview);
+                }
+            }
+            
+            document.getElementById('output').innerHTML = 
+                `<p>Created ${tiles.length} tiles. Click "Download All Tiles" to save them.</p>`;
+        }
+
+        function downloadAll() {
+            if (tiles.length === 0) {
+                alert('No tiles to download. Cut tiles first.');
+                return;
+            }
+
+            tiles.forEach((tile, index) => {
+                setTimeout(() => {
+                    downloadTile(tile);
+                }, index * 100); // Stagger downloads
+            });
+        }
+
+        function downloadTile(tile) {
+            const blob = new Blob([tile.svg], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = tile.filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
