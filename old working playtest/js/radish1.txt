@@ -1,0 +1,189 @@
+// Radish Drawing with 5 Colors
+// Colors: Pink (#F48FB1), Green (#9CCC65), White, Yellow (#D4BE40), Black
+
+function createRadishDrawing(containerId) {
+  // Define our 5 colors
+  const COLORS = {
+    pink: "#F48FB1",
+    green: "#9CCC65",
+    white: "#FFFFFF",
+    yellow: "#D4BE40",
+    black: "#000000"
+  };
+
+  // Create SVG namespace
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  
+  // Create the SVG element
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 400 400");
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", "100%");
+  
+  // Create the background and frame
+  const frame = document.createElementNS(SVG_NS, "rect");
+  frame.setAttribute("x", "10");
+  frame.setAttribute("y", "10");
+  frame.setAttribute("width", "380");
+  frame.setAttribute("height", "380");
+  frame.setAttribute("fill", COLORS.white);
+  frame.setAttribute("stroke", COLORS.yellow);
+  frame.setAttribute("stroke-width", "10");
+  svg.appendChild(frame);
+  
+  // Function to create a path element with given attributes
+  function createPath(d, fill, stroke, strokeWidth, opacity = 1, strokeDasharray = null) {
+    const path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    if (fill) path.setAttribute("fill", fill);
+    if (stroke) path.setAttribute("stroke", stroke);
+    if (strokeWidth) path.setAttribute("stroke-width", strokeWidth);
+    if (opacity !== 1) path.setAttribute("opacity", opacity);
+    if (strokeDasharray) path.setAttribute("stroke-dasharray", strokeDasharray);
+    return path;
+  }
+  
+  // Create a group for radishes
+  const radishesGroup = document.createElementNS(SVG_NS, "g");
+  radishesGroup.setAttribute("id", "radishes");
+  
+  // Create radish 1
+  radishesGroup.appendChild(createPath(
+    "M150,180 C170,210 180,240 175,270 C170,300 140,300 130,270 C120,240 130,210 150,180",
+    COLORS.pink, COLORS.black, "1.5"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M150,180 C155,210 160,240 155,260 C150,280 140,280 135,260 C130,240 140,210 150,180",
+    COLORS.white, null, null, "0.6"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M130,270 C125,290 120,320 118,340",
+    null, COLORS.pink, "2.5"
+  ));
+  
+  // Create radish 2
+  radishesGroup.appendChild(createPath(
+    "M190,190 C210,220 220,250 215,280 C210,310 180,310 170,280 C160,250 170,220 190,190",
+    COLORS.pink, COLORS.black, "1.5"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M190,190 C195,220 200,250 195,270 C190,290 180,290 175,270 C170,250 180,220 190,190",
+    COLORS.white, null, null, "0.6"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M170,280 C165,300 163,330 160,350",
+    null, COLORS.pink, "2.5"
+  ));
+  
+  // Create radish 3
+  radishesGroup.appendChild(createPath(
+    "M230,170 C250,200 260,230 255,260 C250,290 220,290 210,260 C200,230 210,200 230,170",
+    COLORS.pink, COLORS.black, "1.5"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M230,170 C235,200 240,230 235,250 C230,270 220,270 215,250 C210,230 220,200 230,170",
+    COLORS.white, null, null, "0.6"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M210,260 C205,280 200,310 195,330",
+    null, COLORS.pink, "2.5"
+  ));
+  
+  // Create radish 4
+  radishesGroup.appendChild(createPath(
+    "M270,180 C290,210 300,240 295,270 C290,300 260,300 250,270 C240,240 250,210 270,180",
+    COLORS.pink, COLORS.black, "1.5"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M270,180 C275,210 280,240 275,260 C270,280 260,280 255,260 C250,240 260,210 270,180",
+    COLORS.white, null, null, "0.6"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M250,270 C245,290 240,320 235,340",
+    null, COLORS.pink, "2.5"
+  ));
+  
+  // Create radish 5 (smaller, tucked behind)
+  radishesGroup.appendChild(createPath(
+    "M185,200 C195,220 200,240 195,260 C190,280 170,280 165,260 C160,240 170,220 185,200",
+    COLORS.pink, COLORS.black, "1.5"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M185,200 C190,220 192,240 188,255 C184,270 175,270 172,255 C168,240 175,220 185,200",
+    COLORS.white, null, null, "0.6"
+  ));
+  radishesGroup.appendChild(createPath(
+    "M165,260 C162,275 158,295 155,315",
+    null, COLORS.pink, "2.5"
+  ));
+  
+  svg.appendChild(radishesGroup);
+  
+  // Create a group for leaves
+  const leavesGroup = document.createElementNS(SVG_NS, "g");
+  leavesGroup.setAttribute("id", "leaves");
+  
+  // Create large leaves
+  leavesGroup.appendChild(createPath(
+    "M150,100 C130,80 90,60 70,80 C50,100 60,130 90,140 C120,150 140,130 150,100",
+    COLORS.green, COLORS.black, "1.5"
+  ));
+  leavesGroup.appendChild(createPath(
+    "M200,90 C200,60 220,30 250,40 C280,50 290,80 270,110 C250,140 200,120 200,90",
+    COLORS.green, COLORS.black, "1.5"
+  ));
+  leavesGroup.appendChild(createPath(
+    "M250,100 C270,80 310,70 330,90 C350,110 340,140 310,150 C280,160 230,130 250,100",
+    COLORS.green, COLORS.black, "1.5"
+  ));
+  
+  // Create small leaves
+  leavesGroup.appendChild(createPath(
+    "M180,150 C170,140 150,130 160,120 C170,110 180,120 190,130 C200,140 190,150 180,150",
+    COLORS.green, COLORS.black, "1.5"
+  ));
+  leavesGroup.appendChild(createPath(
+    "M220,140 C230,130 250,120 240,110 C230,100 220,110 210,120 C200,130 210,140 220,140",
+    COLORS.green, COLORS.black, "1.5"
+  ));
+  
+  // Create stems
+  const stemPaths = [
+    "M150,150 C160,160 180,170 190,190",
+    "M170,145 C175,155 180,165 190,190",
+    "M210,145 C205,155 200,165 190,190",
+    "M230,150 C220,160 210,170 190,190",
+    "M250,150 C235,160 210,170 190,190"
+  ];
+  
+  // Add green stems
+  stemPaths.forEach(path => {
+    leavesGroup.appendChild(createPath(
+      path, null, COLORS.green, "3"
+    ));
+  });
+  
+  // Add white stripes on stems
+  stemPaths.forEach(path => {
+    leavesGroup.appendChild(createPath(
+      path, null, COLORS.white, "1", 1, "2,3"
+    ));
+  });
+  
+  svg.appendChild(leavesGroup);
+  
+  // Add the SVG to the container
+  const container = document.getElementById(containerId);
+  if (container) {
+    container.appendChild(svg);
+  } else {
+    document.body.appendChild(svg);
+  }
+  
+  return svg;
+}
+
+// Usage:
+// 1. Include this script in your HTML
+// 2. Create a container div: <div id="radish-container"></div>
+// 3. Call the function: createRadishDrawing("radish-container");

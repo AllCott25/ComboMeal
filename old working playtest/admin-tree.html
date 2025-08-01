@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Culinary Logic Puzzle - Recipe Tree Admin</title>
+    <link rel="stylesheet" href="css/admin.css">
+    <style>
+        /* Tree-specific styles */
+        .recipe-tree {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 8px;
+        }
+        
+        .tree-node {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+        
+        .tree-node.final {
+            background-color: #e6f7ff;
+            border-color: #91d5ff;
+        }
+        
+        .tree-children {
+            margin-left: 30px;
+            padding-left: 10px;
+            border-left: 2px dashed #ddd;
+        }
+        
+        .tree-node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .tree-node-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .add-child-btn {
+            background-color: #52c41a;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .add-child-form {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .add-child-form.visible {
+            display: block;
+        }
+        
+        .node-details {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .node-ingredients {
+            margin-top: 5px;
+            padding: 5px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+        }
+        
+        .ingredient-item {
+            display: inline-block;
+            margin: 2px 5px 2px 0;
+            padding: 2px 8px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            font-size: 0.85em;
+        }
+        
+        .ingredient-item.base {
+            background-color: #e6f7ff;
+        }
+        
+        /* Edit button styles */
+        .edit-btn {
+            background-color: #1890ff;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        
+        .edit-btn:hover {
+            background-color: #096dd9;
+        }
+        
+        /* Delete button styles */
+        .delete-btn {
+            background-color: #ff4d4f;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        
+        .delete-btn:hover {
+            background-color: #cf1322;
+        }
+        
+        .delete-ing-btn {
+            background-color: transparent;
+            color: #ff4d4f;
+            border: none;
+            padding: 0 3px;
+            font-size: 0.9em;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        
+        .delete-ing-btn:hover {
+            color: #cf1322;
+        }
+        
+        /* Edit ingredient button */
+        .edit-ing-btn {
+            background-color: transparent;
+            color: #1890ff;
+            border: none;
+            padding: 0 3px;
+            font-size: 0.9em;
+            cursor: pointer;
+            vertical-align: middle;
+        }
+        
+        .edit-ing-btn:hover {
+            color: #096dd9;
+        }
+        
+        /* Playtest button */
+        .playtest-btn {
+            background-color: #722ed1;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        
+        .playtest-btn:hover {
+            background-color: #531dab;
+        }
+        
+        /* Calendar View Styles */
+        .calendar-controls {
+            margin-bottom: 20px;
+        }
+        
+        .calendar-navigation {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .calendar-day {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .calendar-day-header {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .calendar-day-number {
+            background-color: #f0f0f0;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.9em;
+        }
+        
+        .calendar-recipe {
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            border-left: 3px solid #3498db;
+            position: relative;
+        }
+        
+        .calendar-recipe.empty {
+            border-left-color: #ddd;
+            background-color: #f5f5f5;
+            color: #999;
+            font-style: italic;
+        }
+        
+        .calendar-recipe.suggestion {
+            border-left-color: #f39c12;
+            background-color: #fef9e7;
+        }
+        
+        .suggestion-note {
+            font-size: 0.85em;
+            color: #7f8c8d;
+            font-style: italic;
+            margin: 5px 0;
+            padding: 5px;
+            background-color: rgba(243, 156, 18, 0.1);
+            border-radius: 4px;
+        }
+        
+        .calendar-recipe img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+        
+        .calendar-recipe-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .calendar-recipe-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 8px;
+        }
+        
+        .calendar-recipe-actions {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .calendar-recipe-edit-form {
+            margin-top: 10px;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .calendar-recipe-edit-form.visible {
+            display: block;
+        }
+        
+        .calendar-empty-slot {
+            padding: 15px;
+            margin-top: 10px;
+            background-color: #f5f5f5;
+            border-radius: 6px;
+            border: 1px dashed #ddd;
+            text-align: center;
+            color: #999;
+        }
+        
+        .quick-edit-btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        
+        .quick-edit-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .quick-save-btn {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        
+        .quick-save-btn:hover {
+            background-color: #219653;
+        }
+        
+        .quick-cancel-btn {
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        
+        .quick-cancel-btn:hover {
+            background-color: #7f8c8d;
+        }
+        
+        /* For smaller screens, switch to single column */
+        @media (max-width: 768px) {
+            .calendar-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Modal Styles */
+        .modal-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 20px;
+            gap: 10px;
+        }
+    </style>
+    
+    <!-- Favicon Support -->
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16x16.png">
+    <link rel="manifest" href="assets/site.webmanifest">
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Culinary Logic Puzzle - Recipe Tree Admin</h1>
+            <nav>
+                <a href="index.html">Main Game</a> | 
+                <a href="admin.html">Standard Admin</a> | 
+                <a href="admin-tree.html" class="active">Recipe Tree Admin</a>
+            </nav>
+        </header>
+        
+        <!-- Login Section -->
+        <div id="login-section" class="section">
+            <h2>Login</h2>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit">Login</button>
+            </form>
+            <div id="login-error" class="error-message"></div>
+        </div>
+        
+        <!-- Admin Panel (hidden until logged in) -->
+        <div id="admin-panel" class="section hidden">
+            <h2>Recipe Tree Builder</h2>
+            
+            <!-- Recipe Selection -->
+            <div class="form-group">
+                <label for="recipe-select">Select Recipe:</label>
+                <select id="recipe-select">
+                    <option value="">-- Select a Recipe --</option>
+                </select>
+                <button id="playtest-recipe-btn" class="playtest-btn" style="display: none;">Playtest Recipe</button>
+            </div>
+            
+            <!-- Navigation Buttons -->
+            <div class="form-group admin-navigation">
+                <button id="new-recipe-btn">Create New Recipe</button>
+                <button id="view-calendar-btn">View Calendar</button>
+            </div>
+            
+            <!-- New Recipe Form (initially hidden) -->
+            <div id="new-recipe-form" class="form-group" style="display: none;">
+                <h3>Create New Recipe</h3>
+                <form id="recipe-form">
+                    <div class="form-group">
+                        <label for="recipe-name">Recipe Name:</label>
+                        <input type="text" id="recipe-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-date">Date (YYYY-MM-DD):</label>
+                        <input type="date" id="recipe-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-day-number">Day Number:</label>
+                        <input type="number" id="recipe-day-number" min="1" placeholder="Optional day number">
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-description">Description:</label>
+                        <textarea id="recipe-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-author">Author:</label>
+                        <input type="text" id="recipe-author" placeholder="Recipe author (optional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-url">Recipe URL:</label>
+                        <input type="url" id="recipe-url">
+                    </div>
+                    <div class="form-group">
+                        <label for="recipe-img-url">Image URL:</label>
+                        <input type="url" id="recipe-img-url" placeholder="URL to recipe image">
+                    </div>
+                    <button type="submit">Create Recipe</button>
+                    <button type="button" id="cancel-recipe-btn">Cancel</button>
+                </form>
+            </div>
+            
+            <!-- Recipe Tree View -->
+            <div id="recipe-tree" class="recipe-tree">
+                <p>Select a recipe to view its combination tree.</p>
+            </div>
+            
+            <!-- Recipe container (removed) -->
+            <div id="recipe-container" style="display: none;"></div>
+            
+            <!-- Edit Recipe Form (initially hidden) -->
+            <div id="edit-recipe-form" class="form-group" style="display: none;">
+                <h3>Edit Recipe</h3>
+                <form id="edit-recipe-form-element">
+                    <input type="hidden" id="edit-recipe-id">
+                    <div class="form-group">
+                        <label for="edit-recipe-name">Recipe Name:</label>
+                        <input type="text" id="edit-recipe-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-recipe-date">Date (YYYY-MM-DD):</label>
+                        <input type="date" id="edit-recipe-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-recipe-day-number">Day Number:</label>
+                        <input type="number" id="edit-recipe-day-number" min="1" placeholder="Optional day number">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-recipe-description">Description:</label>
+                        <textarea id="edit-recipe-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-recipe-author">Author:</label>
+                        <input type="text" id="edit-recipe-author" placeholder="Recipe author (optional)">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-recipe-url">Recipe URL:</label>
+                        <input type="url" id="edit-recipe-url">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-recipe-img-url">Image URL:</label>
+                        <input type="url" id="edit-recipe-img-url" placeholder="URL to recipe image">
+                    </div>
+                    <button type="submit">Update Recipe</button>
+                    <button type="button" id="cancel-edit-recipe-btn">Cancel</button>
+                </form>
+            </div>
+            
+            <!-- Easter Eggs Section -->
+            <div id="easter-eggs-section" class="section" style="display: none;">
+                <h3>Easter Eggs for <span id="easter-eggs-recipe-name"></span></h3>
+                
+                <div id="easter-eggs-list" class="existing-items-list">
+                    <p>No Easter Eggs found for this recipe.</p>
+                </div>
+                
+                <h4>Add New Easter Egg</h4>
+                <form id="easter-egg-form">
+                    <input type="hidden" id="easter-egg-recipe-id">
+                    <div class="form-group">
+                        <label for="easter-egg-name">Easter Egg Name:</label>
+                        <input type="text" id="easter-egg-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="easter-egg-ing1">Ingredient 1:</label>
+                        <select id="easter-egg-ing1" required>
+                            <option value="">-- Select Ingredient --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="easter-egg-ing2">Ingredient 2:</label>
+                        <select id="easter-egg-ing2" required>
+                            <option value="">-- Select Ingredient --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Add Easter Egg</button>
+                </form>
+            </div>
+            
+            <!-- Edit Combination Form (initially hidden) -->
+            <div id="edit-combo-form" class="form-group" style="display: none;">
+                <h3>Edit Combination</h3>
+                <form id="edit-combo-form-element">
+                    <input type="hidden" id="edit-combo-id">
+                    <div class="form-group">
+                        <label for="edit-combo-name">Combination Name:</label>
+                        <input type="text" id="edit-combo-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-combo-verb">Verb:</label>
+                        <input type="text" id="edit-combo-verb">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-combo-is-final">Is Final Combination:</label>
+                        <input type="checkbox" id="edit-combo-is-final">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-combo-parent">Parent Combination:</label>
+                        <select id="edit-combo-parent">
+                            <option value="">-- No Parent --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Update Combination</button>
+                    <button type="button" id="cancel-edit-combo-btn">Cancel</button>
+                </form>
+            </div>
+            
+            <!-- Edit Ingredient Form (initially hidden) -->
+            <div id="edit-ingredient-form" class="form-group" style="display: none;">
+                <h3>Edit Ingredient</h3>
+                <form id="edit-ingredient-form-element">
+                    <input type="hidden" id="edit-ingredient-id">
+                    <div class="form-group">
+                        <label for="edit-ingredient-name">Ingredient Name:</label>
+                        <input type="text" id="edit-ingredient-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-ingredient-is-base">Is Base Ingredient:</label>
+                        <input type="checkbox" id="edit-ingredient-is-base">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-ingredient-combo">Combination:</label>
+                        <select id="edit-ingredient-combo" required>
+                            <option value="">-- Select Combination --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Update Ingredient</button>
+                    <button type="button" id="cancel-edit-ingredient-btn">Cancel</button>
+                </form>
+            </div>
+            
+            <!-- Edit Easter Egg Form (initially hidden) -->
+            <div id="edit-easter-egg-form" class="form-group" style="display: none;">
+                <h3>Edit Easter Egg</h3>
+                <form id="edit-easter-egg-form-element">
+                    <input type="hidden" id="edit-easter-egg-id">
+                    <div class="form-group">
+                        <label for="edit-easter-egg-name">Easter Egg Name:</label>
+                        <input type="text" id="edit-easter-egg-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-easter-egg-ing1">Ingredient 1:</label>
+                        <select id="edit-easter-egg-ing1" required>
+                            <option value="">-- Select Ingredient --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-easter-egg-ing2">Ingredient 2:</label>
+                        <select id="edit-easter-egg-ing2" required>
+                            <option value="">-- Select Ingredient --</option>
+                        </select>
+                    </div>
+                    <button type="submit">Update Easter Egg</button>
+                    <button type="button" id="cancel-edit-easter-egg-btn">Cancel</button>
+                </form>
+            </div>
+            
+            <!-- Calendar View Section (initially hidden) -->
+            <div id="calendar-view-section" class="section" style="display: none;">
+                <h3>Recipe Calendar View</h3>
+                <div class="calendar-controls">
+                    <div class="form-group">
+                        <label for="calendar-start-date">Start Date:</label>
+                        <input type="date" id="calendar-start-date">
+                        <button id="load-calendar-btn">Load Calendar</button>
+                    </div>
+                    <div class="calendar-navigation">
+                        <button id="prev-week-btn">&laquo; Previous Week</button>
+                        <span id="calendar-range">No date range selected</span>
+                        <button id="next-week-btn">Next Week &raquo;</button>
+                    </div>
+                </div>
+                
+                <div id="calendar-grid" class="calendar-grid">
+                    <p>Select a start date and load the calendar to view scheduled recipes.</p>
+                </div>
+            </div>
+            
+            <!-- Message Area -->
+            <div id="message-area" class="message"></div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 Culinary Logic Puzzle - Recipe Tree Admin</p>
+        </footer>
+    </div>
+    
+    <script src="js/admin-tree.js"></script>
+    <script src="js/admin-calendar.js"></script>
+    <script>
+        // Initialize calendar when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if Calendar is available
+            if (window.Calendar) {
+                window.Calendar.init();
+            }
+        });
+    </script>
+</body>
+</html> 
