@@ -1,0 +1,1018 @@
+/**
+ * Standalone Recipe Playtest System
+ * 
+ * A simplified, self-contained version of the game that:
+ * - Has its own Supabase connection logic
+ * - Implements core game mechanics independently
+ * - Won't break when main game files are updated
+ * - Focuses on reliability over feature completeness
+ */
+
+// ===== Configuration =====
+const CONFIG = {
+    // Copy these from your environment or config.js
+    // This way updates to config.js won't affect this standalone version
+    SUPABASE_URL: 'https://ovrvtfjejmhrflybslwi.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk',
+    
+    // Game configuration
+    VESSEL_COLORS: {
+        base: '#FFFFFF',
+        partial: '#FFD700',
+        complete: '#778F5D',
+        hint: '#FF5252'
+    },
+    
+    // Timing
+    COMBINATION_DELAY: 500 // ms
+};
+
+// ===== Global State =====
+const gameState = {
+    // Recipe data
+    recipes: [],
+    currentRecipe: null,
+    
+    // Game state
+    vessels: [],
+    moves: 0,
+    startTime: null,
+    timerInterval: null,
+    
+    // UI state
+    currentScreen: 'selector',
+    draggedVessel: null,
+    
+    // Tracking
+    usedCombinations: new Set(),
+    completedSteps: []
+};
+
+// ===== Supabase Connection =====
+let supabase;
+
+function initializeSupabase() {
+    try {
+        supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        console.log('✅ Supabase initialized');
+    } catch (error) {
+        console.error('❌ Failed to initialize Supabase:', error);
+        showError('Failed to connect to database. Please check your connection.');
+    }
+}
+
+// ===== Recipe Loading =====
+async function loadRecipes() {
+    showLoading(true);
+    
+    try {
+        // First fetch all recipes (lightweight - just the recipe data)
+        const { data: recipes, error: recipesError } = await supabase
+            .from('recipes')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (recipesError) throw recipesError;
+
+        // Show recipes immediately with basic info
+        const basicRecipes = recipes.map(recipe => ({
+            ...recipe,
+            baseIngredients: [],
+            intermediateCombinations: [],
+            finalCombination: null,
+            easterEggs: [],
+            dayNumber: calculateDayNumber(recipe.date),
+            isLoading: true
+        }));
+        
+        gameState.recipes = basicRecipes;
+        displayRecipes(gameState.recipes);
+        showLoading(false);
+        
+        // Then load details in batches
+        const batchSize = 5;
+        for (let i = 0; i < recipes.length; i += batchSize) {
+            const batch = recipes.slice(i, i + batchSize);
+            
+            // Process batch in parallel
+            const batchPromises = batch.map(async (recipe) => {
+                try {
+                    // Fetch combinations
+                    const { data: combinations, error: combosError } = await supabase
+                        .from('combinations')
+                        .select('*')
+                        .eq('rec_id', recipe.rec_id);
+                    
+                    if (combosError) {
+                        console.error(`Error loading combinations for recipe ${recipe.rec_id}:`, combosError);
+                        return null;
+                    }
+                    
+                    // Fetch ingredients
+                    const comboIds = combinations.map(c => c.combo_id);
+                    const { data: ingredients, error: ingredientsError } = await supabase
+                        .from('ingredients')
+                        .select('*')
+                        .in('combo_id', comboIds);
+                    
+                    if (ingredientsError) {
+                        console.error(`Error loading ingredients for recipe ${recipe.rec_id}:`, ingredientsError);
+                        return null;
+                    }
+                    
+                    // Fetch easter eggs
+                    const easterEggs = await fetchEasterEggs(recipe.rec_id);
+                    
+                    // Process the recipe data
+                    return processRecipeData(recipe, combinations, ingredients, easterEggs);
+                } catch (error) {
+                    console.error(`Error processing recipe ${recipe.rec_id}:`, error);
+                    return null;
+                }
+            });
+            
+            // Wait for batch to complete
+            const processedBatch = await Promise.all(batchPromises);
+            
+            // Update recipes with processed data
+            processedBatch.forEach((processedRecipe, index) => {
+                if (processedRecipe) {
+                    const recipeIndex = gameState.recipes.findIndex(r => r.rec_id === batch[index].rec_id);
+                    if (recipeIndex !== -1) {
+                        gameState.recipes[recipeIndex] = processedRecipe;
+                    }
+                }
+            });
+            
+            // Update display for this batch
+            displayRecipes(gameState.recipes);
+        }
+        
+        console.log(`✅ Loaded ${gameState.recipes.filter(r => !r.isLoading).length} complete recipes`);
+    } catch (error) {
+        console.error('❌ Failed to load recipes:', error);
+        showError('Failed to load recipes. Please try again.');
+    }
+}
+
+// Fetch easter eggs for a recipe
+async function fetchEasterEggs(recipeId) {
+    try {
+        // Query the eastereggs table
+        const { data: easterEggs, error } = await supabase
+            .from('eastereggs')
+            .select('*')
+            .eq('rec_id', recipeId);
+        
+        if (error) {
+            console.error("Easter eggs error:", error);
+            return [];
+        }
+        
+        if (!easterEggs || easterEggs.length === 0) {
+            return [];
+        }
+        
+        // Get ingredient IDs
+        const ingredientIds = [];
+        easterEggs.forEach(egg => {
+            if (egg.ing_id_1) ingredientIds.push(egg.ing_id_1);
+            if (egg.ing_id_2) ingredientIds.push(egg.ing_id_2);
+        });
+        
+        // Fetch ingredient names
+        if (ingredientIds.length > 0) {
+            const { data: ingredientData, error: ingredientError } = await supabase
+                .from('ingredients')
+                .select('ing_id, name')
+                .in('ing_id', ingredientIds);
+            
+            if (!ingredientError && ingredientData) {
+                // Create map of ing_id to name
+                const ingredientMap = {};
+                ingredientData.forEach(ing => {
+                    ingredientMap[ing.ing_id] = ing.name;
+                });
+                
+                // Format easter eggs with ingredient names
+                return easterEggs.map(egg => {
+                    const required = [];
+                    if (egg.ing_id_1 && ingredientMap[egg.ing_id_1]) {
+                        required.push(ingredientMap[egg.ing_id_1]);
+                    }
+                    if (egg.ing_id_2 && ingredientMap[egg.ing_id_2]) {
+                        required.push(ingredientMap[egg.ing_id_2]);
+                    }
+                    
+                    return {
+                        id: egg.egg_id,
+                        name: egg.name || "Secret Combination",
+                        required: required
+                    };
+                });
+            }
+        }
+        
+        return [];
+    } catch (error) {
+        console.error('Error fetching easter eggs:', error);
+        return [];
+    }
+}
+
+// Process recipe data into a consistent format
+function processRecipeData(recipe, combinations, ingredients, easterEggs = []) {
+    try {
+        // Find the final combination
+        const finalCombo = combinations.find(combo => combo.is_final === true);
+        
+        if (!finalCombo) {
+            console.warn(`No final combination found for recipe ${recipe.rec_id}, skipping...`);
+            return null;
+        }
+        
+        // Find intermediate combinations
+        const intermediateCombos = combinations.filter(combo => combo.is_final === false);
+        
+        // Get all base ingredients - preserve duplicates!
+        const baseIngredients = ingredients
+            .filter(ing => ing.is_base === true)
+            .map(ing => ing.name);
+        
+        // Group ingredients by combination
+        const ingredientsByCombo = {};
+        ingredients.forEach(ing => {
+            if (!ingredientsByCombo[ing.combo_id]) {
+                ingredientsByCombo[ing.combo_id] = [];
+            }
+            ingredientsByCombo[ing.combo_id].push(ing.name);
+        });
+        
+        // Format intermediate combinations
+        const intermediateCombinations = intermediateCombos.map(combo => {
+            const comboIngredients = ingredientsByCombo[combo.combo_id] || [];
+            return {
+                name: combo.name,
+                required: comboIngredients,
+                verb: combo.verb || "mix"
+            };
+        });
+        
+        // Format final combination
+        const finalIngredients = ingredientsByCombo[finalCombo.combo_id] || [];
+        const finalCombination = {
+            name: finalCombo.name,
+            required: intermediateCombinations.map(c => c.name),
+            verb: finalCombo.verb || "create"
+        };
+        
+        return {
+            ...recipe,
+            baseIngredients,
+            intermediateCombinations,
+            finalCombination,
+            easterEggs: easterEggs || [],
+            dayNumber: calculateDayNumber(recipe.date)
+        };
+    } catch (error) {
+        console.error('Error processing recipe data:', error);
+        return null;
+    }
+}
+
+// Calculate day number from date
+function calculateDayNumber(dateStr) {
+    const startDate = new Date('2025-03-10');
+    const recipeDate = new Date(dateStr);
+    const diffTime = Math.abs(recipeDate - startDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+}
+
+// ===== Recipe Display =====
+function displayRecipes(recipes) {
+    const listElement = document.getElementById('recipe-list');
+    listElement.innerHTML = '';
+    
+    recipes.forEach(recipe => {
+        const recipeElement = createRecipeElement(recipe);
+        listElement.appendChild(recipeElement);
+    });
+}
+
+function createRecipeElement(recipe) {
+    const div = document.createElement('div');
+    div.className = 'recipe-item';
+    
+    if (recipe.isLoading) {
+        div.innerHTML = `
+            <div class="recipe-header">
+                <h3>${recipe.name || recipe.recipe_name || 'Loading...'}</h3>
+                <span class="recipe-date">Day ${recipe.dayNumber} - ${formatDate(recipe.date)}</span>
+            </div>
+            <div class="recipe-preview">
+                <span style="color: #999;">Loading recipe details...</span>
+            </div>
+        `;
+        div.style.opacity = '0.7';
+    } else {
+        div.innerHTML = `
+            <div class="recipe-header">
+                <h3>${recipe.name || recipe.recipe_name || 'Unnamed Recipe'}</h3>
+                <span class="recipe-date">Day ${recipe.dayNumber} - ${formatDate(recipe.date)}</span>
+            </div>
+            <div class="recipe-preview">
+                ${recipe.baseIngredients.length} ingredients → 
+                ${recipe.intermediateCombinations.length} combinations → 
+                ${recipe.finalCombination?.name || '???'}
+            </div>
+        `;
+    }
+    
+    div.addEventListener('click', () => {
+        if (!recipe.isLoading) {
+            selectRecipe(recipe);
+        }
+    });
+    
+    return div;
+}
+
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
+
+// ===== Recipe Selection =====
+function selectRecipe(recipe) {
+    gameState.currentRecipe = recipe;
+    startGame();
+}
+
+// ===== Game Logic =====
+function startGame() {
+    if (!gameState.currentRecipe) return;
+    
+    // Reset game state
+    gameState.vessels = [];
+    gameState.moves = 0;
+    gameState.startTime = Date.now();
+    gameState.usedCombinations.clear();
+    gameState.completedSteps = [];
+    
+    // Update UI
+    document.getElementById('recipe-name').textContent = gameState.currentRecipe.name || gameState.currentRecipe.recipe_name || 'Recipe';
+    document.getElementById('recipe-date').textContent = `Day ${gameState.currentRecipe.dayNumber}`;
+    document.getElementById('moves').textContent = '0';
+    
+    // Clear previous combinations list
+    document.getElementById('combinations-list').innerHTML = '';
+    
+    // Create initial vessels
+    createInitialVessels();
+    
+    // Switch screens
+    showScreen('game');
+    
+    // Start timer
+    startTimer();
+    
+    console.log('🎮 Game started:', gameState.currentRecipe.name || gameState.currentRecipe.recipe_name || 'Recipe');
+    console.log('Recipe structure:', {
+        baseIngredients: gameState.currentRecipe.baseIngredients,
+        intermediateCombinations: gameState.currentRecipe.intermediateCombinations,
+        finalCombination: gameState.currentRecipe.finalCombination,
+        easterEggs: gameState.currentRecipe.easterEggs
+    });
+    
+    // Display easter eggs if any
+    displayEasterEggs();
+}
+
+function displayEasterEggs() {
+    const recipe = gameState.currentRecipe;
+    const easterEggSection = document.getElementById('easter-egg-section');
+    const easterEggHint = document.getElementById('easter-egg-hint');
+    
+    if (recipe.easterEggs && recipe.easterEggs.length > 0) {
+        easterEggSection.classList.remove('hidden');
+        
+        const hints = recipe.easterEggs.map(egg => {
+            if (egg.required && egg.required.length === 2) {
+                return `<span class="easter-egg-recipe">${egg.required[0]} + ${egg.required[1]} = ${egg.name}</span>`;
+            }
+            return '';
+        }).filter(h => h).join('');
+        
+        easterEggHint.innerHTML = hints || 'Secret combinations available!';
+    } else {
+        easterEggSection.classList.add('hidden');
+    }
+}
+
+function createInitialVessels() {
+    const ingredientArea = document.getElementById('ingredient-area');
+    ingredientArea.innerHTML = '';
+    
+    // Create vessels for base ingredients
+    gameState.currentRecipe.baseIngredients.forEach((ingredient, index) => {
+        const vessel = createVessel({
+            id: `vessel-${Date.now()}-${index}`,
+            type: 'base',
+            contents: [ingredient],
+            name: ingredient,
+            x: 0,
+            y: 0
+        });
+        
+        gameState.vessels.push(vessel);
+        ingredientArea.appendChild(vessel.element);
+    });
+    
+    // Arrange vessels in a grid
+    arrangeVessels();
+}
+
+function createVessel(data) {
+    const vessel = {
+        ...data,
+        element: document.createElement('div')
+    };
+    
+    vessel.element.className = `vessel vessel-${data.type}`;
+    vessel.element.id = data.id;
+    vessel.element.innerHTML = `
+        <div class="vessel-content">
+            <span class="vessel-name">${data.name}</span>
+        </div>
+    `;
+    
+    // Set initial position style
+    vessel.element.style.position = 'absolute';
+    
+    // Make vessel draggable
+    vessel.element.draggable = true;
+    vessel.element.addEventListener('dragstart', (e) => handleDragStart(e, vessel));
+    vessel.element.addEventListener('dragend', handleDragEnd);
+    vessel.element.addEventListener('dragover', handleDragOver);
+    vessel.element.addEventListener('drop', (e) => handleDrop(e, vessel));
+    
+    // Touch support
+    vessel.element.addEventListener('touchstart', (e) => handleTouchStart(e, vessel), { passive: false });
+    vessel.element.addEventListener('touchmove', handleTouchMove, { passive: false });
+    vessel.element.addEventListener('touchend', handleTouchEnd, { passive: false });
+    
+    return vessel;
+}
+
+function arrangeVessels() {
+    // Small delay to ensure DOM is ready
+    setTimeout(() => {
+        const container = document.getElementById('ingredient-area');
+        const vessels = container.querySelectorAll('.vessel');
+        const containerWidth = container.offsetWidth;
+        const vesselWidth = 120;
+        const vesselHeight = 80;
+        const padding = 20;
+        const vesselsPerRow = Math.max(1, Math.floor((containerWidth - padding) / (vesselWidth + padding)));
+        
+        vessels.forEach((vessel, index) => {
+            const row = Math.floor(index / vesselsPerRow);
+            const col = index % vesselsPerRow;
+            
+            vessel.style.position = 'absolute';
+            vessel.style.left = `${col * (vesselWidth + padding) + padding}px`;
+            vessel.style.top = `${row * (vesselHeight + padding) + padding}px`;
+            vessel.style.width = `${vesselWidth}px`;
+            vessel.style.height = `${vesselHeight}px`;
+        });
+        
+        // Update container height to fit all vessels
+        const rows = Math.ceil(vessels.length / vesselsPerRow);
+        const minHeight = rows * (vesselHeight + padding) + padding;
+        container.style.minHeight = `${minHeight}px`;
+    }, 100);
+}
+
+// ===== Drag and Drop =====
+function handleDragStart(e, vessel) {
+    gameState.draggedVessel = vessel;
+    e.dataTransfer.effectAllowed = 'move';
+    e.target.classList.add('dragging');
+}
+
+function handleDragEnd(e) {
+    e.target.classList.remove('dragging');
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+}
+
+function handleDrop(e, targetVessel) {
+    e.preventDefault();
+    
+    if (gameState.draggedVessel && gameState.draggedVessel.id !== targetVessel.id) {
+        attemptCombination(gameState.draggedVessel, targetVessel);
+    }
+    
+    gameState.draggedVessel = null;
+}
+
+// ===== Touch Support =====
+let touchedVessel = null;
+let touchClone = null;
+
+function handleTouchStart(e, vessel) {
+    touchedVessel = vessel;
+    const touch = e.touches[0];
+    
+    // Create a visual clone for dragging
+    touchClone = vessel.element.cloneNode(true);
+    touchClone.classList.add('touch-clone');
+    touchClone.style.position = 'fixed';
+    touchClone.style.left = `${touch.clientX - 60}px`;
+    touchClone.style.top = `${touch.clientY - 40}px`;
+    touchClone.style.pointerEvents = 'none';
+    touchClone.style.zIndex = '1000';
+    document.body.appendChild(touchClone);
+    
+    vessel.element.classList.add('dragging');
+}
+
+function handleTouchMove(e) {
+    if (!touchClone) return;
+    
+    e.preventDefault();
+    const touch = e.touches[0];
+    
+    touchClone.style.left = `${touch.clientX - 60}px`;
+    touchClone.style.top = `${touch.clientY - 40}px`;
+}
+
+function handleTouchEnd(e) {
+    if (!touchedVessel || !touchClone) return;
+    
+    const touch = e.changedTouches[0];
+    
+    // Remove clone
+    touchClone.remove();
+    touchClone = null;
+    
+    // Find element under touch point
+    const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetVessel = elementBelow?.closest('.vessel');
+    
+    if (targetVessel && targetVessel.id !== touchedVessel.element.id) {
+        const target = gameState.vessels.find(v => v.element.id === targetVessel.id);
+        if (target) {
+            attemptCombination(touchedVessel, target);
+        }
+    }
+    
+    touchedVessel.element.classList.remove('dragging');
+    touchedVessel = null;
+}
+
+// ===== Combination Logic =====
+function attemptCombination(vessel1, vessel2) {
+    console.log('Attempting combination:', vessel1.contents, '+', vessel2.contents);
+    
+    // Increment move counter
+    gameState.moves++;
+    document.getElementById('moves').textContent = gameState.moves;
+    
+    // Combine all contents
+    const allContents = [...vessel1.contents, ...vessel2.contents].sort();
+    console.log('Combined contents:', allContents);
+    
+    // Check for valid combinations
+    const result = checkCombination(allContents);
+    
+    if (result) {
+        console.log('Valid combination found:', result);
+        // Valid combination found
+        performCombination(vessel1, vessel2, result);
+    } else {
+        console.log('Invalid combination');
+        // Invalid combination - shake vessels
+        shakeVessel(vessel1.element);
+        shakeVessel(vessel2.element);
+    }
+}
+
+function checkCombination(contents) {
+    const recipe = gameState.currentRecipe;
+    
+    // First check easter eggs (they take priority)
+    if (recipe.easterEggs) {
+        for (const egg of recipe.easterEggs) {
+            if (egg.required && arraysEqual(contents, egg.required.sort())) {
+                return {
+                    type: 'easter',
+                    name: egg.name,
+                    isComplete: true
+                };
+            }
+        }
+    }
+    
+    // Then check if this matches the final combination
+    if (recipe.finalCombination) {
+        // Final combination uses intermediate combination names
+        if (arraysEqual(contents, recipe.finalCombination.required.sort())) {
+            return {
+                type: 'final',
+                name: recipe.finalCombination.name,
+                isComplete: true
+            };
+        }
+    }
+    
+    // Then check intermediate combinations
+    for (const combo of recipe.intermediateCombinations) {
+        if (arraysEqual(contents, combo.required.sort())) {
+            return {
+                type: 'intermediate',
+                name: combo.name,
+                isComplete: true
+            };
+        }
+        
+        // Check partial match
+        if (isPartialMatch(contents, combo.required)) {
+            return {
+                type: 'intermediate',
+                name: `Partial ${combo.name}`,
+                isComplete: false,
+                targetCombo: combo
+            };
+        }
+    }
+    
+    return null;
+}
+
+function arraysEqual(a, b) {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+}
+
+function isPartialMatch(contents, required) {
+    // Check if contents are a subset of required
+    return contents.length < required.length && 
+           contents.every(item => required.includes(item));
+}
+
+function performCombination(vessel1, vessel2, result) {
+    // Determine the contents for the new vessel
+    let newContents;
+    let vesselType;
+    
+    if (result.type === 'easter') {
+        // Easter egg - special handling
+        newContents = [result.name];
+        vesselType = 'easter';
+    } else if (result.type === 'final') {
+        // Final combination doesn't need contents
+        newContents = [result.name];
+        vesselType = 'complete';
+    } else if (result.isComplete) {
+        // Complete intermediate combination - the name becomes the content
+        newContents = [result.name];
+        vesselType = 'complete';
+    } else {
+        // Partial combination - keep individual ingredients
+        newContents = [...vessel1.contents, ...vessel2.contents];
+        vesselType = 'partial';
+    }
+    
+    // Create new vessel
+    const newVessel = createVessel({
+        id: `vessel-${Date.now()}`,
+        type: vesselType,
+        contents: newContents,
+        name: result.name,
+        x: vessel1.x,
+        y: vessel1.y
+    });
+    
+    // Add to game state
+    gameState.vessels.push(newVessel);
+    
+    // Remove old vessels
+    removeVessel(vessel1);
+    removeVessel(vessel2);
+    
+    // Add new vessel to appropriate area
+    if (result.type === 'final') {
+        // Game won!
+        handleWin(result);
+    } else {
+        document.getElementById('ingredient-area').appendChild(newVessel.element);
+        arrangeVessels();
+        
+        // Update combination list
+        updateCombinationsList(result);
+        
+        // Check for autocomplete condition (but not for easter eggs)
+        if (result.type !== 'easter') {
+            checkForAutocomplete();
+        }
+        
+        // If it's an easter egg, split it back after a delay
+        if (result.type === 'easter') {
+            setTimeout(() => {
+                splitEasterEgg(newVessel, vessel1.contents, vessel2.contents);
+            }, 2000); // Show easter egg for 2 seconds
+        }
+    }
+    
+    // Animate
+    newVessel.element.classList.add('vessel-appear');
+    setTimeout(() => {
+        newVessel.element.classList.remove('vessel-appear');
+    }, 500);
+}
+
+function splitEasterEgg(easterVessel, contents1, contents2) {
+    // Remove the easter egg vessel
+    removeVessel(easterVessel);
+    
+    // Recreate the original vessels
+    const vessel1 = createVessel({
+        id: `vessel-${Date.now()}-1`,
+        type: 'base',
+        contents: contents1,
+        name: contents1[0],
+        x: 0,
+        y: 0
+    });
+    
+    const vessel2 = createVessel({
+        id: `vessel-${Date.now()}-2`,
+        type: 'base',
+        contents: contents2,
+        name: contents2[0],
+        x: 0,
+        y: 0
+    });
+    
+    // Add them back to the game
+    gameState.vessels.push(vessel1);
+    gameState.vessels.push(vessel2);
+    
+    const ingredientArea = document.getElementById('ingredient-area');
+    ingredientArea.appendChild(vessel1.element);
+    ingredientArea.appendChild(vessel2.element);
+    
+    // Rearrange vessels
+    arrangeVessels();
+    
+    // Add animation
+    vessel1.element.classList.add('vessel-appear');
+    vessel2.element.classList.add('vessel-appear');
+    setTimeout(() => {
+        vessel1.element.classList.remove('vessel-appear');
+        vessel2.element.classList.remove('vessel-appear');
+    }, 500);
+}
+
+function checkForAutocomplete() {
+    const recipe = gameState.currentRecipe;
+    const currentVesselContents = gameState.vessels.map(v => v.contents).flat();
+    
+    // Check if we have exactly the components needed for the final combination
+    const requiredForFinal = recipe.finalCombination.required.sort();
+    const availableIntermediates = currentVesselContents.filter(c => 
+        recipe.intermediateCombinations.some(ic => ic.name === c)
+    ).sort();
+    
+    if (arraysEqual(requiredForFinal, availableIntermediates)) {
+        console.log('🎉 Autocomplete condition met!');
+        showAutocompleteNotification(requiredForFinal);
+        
+        // Auto-combine after a delay
+        setTimeout(() => {
+            performAutocomplete();
+        }, 3000);
+    }
+}
+
+function showAutocompleteNotification(vessels) {
+    const notification = document.getElementById('autocomplete-notification');
+    const vesselsList = document.getElementById('autocomplete-vessels');
+    
+    vesselsList.innerHTML = vessels.map(v => 
+        `<div class="autocomplete-vessel">${v}</div>`
+    ).join('');
+    
+    notification.classList.remove('hidden');
+    
+    // Hide after 2.5 seconds
+    setTimeout(() => {
+        notification.classList.add('hidden');
+    }, 2500);
+}
+
+function performAutocomplete() {
+    const recipe = gameState.currentRecipe;
+    const finalVessels = gameState.vessels.filter(v => 
+        recipe.finalCombination.required.includes(v.name)
+    );
+    
+    if (finalVessels.length === recipe.finalCombination.required.length) {
+        // Simulate combining all final vessels
+        const result = {
+            type: 'final',
+            name: recipe.finalCombination.name,
+            isComplete: true
+        };
+        
+        // Create final vessel at center
+        const centerX = document.getElementById('ingredient-area').offsetWidth / 2;
+        const centerY = document.getElementById('ingredient-area').offsetHeight / 2;
+        
+        const finalVessel = createVessel({
+            id: `vessel-${Date.now()}`,
+            type: 'complete',
+            contents: [result.name],
+            name: result.name,
+            x: centerX,
+            y: centerY
+        });
+        
+        // Remove all component vessels
+        finalVessels.forEach(v => removeVessel(v));
+        
+        // Trigger win
+        handleWin(result);
+    }
+}
+
+function removeVessel(vessel) {
+    const index = gameState.vessels.indexOf(vessel);
+    if (index > -1) {
+        gameState.vessels.splice(index, 1);
+    }
+    vessel.element.remove();
+}
+
+function shakeVessel(element) {
+    element.classList.add('shake');
+    setTimeout(() => {
+        element.classList.remove('shake');
+    }, 500);
+}
+
+function updateCombinationsList(result) {
+    const list = document.getElementById('combinations-list');
+    const item = document.createElement('div');
+    item.className = 'combination-item';
+    item.innerHTML = `✓ ${result.name}`;
+    list.appendChild(item);
+}
+
+// ===== Win Handling =====
+function handleWin(result) {
+    // Stop timer
+    clearInterval(gameState.timerInterval);
+    
+    // Calculate time
+    const totalTime = Math.floor((Date.now() - gameState.startTime) / 1000);
+    const minutes = Math.floor(totalTime / 60);
+    const seconds = totalTime % 60;
+    
+    // Update win overlay
+    document.getElementById('final-dish').textContent = result.name;
+    document.getElementById('final-moves').textContent = gameState.moves;
+    document.getElementById('final-time').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    // Show win overlay
+    document.getElementById('win-overlay').classList.remove('hidden');
+    
+    console.log('🎉 Game won!', result.name);
+}
+
+// ===== Timer =====
+function startTimer() {
+    gameState.timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - gameState.startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('time').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+}
+
+// ===== Search Functionality =====
+function setupSearch() {
+    const searchInput = document.getElementById('recipe-search');
+    
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        
+        if (!query) {
+            displayRecipes(gameState.recipes);
+            return;
+        }
+        
+        const filtered = gameState.recipes.filter(recipe => {
+            const recipeName = (recipe.name || recipe.recipe_name || '').toLowerCase();
+            return recipeName.includes(query) ||
+                   recipe.date?.includes(query) ||
+                   recipe.dayNumber?.toString().includes(query) ||
+                   recipe.finalCombination?.name?.toLowerCase().includes(query);
+        });
+        
+        displayRecipes(filtered);
+    });
+}
+
+// ===== UI Helpers =====
+function showScreen(screenName) {
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.remove('active');
+    });
+    
+    document.getElementById(`${screenName}-screen`).classList.add('active');
+    gameState.currentScreen = screenName;
+}
+
+function showLoading(show) {
+    document.getElementById('loading-overlay').classList.toggle('hidden', !show);
+}
+
+function showError(message) {
+    document.getElementById('error-message').textContent = message;
+    document.getElementById('error-modal').classList.remove('hidden');
+}
+
+function hideError() {
+    document.getElementById('error-modal').classList.add('hidden');
+}
+
+// ===== Event Handlers =====
+function setupEventHandlers() {
+    // Random recipe button
+    document.getElementById('random-recipe').addEventListener('click', () => {
+        if (gameState.recipes.length > 0) {
+            const randomRecipe = gameState.recipes[Math.floor(Math.random() * gameState.recipes.length)];
+            selectRecipe(randomRecipe);
+        }
+    });
+    
+    // Back button
+    document.getElementById('back-button').addEventListener('click', () => {
+        clearInterval(gameState.timerInterval);
+        // Hide any notifications
+        document.getElementById('autocomplete-notification').classList.add('hidden');
+        document.getElementById('easter-egg-section').classList.add('hidden');
+        showScreen('selector');
+    });
+    
+    // Play again button
+    document.getElementById('play-again').addEventListener('click', () => {
+        document.getElementById('win-overlay').classList.add('hidden');
+        showScreen('selector');
+    });
+    
+    // Window resize
+    window.addEventListener('resize', () => {
+        if (gameState.currentScreen === 'game') {
+            arrangeVessels();
+        }
+    });
+}
+
+// ===== Initialization =====
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 Initializing Standalone Playtest System');
+    
+    // Initialize Supabase
+    initializeSupabase();
+    
+    // Set up UI
+    setupSearch();
+    setupEventHandlers();
+    
+    // Load recipes
+    loadRecipes();
+});
+
+// ===== Public API =====
+// Expose minimal API for debugging
+window.StandalonePlaytest = {
+    gameState,
+    reloadRecipes: loadRecipes,
+    getCurrentRecipe: () => gameState.currentRecipe,
+    getVessels: () => gameState.vessels
+};

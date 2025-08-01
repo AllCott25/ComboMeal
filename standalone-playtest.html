@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Standalone Recipe Playtest</title>
+    
+    <!-- Minimal external dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Our standalone CSS -->
+    <link rel="stylesheet" href="standalone-playtest.css">
+</head>
+<body>
+    <!-- Recipe Selector Screen -->
+    <div id="recipe-selector" class="screen active">
+        <div class="container">
+            <h1>Recipe Playtest</h1>
+            <p class="subtitle">Select a recipe to test</p>
+            
+            <div class="search-box">
+                <input type="text" id="recipe-search" placeholder="Search by name, date, or day number...">
+            </div>
+            
+            <div id="recipe-list" class="recipe-list">
+                <!-- Recipes will be loaded here -->
+            </div>
+            
+            <button id="random-recipe" class="button secondary">Random Recipe</button>
+        </div>
+    </div>
+    
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+        <div class="game-header">
+            <button id="back-button" class="button small">← Back to Recipes</button>
+            <div id="recipe-info">
+                <h2 id="recipe-name"></h2>
+                <p id="recipe-date"></p>
+            </div>
+        </div>
+        
+        <div id="game-container">
+            <div id="ingredient-area" class="ingredient-area">
+                <!-- Ingredients will be loaded here -->
+            </div>
+            
+            <div id="combination-area" class="combination-area">
+                <h3>Combinations</h3>
+                <div id="combinations-list"></div>
+            </div>
+            
+            <div id="status-bar">
+                <div id="move-counter">Moves: <span id="moves">0</span></div>
+                <div id="timer">Time: <span id="time">0:00</span></div>
+            </div>
+            
+            <!-- Easter Egg Display -->
+            <div id="easter-egg-section" class="easter-egg-section hidden">
+                <h3>🥚 Easter Egg Recipe</h3>
+                <div id="easter-egg-hint"></div>
+            </div>
+            
+            <!-- Autocomplete Notification -->
+            <div id="autocomplete-notification" class="autocomplete-notification hidden">
+                <div class="autocomplete-content">
+                    <h3>✨ Autocomplete Available!</h3>
+                    <p>You have all the components for the final dish. They will automatically combine!</p>
+                    <div id="autocomplete-vessels"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Win Screen Overlay -->
+        <div id="win-overlay" class="overlay hidden">
+            <div class="win-content">
+                <h1>🎉 Recipe Complete!</h1>
+                <p id="final-dish"></p>
+                <div class="stats">
+                    <p>Moves: <span id="final-moves"></span></p>
+                    <p>Time: <span id="final-time"></span></p>
+                </div>
+                <button id="play-again" class="button">Test Another Recipe</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="overlay hidden">
+        <div class="loader"></div>
+        <p>Loading recipe...</p>
+    </div>
+    
+    <!-- Error Modal -->
+    <div id="error-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Error</h2>
+            <p id="error-message"></p>
+            <button onclick="hideError()" class="button">OK</button>
+        </div>
+    </div>
+    
+    <!-- Our standalone JavaScript -->
+    <script src="standalone-playtest.js"></script>
+</body>
+</html>
