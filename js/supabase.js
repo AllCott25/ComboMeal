@@ -1,66 +1,21 @@
 // Supabase Integration for Culinary Logic Puzzle
 // This file handles fetching recipe data from Supabase
 
-// Initialize Supabase client
-// SECURITY: These should be loaded from environment variables, not hardcoded
-// The anon key is safe to expose as it only grants access based on Row Level Security policies
-const SUPABASE_URL = window.SUPABASE_URL || 'YOUR_SUPABASE_URL_HERE';
-const SUPABASE_KEY = window.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_HERE';
+// Get the supabase client that was initialized by supabase-config.js
+let supabase = window.supabaseClient || window.supabase;
 
-// Validate that credentials are properly configured
-if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
-  console.error('SECURITY WARNING: Supabase credentials not properly configured. Please set up environment variables.');
-}
-
-// Create a single supabase client for interacting with your database
-let supabase;
-
-// Function to initialize supabase client
-function initSupabaseClient() {
-  if (window.supabaseClient) {
-    // Use the pre-initialized client
-    supabase = window.supabaseClient;
-    return true;
-  } else if (window.supabase && window.supabase.createClient && typeof window.supabase.createClient === 'function') {
-    // Try to create it ourselves
-    try {
-      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      window.supabaseClient = supabase; // Make it available globally
-      return true;
-    } catch (error) {
-      console.error('Failed to create Supabase client:', error);
-      return false;
-    }
-  }
-  return false;
-}
-
-// Try to initialize immediately
-if (!initSupabaseClient()) {
-  console.warn('Supabase not ready yet, waiting for initialization...');
+// If not available yet, wait for it
+if (!supabase || typeof supabase.from !== 'function') {
+  console.warn('Supabase client not ready, waiting for initialization...');
   
-  // Wait for the supabaseReady event
+  // Listen for the ready event
   window.addEventListener('supabaseReady', function() {
-    if (initSupabaseClient()) {
-      console.log('Supabase client initialized after ready event');
-    }
+    supabase = window.supabaseClient || window.supabase;
+    console.log('Supabase client ready in supabase.js');
   });
-  
-  // Create a mock object to prevent immediate errors
-  supabase = {
-    from: () => ({
-      select: () => Promise.reject(new Error('Supabase not initialized yet')),
-      insert: () => Promise.reject(new Error('Supabase not initialized yet')),
-      update: () => Promise.reject(new Error('Supabase not initialized yet')),
-      delete: () => Promise.reject(new Error('Supabase not initialized yet'))
-    }),
-    auth: {
-      getSession: () => Promise.reject(new Error('Supabase not initialized yet')),
-      signIn: () => Promise.reject(new Error('Supabase not initialized yet')),
-      signOut: () => Promise.reject(new Error('Supabase not initialized yet'))
-    }
-  };
 }
+
+
 
 // Function to get the current date in EST/EDT timezone
 function getCurrentDateEST() {
