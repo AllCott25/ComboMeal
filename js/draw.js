@@ -2512,6 +2512,11 @@ function drawWallpaperAnimation() {
     isLoadingRecipe = false;
     loadingError = false;
     
+    // Reset rim decal assignments
+    if (window.rimDecalSystem) {
+      rimDecalSystem.reset();
+    }
+    
     // Force a delay before reinitializing
     setTimeout(() => {
       // Reinitialize
