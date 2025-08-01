@@ -1,19 +1,21 @@
 // Supabase Integration for Culinary Logic Puzzle
 // This file handles fetching recipe data from Supabase
 
-// Initialize Supabase client
-// SECURITY: These should be loaded from environment variables, not hardcoded
-// The anon key is safe to expose as it only grants access based on Row Level Security policies
-const SUPABASE_URL = window.SUPABASE_URL || 'YOUR_SUPABASE_URL_HERE';
-const SUPABASE_KEY = window.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_HERE';
+// Get the supabase client that was initialized by supabase-config.js
+let supabase = window.supabaseClient || window.supabase;
 
-// Validate that credentials are properly configured
-if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_KEY === 'YOUR_SUPABASE_ANON_KEY_HERE') {
-  console.error('SECURITY WARNING: Supabase credentials not properly configured. Please set up environment variables.');
+// If not available yet, wait for it
+if (!supabase || typeof supabase.from !== 'function') {
+  console.warn('Supabase client not ready, waiting for initialization...');
+  
+  // Listen for the ready event
+  window.addEventListener('supabaseReady', function() {
+    supabase = window.supabaseClient || window.supabase;
+    console.log('Supabase client ready in supabase.js');
+  });
 }
 
-// Create a single supabase client for interacting with your database
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 
 // Function to get the current date in EST/EDT timezone
 function getCurrentDateEST() {
