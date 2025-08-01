@@ -13,7 +13,54 @@ if (SUPABASE_URL === 'YOUR_SUPABASE_URL_HERE' || SUPABASE_KEY === 'YOUR_SUPABASE
 }
 
 // Create a single supabase client for interacting with your database
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabase;
+
+// Function to initialize supabase client
+function initSupabaseClient() {
+  if (window.supabaseClient) {
+    // Use the pre-initialized client
+    supabase = window.supabaseClient;
+    return true;
+  } else if (window.supabase && window.supabase.createClient && typeof window.supabase.createClient === 'function') {
+    // Try to create it ourselves
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      window.supabaseClient = supabase; // Make it available globally
+      return true;
+    } catch (error) {
+      console.error('Failed to create Supabase client:', error);
+      return false;
+    }
+  }
+  return false;
+}
+
+// Try to initialize immediately
+if (!initSupabaseClient()) {
+  console.warn('Supabase not ready yet, waiting for initialization...');
+  
+  // Wait for the supabaseReady event
+  window.addEventListener('supabaseReady', function() {
+    if (initSupabaseClient()) {
+      console.log('Supabase client initialized after ready event');
+    }
+  });
+  
+  // Create a mock object to prevent immediate errors
+  supabase = {
+    from: () => ({
+      select: () => Promise.reject(new Error('Supabase not initialized yet')),
+      insert: () => Promise.reject(new Error('Supabase not initialized yet')),
+      update: () => Promise.reject(new Error('Supabase not initialized yet')),
+      delete: () => Promise.reject(new Error('Supabase not initialized yet'))
+    }),
+    auth: {
+      getSession: () => Promise.reject(new Error('Supabase not initialized yet')),
+      signIn: () => Promise.reject(new Error('Supabase not initialized yet')),
+      signOut: () => Promise.reject(new Error('Supabase not initialized yet'))
+    }
+  };
+}
 
 // Function to get the current date in EST/EDT timezone
 function getCurrentDateEST() {

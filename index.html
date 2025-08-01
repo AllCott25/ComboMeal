@@ -17,13 +17,6 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     
-    <!-- Supabase Configuration -->
-    <script>
-        // Set Supabase credentials as global variables
-        window.SUPABASE_URL = 'https://ovrvtfjejmhrflybslwi.supabase.co';
-        window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92cnZ0Zmplam1ocmZseWJzbHdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwNDkxMDgsImV4cCI6MjA1NjYyNTEwOH0.V5_pJUQN9Xhd-Ot4NABXzxSVHGtNYNFuLMWE1JDyjAk';
-    </script>
-    
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/style.css">
     
@@ -86,10 +79,12 @@
     
     <!-- Supabase Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- P5.js Library -->
-    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
     <!-- Configuration - loads environment-specific settings -->
     <script src="js/config.js"></script>
+    <!-- Initialize Supabase properly -->
+    <script src="js/supabase-init.js"></script>
+    <!-- P5.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
     <!-- Design System - must load before other game scripts -->
     <script src="js/design-system.js"></script>
     <!-- Our Supabase Integration -->
