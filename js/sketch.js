@@ -529,6 +529,15 @@ let intermediate_combinations = [
     // Initialize the touch system
     touchSystem.init(); // MOVED to interaction.js
     
+    // Initialize the rim decal system
+    if (window.rimDecalSystem) {
+      rimDecalSystem.init().then(() => {
+        console.log("✅ Rim Decal System initialized");
+      }).catch(err => {
+        console.error("❌ Failed to initialize Rim Decal System:", err);
+      });
+    }
+    
     // Explicitly assign p5.js mouse event handlers from interaction.js
     // window.mousePressed = mousePressed; // Causing: mousePressed is not defined
     // window.mouseDragged = mouseDragged;

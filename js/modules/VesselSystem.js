@@ -265,6 +265,27 @@
           // Draw vessel body with rounded corners matching basic vessel style
           rectMode(CENTER);
           
+          // First, draw the vessel fill (for rim decals to render on top of)
+          noStroke();
+          rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, 
+               topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+          
+          // Render rim decals if available
+          if (window.rimDecalSystem && window.rimDecalSystem.loadingComplete) {
+            // Temporarily restore transform for decal rendering
+            pop();
+            push();
+            translate(this.x, this.y);
+            window.rimDecalSystem.renderDecals(this);
+            pop();
+            push();
+            translate(this.x, this.y);
+            scale(this.bodyScale);
+          }
+          
+          // Now draw the three-layer outline
+          noFill();
+          
           // First, draw the outer thin black outline
           stroke(0);
           strokeWeight(outerBlackOutline); // Use thicker outer black line - APlasker
@@ -293,6 +314,27 @@
           
           // Draw vessel body with the three-layer outline - APlasker
           rectMode(CENTER);
+          
+          // First, draw the vessel fill (for rim decals to render on top of)
+          noStroke();
+          rect(0, -this.h * 0.1, this.w * 0.8, this.h * 0.6, 
+               topCornerRadius, topCornerRadius, bottomCornerRadius, bottomCornerRadius);
+          
+          // Render rim decals if available
+          if (window.rimDecalSystem && window.rimDecalSystem.loadingComplete) {
+            // Temporarily restore transform for decal rendering
+            pop();
+            push();
+            translate(this.x, this.y);
+            window.rimDecalSystem.renderDecals(this);
+            pop();
+            push();
+            translate(this.x, this.y);
+            scale(this.bodyScale);
+          }
+          
+          // Now draw the three-layer outline
+          noFill();
           
           // First, draw the outer thin black outline
           stroke(0);

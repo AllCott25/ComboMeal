@@ -94,6 +94,11 @@ function combineVessels(v1, v2, mouseX = null, mouseY = null) {
             new_v.verb = recipe.verb || "Mix";
             new_v.verbDisplayTime = 120;
             
+            // Store ingredients for rim decal system
+            if (window.rimDecalSystem) {
+                rimDecalSystem.storeVesselIngredients(new_v, items);
+            }
+            
             // Add to completedGreenVessels
             if (!completedGreenVessels.some(vessel => vessel.name === recipe.name)) {
                 completedGreenVessels.push({name: recipe.name});
@@ -2272,6 +2277,11 @@ function combineVessels(v1, v2, mouseX = null, mouseY = null) {
             
             new_v.verb = recipe.verb || "Mix";
             new_v.verbDisplayTime = 120;
+            
+            // Store ingredients for rim decal system
+            if (window.rimDecalSystem) {
+                rimDecalSystem.storeVesselIngredients(new_v, items);
+            }
             
             // Add to completedGreenVessels
             if (!completedGreenVessels.some(vessel => vessel.name === recipe.name)) {
